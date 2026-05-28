@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Serverless Battleships</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/instascan/build/instascan.min.js"></script>
+    <style>
+        body { font-family: -apple-system, sans-serif; background: #121212; color: #fff; text-align: center; margin: 0; padding: 15px; }
+        .hidden { display: none; }
+        h1 { font-size: 1.5rem; margin-bottom: 5px; }
+        .status { background: #222; padding: 10px; border-radius: 8px; margin: 10px 0; }
+        .qr-area, .scanner-area { background: #fff; padding: 10px; border-radius: 8px; max-width: 250px; margin: 15px auto; color: #000; }
+        video { width: 100%; border-radius: 8px; }
+        .grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; max-width: 350px; aspect-ratio: 1; margin: 15px auto; }
+        .cell { background: #333; aspect-ratio: 1; border-radius: 2px; }
+        .cell.target { background: #ff4444; } /* Ship location (for fleet display) */
+        .cell.hit { background: red; }
+        .cell.miss { background: blue; }
+        button { background: #3498db; color: white; border: none; padding: 12px 24px; border-radius: 5px; cursor: pointer; font-size: 1rem; margin: 5px; }
+    </style>
+</head>
+<body>
+
+    <h1>WebRTC Battleships</h1>
+    <div id="status-box" class="status">Initialising...</div>
+
+    <div id="connection-flow">
+        <button id="btn-host">Step 1: Host Game</button>
+        <button id="btn-join">Step 1: Join Game</button>
+        
+        <div id="host-ui" class="hidden">
+            <p>Phone A: Display this QR</p>
+            <div id="qrcode" class="qr-area"></div>
+            <p>Wait for Phone B to show you the 'Answer' token.</p>
+            <input type="text" id="joiner-token-input" placeholder="Paste Phone B token here">
+            <button id="btn-host-finalise">Step 3: Connect</button>
+        </div>
+
+        <div id="join-ui" class="hidden">
+            <p>Phone B: Scan Phone A</p>
+            <video id="scanner" class="scanner-area"></video>
+            <div id="joiner-answer-section" class="hidden">
+                <p>Phone B: Connection Token Created!</p>
+                <p><strong>Copy this and paste it on Phone A:</strong></p>
+                <textarea id="joiner-answer-text" rows="4" style="width: 80%;"></textarea>
+            </div>
+        </div>
+    </div>
+
+    <div id="game-ui" class="hidden">
+        <h3>Game Active!</h3>
+        <p>Turn: <span id="turn-display">Waiting...</span></p>
+        <div id="opponent-board" class="grid"></div>
+        <hr>
+        <h4>Your Fleet</h4>
+        <div id="your-board" class="grid"></div>
+    </div>
+
+    <script>
+        const statusBox = document.getElementById('status-box');
+        const turnDisplay = document.getElementById('turn-display');
+        let peer, conn;
+        let myRole, myTurn = false;
+        
+        // Simple Game State
+        const boardSize = 10;
+        let opponentBoardHits = Array(boardSize * boardSize).fill(0); // 0=water, 1=hit, 2=miss
+        let yourFleetLocations = Array(boardSize * boardSize).fill(0); // For demo, we just randomly fill ships
+
+        // 1. Initialise PeerJS
+        // 1. Initialise PeerJS
+function initPeer(id) {
+    // Leaving the options blank defaults cleanly to the official, active PeerJS Cloud Network
+    peer = new Peer();
+
+    peer.on('open', (id) => {
+        statusBox.innerText = `Connected! Your ID: ${id}`;
+        document.getElementById('connection-flow').classList.remove('hidden');
+        initHostFlow(id); // Prepare host option
+        initJoinFlow();   // Prepare join option
+    });
+
+    peer.on('error', (err) => {
+        console.error(err);
+        statusBox.innerText = `Network Error: ${err.type}`;
+    });
+}
+
+        // 2. HOST FLOW (Phone A)
+        function initHostFlow(hostId) {
+            document.getElementById('btn-host').addEventListener('click', () => {
+                myRole = 'host';
+                document.getElementById('host-ui').classList.remove('hidden');
+                document.getElementById('join-ui').classList.add('hidden');
+                statusBox.innerText = "Hosting. Waiting for Phone B scan.";
+                
+                // Generate QR of our ID for client to scan
+                new QRCode(document.getElementById("qrcode"), {
+                    text: hostId,
+                    width: 250, height: 250
+                });
+            });
+
+            peer.on('connection', (c) => {
+                setupConnection(c);
+                statusBox.innerText = "Phone B connected! Game ready.";
+            });
+        }
+
+        // 3. JOIN FLOW (Phone B)
+function initJoinFlow() {
+    document.getElementById('btn-join').addEventListener('click', () => {
+        myRole = 'client';
+        document.getElementById('join-ui').classList.remove('hidden');
+        document.getElementById('host-ui').classList.add('hidden');
+        statusBox.innerText = "Scanning... Point camera at Phone A.";
+
+        const scanner = new Instascan.Scanner({ video: document.getElementById('scanner'), mirror: false });
+        
+        scanner.addListener('scan', function (hostId) {
+            scanner.stop();
+            document.getElementById('scanner').classList.add('hidden');
+            connectToHost(hostId);
+        });
+
+        Instascan.Camera.getCameras().then(cameras => {
+            if (cameras.length > 0) {
+                // If the phone has multiple cameras, try to pick the back camera (usually index 1 or the last one)
+                let selectedCamera = cameras.find(cam => cam.name.toLowerCase().includes('back')) || cameras[0];
+                if (!selectedCamera && cameras.length > 1) {
+                    selectedCamera = cameras[1]; // Common fallback for secondary rear lenses
+                }
+                scanner.start(selectedCamera);
+            } else {
+                statusBox.innerText = "Error: No cameras found on this device.";
+            }
+        }).catch(err => {
+            console.error(err);
+            statusBox.innerText = "Camera access denied. Ensure page is loaded via HTTPS.";
+        });
+    });
+}
+
+        // 4. Client initiates connection
+        function connectToHost(hostId) {
+            statusBox.innerText = `Connecting to host: ${hostId}...`;
+            conn = peer.connect(hostId);
+            setupConnection(conn);
+        }
+
+        // 5. Shared connection setup & gameplay logic
+        function setupConnection(connection) {
+            conn = connection;
+            conn.on('open', () => {
+                // Connection achieved! Switch UI
+                document.getElementById('connection-flow').classList.add('hidden');
+                document.getElementById('game-ui').classList.remove('hidden');
+                statusBox.innerText = `P2P Connection Established!`;
+                
+                initialiseGame();
+            });
+
+            conn.on('data', (data) => {
+                // Receive a move from opponent
+                if (data.type === 'shot') {
+                    handleOpponentShot(data.coord);
+                } else if (data.type === 'result') {
+                    handleShotResult(data.coord, data.isHit);
+                }
+            });
+        }
+
+        // --- Basic Gameplay Architecture ---
+
+        function initialiseGame() {
+            // 1. Deciding Turn
+            if (myRole === 'host') {
+                myTurn = true;
+                turnDisplay.innerText = "Your Turn";
+            } else {
+                myTurn = false;
+                turnDisplay.innerText = "Opponent's Turn";
+            }
+
+            // 2. Setup Boards
+            // In a real game, you would let the user place ships.
+            // Here, we just put 5 random ship segments.
+            for (let i = 0; i < 5; i++) {
+                yourFleetLocations[Math.floor(Math.random() * 100)] = 1;
+            }
+
+            renderGrid('opponent-board', handleMyShot);
+            renderGrid('your-board', null); // Show fleet
+            updateBoardDisplays();
+        }
+
+        function renderGrid(containerId, clickHandler) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+            for (let i = 0; i < boardSize * boardSize; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.dataset.index = i;
+                if (clickHandler) cell.addEventListener('click', () => clickHandler(i));
+                container.appendChild(cell);
+            }
+        }
+
+        function updateBoardDisplays() {
+            // Update Opponent board (where we are firing)
+            const oppCells = document.querySelectorAll('#opponent-board .cell');
+            oppCells.forEach((cell, i) => {
+                cell.classList.remove('hit', 'miss');
+                if (opponentBoardHits[i] === 1) cell.classList.add('hit');
+                if (opponentBoardHits[i] === 2) cell.classList.add('miss');
+            });
+
+            // Update Your Fleet board (where opponent is firing at you)
+            const yourCells = document.querySelectorAll('#your-board .cell');
+            yourCells.forEach((cell, i) => {
+                cell.classList.remove('target');
+                if (yourFleetLocations[i] === 1) cell.classList.add('target');
+            });
+        }
+
+        // Actions
+        function handleMyShot(coord) {
+            if (!myTurn || opponentBoardHits[coord] !== 0) return; // Prevent double clicking or out-of-turn
+            
+            console.log(`Firing at ${coord}`);
+            conn.send({ type: 'shot', coord: coord }); // Send coordinate
+            myTurn = false;
+            turnDisplay.innerText = "Waiting for result...";
+        }
+
+        function handleOpponentShot(coord) {
+            // Opponent sent a shot coordinate
+            console.log(`Receiving shot at ${coord}`);
+            const isHit = yourFleetLocations[coord] === 1;
+            
+            // Reply with result
+            conn.send({ type: 'result', coord: coord, isHit: isHit });
+            
+            myTurn = true;
+            turnDisplay.innerText = "Your Turn";
+        }
+
+        function handleShotResult(coord, isHit) {
+            // Receiving confirmation of the shot WE fired
+            opponentBoardHits[coord] = isHit ? 1 : 2;
+            updateBoardDisplays();
+            turnDisplay.innerText = "Opponent's Turn";
+        }
+
+        // Run the setup
+        window.addEventListener('load', () => {
+            initPeer(); // No ID specified = random ID generated
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pool Scorer: Pro Elite</title>
+    <style>
+        :root {
+            --bg: #0a0a0a; --card: #161616; --input: #222; --text: #eee;
+            --accent: #2ecc71; --red: #e74c3c; --yellow: #f1c40f; --blue: #3498db;
+            --gold: #f1c40f; --overlay: rgba(0,0,0,0.95);
+        }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; justify-content: center; padding: 10px; }
+        #app { width: 100%; max-width: 420px; background: var(--card); padding: 20px; border-radius: 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); position: relative; overflow: hidden; min-height: 600px; }
+        .hidden { display: none !important; }
+
+        h2 { text-align: center; color: var(--accent); margin-bottom: 20px; text-transform: uppercase; letter-spacing: 2px; }
+        .setup-group { margin-bottom: 12px; }
+        label { display: block; font-size: 0.65rem; font-weight: 800; color: #666; text-transform: uppercase; margin-bottom: 4px; }
+        input, select { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid #333; background: var(--input); color: white; box-sizing: border-box; font-weight: bold; font-size: 0.9rem; }
+        
+        .btn { width: 100%; padding: 15px; border-radius: 12px; border: none; font-weight: 800; cursor: pointer; margin-top: 10px; text-transform: uppercase; }
+        .btn-main { background: var(--accent); color: white; }
+        .btn-sub { background: #333; color: #ccc; font-size: 0.8rem; }
+        
+        .player-entry { display: flex; gap: 5px; margin-bottom: 8px; }
+        
+        #choice-ui { display: none; gap: 10px; margin-bottom: 15px; background: #222; padding: 15px; border-radius: 15px; border: 2px solid var(--gold); }
+        .btn-choice { flex: 1; padding: 15px; font-size: 0.8rem; border-radius: 10px; border: none; font-weight: 900; cursor: pointer; color: white; text-transform: uppercase; }
+
+        .header { text-align: center; background: #222; padding: 15px; border-radius: 15px 15px 0 0; border-bottom: 3px solid var(--accent); position: relative; }
+        .timer-display { position: absolute; top: 12px; right: 15px; color: var(--gold); font-size: 1.4rem; font-weight: 900; font-family: monospace; }
+        
+        .scoreboard { display: flex; justify-content: space-between; background: #000; padding: 15px; border-radius: 0 0 15px 15px; margin-bottom: 15px; border: 1px solid #222; flex-direction: row; }
+        .score-big { font-size: 2.5rem; font-weight: 900; color: var(--accent); line-height: 1; margin: 5px 0; }
+        .pts-small { color: var(--blue); font-size: 0.8rem; font-weight: bold; }
+        .assign-tag { font-size: 0.6rem; font-weight: 900; margin-top: 5px; padding: 2px 8px; border-radius: 4px; display: inline-block; min-width: 50px; }
+
+        .life-heart { color: var(--red); font-size: 1.2rem; letter-spacing: 2px; }
+        .out { opacity: 0.3; text-decoration: line-through; }
+
+        .ball-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px; }
+        .ball { aspect-ratio: 1; border-radius: 50%; border: none; font-weight: 900; color: white; cursor: pointer; box-shadow: inset -4px -4px 10px rgba(0,0,0,0.5); font-size: 1.2rem; }
+        .ball-r { background: radial-gradient(circle at 30% 30%, #ff5e57, #c0392b); }
+        .ball-y { background: radial-gradient(circle at 30% 30%, #f1c40f, #d4ac0d); color: #000; }
+        .ball-b { background: #111; border: 1px solid #444; }
+        
+        .pot-row { display: flex; gap: 5px; padding: 12px; background: #000; border-radius: 10px; min-height: 20px; overflow-x: auto; margin-bottom: 15px; border: 1px solid #111; }
+        .mini { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
+        
+        .overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: var(--overlay); display: flex; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(5px); }
+        .modal { background: #1a1a1a; width: 85%; padding: 30px; border-radius: 20px; text-align: center; border: 1px solid #333; }
+
+        @keyframes pulse-red {
+            0% { background-color: var(--card); }
+            50% { background-color: #4c1d1d; }
+            100% { background-color: var(--card); }
+        }
+        .timer-warn { animation: pulse-red 1s infinite; }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <div id="setup-screen">
+        <h2>POOL SCORER</h2>
+        
+        <div class="setup-group">
+            <label>Game Mode</label>
+            <select id="game-mode-sel" onchange="toggleKillerUI()">
+                <option value="standard">Standard</option>
+                <option value="speed">Blitz (10s)</option>
+                <option value="killer">Killer (3 Lives)</option>
+            </select>
+        </div>
+
+        <div id="bo-group" class="setup-group">
+            <label>Best Of</label>
+            <input type="number" id="bo-in" value="3" min="1">
+        </div>
+
+        <div id="standard-players">
+            <div class="setup-group"><label>Player 1</label><input type="text" id="p1-in" value="Player 1"></div>
+            <div class="setup-group"><label>Player 2</label><input type="text" id="p2-in" value="Player 2"></div>
+        </div>
+
+        <div id="killer-players" class="hidden">
+            <label>Players</label>
+            <div id="player-list">
+                <div class="player-entry">
+                    <input type="text" class="p-name" value="Player 1">
+                </div>
+                <div class="player-entry">
+                    <input type="text" class="p-name" value="Player 2">
+                    <button class="btn-sub" onclick="this.parentElement.remove()" style="width:40px; margin:0">X</button>
+                </div>
+            </div>
+            <button class="btn btn-sub" onclick="addPlayerInput()">+ ADD PLAYER</button>
+        </div>
+
+        <button class="btn btn-main" onclick="initMatch()">START MATCH</button>
+    </div>
+
+    <div id="game-screen" class="hidden">
+        <div class="header">
+            <div id="turn-timer" class="timer-display">--</div>
+            <h3 id="active-p" style="margin:0">PLAYER 1</h3>
+            <div id="mode-tag" style="font-size:0.6rem; color:#666">READY</div>
+        </div>
+
+        <div class="scoreboard" id="ui-scoreboard"></div>
+
+        <div id="choice-ui">
+            <button class="btn-choice" style="background:var(--red)" onclick="manualClaim('red')">CLAIM RED</button>
+            <button class="btn-choice" style="background:var(--yellow); color:black" onclick="manualClaim('yellow')">CLAIM YELLOW</button>
+        </div>
+
+        <div class="ball-grid" id="ball-grid"></div>
+        
+        <div style="display:flex; gap:10px">
+            <button class="btn btn-sub" style="background:#c0392b; color:white; flex:1" onclick="handleMiss()">MISS</button>
+            <button class="btn btn-sub" style="background:#8e44ad; color:white; flex:1" onclick="handleFoul()">FOUL</button>
+        </div>
+        
+        <div class="pot-row" id="pot-vis"></div>
+        <button class="btn btn-sub" onclick="undo()">UNDO</button>
+    </div>
+
+    <div id="break-modal" class="overlay hidden">
+        <div class="modal">
+            <h3>WHO BREAKS?</h3>
+            <div id="break-options"></div>
+        </div>
+    </div>
+
+    <div id="frame-modal" class="overlay hidden">
+        <div class="modal">
+            <h2 id="frame-winner-text">FRAME OVER</h2>
+            <div style="background:#000; padding:15px; border-radius:15px; margin:20px 0;">
+                <h3 id="match-score-display" style="font-size:2rem">0 - 0</h3>
+            </div>
+            <button class="btn btn-main" id="next-frame-btn">NEXT FRAME</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let players = [], frameWins = [], totalPoints = [], lives = [];
+    let mode = 'standard', currentIdx = 0, turnScore = 0, pots = {red: 0, yellow: 0};
+    let assigns = [null, null], timerInt, stateStack = [];
+
+    function toggleKillerUI() {
+        const isKiller = document.getElementById('game-mode-sel').value === 'killer';
+        document.getElementById('killer-players').classList.toggle('hidden', !isKiller);
+        document.getElementById('standard-players').classList.toggle('hidden', isKiller);
+        document.getElementById('bo-group').classList.toggle('hidden', isKiller);
+    }
+
+    function addPlayerInput() {
+        const div = document.createElement('div');
+        div.className = 'player-entry';
+        div.innerHTML = `<input type="text" class="p-name" placeholder="Name">
+                         <button class="btn-sub" onclick="this.parentElement.remove()" style="width:40px; margin:0">X</button>`;
+        document.getElementById('player-list').appendChild(div);
+    }
+
+    function initMatch() {
+        mode = document.getElementById('game-mode-sel').value;
+        
+        if (mode === 'killer') {
+            players = Array.from(document.querySelectorAll('.p-name')).map(i => i.value || "Anon");
+            lives = players.map(() => 3);
+            currentIdx = Math.floor(Math.random() * players.length);
+            document.getElementById('setup-screen').classList.add('hidden');
+            startFrame(currentIdx);
+        } else {
+            const p1 = document.getElementById('p1-in').value || "Player 1";
+            const p2 = document.getElementById('p2-in').value || "Player 2";
+            players = [p1, p2];
+            frameWins = [0, 0];
+            totalPoints = [0, 0];
+            document.getElementById('setup-screen').classList.add('hidden');
+            showBreakPicker();
+        }
+    }
+
+    function showBreakPicker() {
+        document.getElementById('frame-modal').classList.add('hidden');
+        document.getElementById('game-screen').classList.add('hidden');
+        document.getElementById('break-modal').classList.remove('hidden');
+        const opts = document.getElementById('break-options');
+        opts.innerHTML = '';
+        players.forEach((p, i) => {
+            const btn = document.createElement('button');
+            btn.className = 'btn btn-main';
+            btn.innerText = p;
+            btn.onclick = () => startFrame(i);
+            opts.appendChild(btn);
+        });
+    }
+
+    function startFrame(starter) {
+        currentIdx = starter; pots = {red: 0, yellow: 0}; assigns = [null, null]; turnScore = 0;
+        document.getElementById('break-modal').classList.add('hidden');
+        document.getElementById('game-screen').classList.remove('hidden');
+        document.getElementById('pot-vis').innerHTML = '';
+        document.getElementById('mode-tag').innerText = mode.toUpperCase();
+        resetClock();
+        updateUI();
+    }
+
+    function resetClock() {
+        if(timerInt) clearInterval(timerInt);
+        const appEl = document.getElementById('app');
+        appEl.classList.remove('timer-warn');
+        if(mode !== 'speed') { document.getElementById('turn-timer').innerText = "--"; return; }
+        
+        let rem = 10; 
+        document.getElementById('turn-timer').innerText = rem;
+        timerInt = setInterval(() => { 
+            rem--; 
+            document.getElementById('turn-timer').innerText = rem; 
+            if(rem <= 5 && rem > 0) appEl.classList.add('timer-warn');
+            if(rem <= 0) { appEl.classList.remove('timer-warn'); switchPlayer(); } 
+        }, 1000);
+    }
+
+    function handlePot(color) {
+        saveState();
+        if(color !== 'black') pots[color]++;
+        
+        const b = document.createElement('div'); b.className = 'mini';
+        b.style.background = color === 'red' ? 'var(--red)' : (color === 'yellow' ? 'var(--yellow)' : 'white');
+        document.getElementById('pot-vis').appendChild(b);
+
+        if (mode === 'killer') {
+            if (pots.red >= 7 && pots.yellow >= 7 && color === 'black') {
+                if(confirm("Table Clear! Re-rack?")) { pots = {red: 0, yellow: 0}; }
+            }
+            switchPlayer(); 
+        } else {
+            if(assigns[0] && assigns[currentIdx] !== color && color !== 'black') {
+                totalPoints[currentIdx] -= 2; switchPlayer();
+            } else {
+                if(mode === 'speed') totalPoints[currentIdx] += 1;
+                else { turnScore++; totalPoints[currentIdx] += turnScore; }
+                resetClock();
+            }
+        }
+        updateUI();
+    }
+
+    function handleBlack() {
+        if (mode === 'killer') {
+            handlePot('black');
+        } else {
+            if(assigns[0] && pots[assigns[currentIdx]] >= 7) {
+                frameWins[currentIdx]++; showFrameWinner(currentIdx);
+            } else {
+                let other = currentIdx === 0 ? 1 : 0;
+                frameWins[other]++; showFrameWinner(other);
+            }
+        }
+    }
+
+    function handleMiss() {
+        saveState();
+        if (mode === 'killer') {
+            lives[currentIdx]--;
+            if (lives.filter(l => l > 0).length <= 1) {
+                let winner = players[lives.findIndex(l => l > 0)];
+                alert(winner.toUpperCase() + " WINS!");
+                location.reload();
+                return;
+            }
+        }
+        switchPlayer();
+    }
+
+    function handleFoul() { saveState(); if(mode === 'killer') lives[currentIdx]--; switchPlayer(); }
+
+    function switchPlayer() {
+        do {
+            currentIdx = (currentIdx + 1) % players.length;
+        } while (mode === 'killer' && lives[currentIdx] <= 0);
+        turnScore = 0; resetClock(); updateUI();
+    }
+
+    function manualClaim(color) {
+        saveState();
+        assigns[currentIdx] = color;
+        assigns[currentIdx === 0 ? 1 : 0] = (color === 'red' ? 'yellow' : 'red');
+        updateUI();
+    }
+
+    function updateUI() {
+        document.getElementById('active-p').innerText = players[currentIdx].toUpperCase();
+        const sb = document.getElementById('ui-scoreboard');
+        
+        if (mode === 'killer') {
+            sb.style.flexDirection = 'column';
+            sb.innerHTML = players.map((p, i) => `
+                <div style="display:flex; justify-content:space-between; width:100%; padding:8px 0; border-bottom:1px solid #222" class="${lives[i] <= 0 ? 'out' : ''}">
+                    <span style="color:${i === currentIdx ? 'var(--accent)' : '#eee'}">${p}</span>
+                    <span class="life-heart">${'❤️'.repeat(Math.max(0, lives[i]))}</span>
+                </div>
+            `).join('');
+        } else {
+            sb.style.flexDirection = 'row';
+            sb.innerHTML = [0,1].map(i => `
+                <div style="flex:1; text-align:center">
+                    <div style="font-size:0.7rem; font-weight:800; color:#555">${players[i].toUpperCase()}</div>
+                    <div class="score-big">${frameWins[i]}</div>
+                    <div class="pts-small">${totalPoints[i]} pts</div>
+                    <div class="assign-tag" style="background:${assigns[i] ? 'var(--'+assigns[i]+')' : '#222'}; color:${assigns[i]==='yellow'?'#000':'#fff'}">
+                        ${assigns[i] ? assigns[i].toUpperCase() + ' ('+pots[assigns[i]]+'/7)' : 'OPEN'}
+                    </div>
+                </div>
+            `).join('');
+            document.getElementById('choice-ui').style.display = (assigns[0] === null && (pots.red > 0 || pots.yellow > 0)) ? 'flex' : 'none';
+        }
+
+        const grid = document.getElementById('ball-grid');
+        grid.innerHTML = '';
+        if(pots.red < 7) grid.innerHTML += `<button class="ball ball-r" onclick="handlePot('red')">${7-pots.red}</button>`;
+        if(pots.yellow < 7) grid.innerHTML += `<button class="ball ball-y" onclick="handlePot('yellow')">${7-pots.yellow}</button>`;
+        grid.innerHTML += `<button class="ball ball-b" onclick="handleBlack()">B</button>`;
+    }
+
+    function showFrameWinner(wIdx) {
+        if(timerInt) clearInterval(timerInt);
+        const target = Math.ceil(parseInt(document.getElementById('bo-in').value)/2);
+        document.getElementById('frame-winner-text').innerText = `${players[wIdx]} WINS FRAME!`;
+        document.getElementById('match-score-display').innerText = `${frameWins[0]} - ${frameWins[1]}`;
+        document.getElementById('frame-modal').classList.remove('hidden');
+        const btn = document.getElementById('next-frame-btn');
+        if(frameWins[wIdx] >= target) {
+            btn.innerText = "FINISH MATCH";
+            btn.onclick = () => location.reload();
+        } else {
+            btn.innerText = "NEXT FRAME"; btn.onclick = showBreakPicker;
+        }
+    }
+
+    function saveState() {
+        stateStack.push(JSON.stringify({ currentIdx, pots: {...pots}, assigns: [...assigns], totalPoints: [...totalPoints], lives: [...lives], turnScore }));
+    }
+
+    function undo() {
+        if(stateStack.length === 0) return;
+        const s = JSON.parse(stateStack.pop());
+        currentIdx = s.currentIdx; pots = s.pots; assigns = s.assigns; totalPoints = s.totalPoints; lives = s.lives; turnScore = s.turnScore;
+        updateUI();
+    }
+</script>
+</body>
+</html>
