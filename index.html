@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Battleships Pro: Tactical Warzone</title>
     
+    <!-- Stable PubNub SDK Container -->
     <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.7.2.2.min.js"></script>
 
     <style>
@@ -51,6 +52,7 @@
         .cell.miss { background: #3867ff; }
         .cell.revealed-ship { background: #d35400; border: 1px solid #e67e22; opacity: 0.85; } 
         .cell.spectator-ship { background: #1b5e20; border: 1px solid #2e7d32; opacity: 0.7; } 
+        .cell.spectator-ship.cell.hit { background: #ff3838; border-color: #e74c3c; }
         
         .cell.preview-valid { background: #9b59b6 !important; border: 1px solid #e040fb; opacity: 0.9; }
         .cell.preview-invalid { background: #c0392b !important; border: 1px solid #ff0000; opacity: 0.6; }
@@ -59,27 +61,28 @@
         .cell.revealed-ship::after { content: '▰'; color: #fff; font-size: 12px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
         .cell.spectator-ship::after { content: '▰'; color: #81c784; font-size: 10px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
         
-        .stats-table { width: 100%; border-collapse: collapse; margin-top: 15px; background: #111; border-radius: 6px; overflow: hidden; font-size: 0.9rem; }
-        .stats-table th { background: #2c3e50; color: #fff; padding: 10px; font-weight: bold; text-align: left; }
-        .stats-table td { padding: 10px; border-bottom: 1px solid #222; text-align: left; color: #ccc; }
+        .stats-table { width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 15px; background: #111; border-radius: 6px; overflow: hidden; font-size: 0.85rem; }
+        .stats-table th { background: #2c3e50; color: #fff; padding: 8px; font-weight: bold; text-align: left; }
+        .stats-table td { padding: 8px; border-bottom: 1px solid #222; text-align: left; color: #ccc; }
         .stats-highlight { color: #f1c40f; font-weight: bold; }
 
         .main-btn { background: #3498db; color: white; border: none; padding: 16px; border-radius: 6px; cursor: pointer; font-size: 1.1rem; font-weight: bold; width: 100%; box-sizing: border-box; margin-top: 10px; }
         .main-btn:disabled { background: #333; color: #666; cursor: not-allowed; border: 1px dashed #444; }
 
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; box-sizing: border-box; }
-        .modal-content { background: #1a1a1a; border: 2px solid #3498db; border-radius: 12px; max-width: 420px; width: 100%; padding: 25px; box-sizing: border-box; text-align: center; box-shadow: 0 0 20px rgba(52, 152, 219, 0.4); max-height: 90vh; overflow-y: auto; }
+        .modal-content { background: #1a1a1a; border: 2px solid #3498db; border-radius: 12px; max-width: 440px; width: 100%; padding: 22px; box-sizing: border-box; text-align: center; box-shadow: 0 0 20px rgba(52, 152, 219, 0.4); max-height: 90vh; overflow-y: auto; }
         .modal-content.sunk-theme { border-color: #e74c3c; box-shadow: 0 0 20px rgba(231, 76, 60, 0.4); }
         .modal-content.victory-theme { border-color: #2ecc71; box-shadow: 0 0 20px rgba(46, 204, 113, 0.4); }
         .modal-content h3 { margin-top: 0; font-size: 1.4rem; color: #fff; }
-        .modal-content p { color: #ccc; line-height: 1.4; margin: 15px 0; }
+        .modal-content p { color: #ccc; line-height: 1.4; margin: 12px 0; }
     </style>
 </head>
 <body>
 
-    <h1>Battleships Pro Multikill</h1>
+    <h1>Battleships Pro (Multiplayer) - Monster Kill</h1>
     <div id="status-box" class="status">Initializing System...</div>
 
+    <!-- GLOBAL TACTICAL DIALOG MODAL -->
     <div id="game-modal" class="modal-overlay hidden">
         <div id="modal-card" class="modal-content">
             <h3 id="modal-title">Alert</h3>
@@ -88,6 +91,7 @@
         </div>
     </div>
 
+    <!-- 1. ENTRY LOBBY MATCHMAKER -->
     <div id="lobby-screen" class="hidden">
         <div class="setup-card">
             <h3 style="margin-top:0; text-align:center; color:#f1c40f;">Strategic Operations</h3>
@@ -102,6 +106,7 @@
         </div>
     </div>
 
+    <!-- 2. FLEET PLACEMENT ENGINE DOCK -->
     <div id="deployment-dock" class="hidden">
         <div class="dock">
             <h4>FLEET MANAGEMENT DOCK</h4>
@@ -117,13 +122,16 @@
         </div>
     </div>
 
+    <!-- 3. REAL-TIME GAMEPLAY MAP INSTANCE -->
     <div id="game-screen" class="hidden">
+        <!-- Target Selection Panel -->
         <div style="width: 100%; max-width: 400px; margin: 0 auto 5px auto;" id="target-selector-container" class="hidden">
             <label style="font-size: 0.8rem; font-weight: bold; color: #aaa; display: block; text-align: left; margin-bottom: 4px; text-transform: uppercase;">Select System Target:</label>
             <select id="enemy-target-picker"></select>
         </div>
 
         <div class="grid-container">
+            <!-- Upper Grid: Target Attack Board -->
             <div class="board-wrapper hidden" id="opponent-container">
                 <div class="board-title" id="attack-header">Select Target Above</div>
                 <div id="opponent-board" class="grid"></div>
@@ -131,18 +139,24 @@
             
             <hr id="board-divider" class="hidden" style="width: 100%; max-width: 400px; border: 0; border-top: 1px solid #222; margin: 5px 0;">
             
+            <!-- Lower Grid: Home Fleet Board -->
             <div class="board-wrapper hidden" id="your-container">
                 <div class="board-title" id="your-board-header">Your Fleet Map</div>
                 <div id="your-board" class="grid"></div>
             </div>
 
+            <!-- In-Game Intermediary Spectator Panel (Locks Exit Options) -->
             <div class="board-wrapper hidden" id="spectator-action-container">
                 <button class="main-btn" style="background: #34495e; margin-bottom: 8px;" id="btn-spec-stats">Review Combat Metrics</button>
             </div>
 
+            <!-- Branching Post-Match Option Matrix -->
             <div class="board-wrapper hidden" id="game-over-container">
-                <button class="main-btn" style="background: #34495e; margin-bottom: 8px;" id="btn-view-stats">Review Combat Metrics</button>
-                <button class="main-btn" style="background: #e67e22;" id="btn-reset">Return to Strategic Lobby</button>
+                <div style="background:#1a1a1a; padding:15px; border-radius:8px; border:1px solid #333; margin-bottom:10px;">
+                    <h4 style="margin:0 0 10px 0; color:#f1c40f;">MATCH COMPLETED</h4>
+                    <button class="main-btn" style="background: #2ecc71; margin-bottom: 10px; margin-top:0;" id="btn-play-again">Play Again (Same Room)</button>
+                    <button class="main-btn" style="background: #e67e22; margin-top:0;" id="btn-exit-lobby">Exit to Main Lobby</button>
+                </div>
             </div>
         </div>
     </div>
@@ -162,6 +176,9 @@
         let statShotsFired = 0;
         let statHitsLanded = 0;
         let statIncomingShotsByPlayer = {}; 
+        
+        // Dynamic Room-Wide Combat Log Tracker for Spectator Analytics
+        let globalCombatStrikeLog = [];
 
         const shipTypesArr = [
             { name: "Aircraft Carrier", size: 5 },
@@ -197,15 +214,18 @@
         });
         function closeModal() { document.getElementById('game-modal').classList.add('hidden'); }
 
-        // --- STEP 1: MESH NETWORKING REGISTRY & SECURITY ROOM LOCK ---
+        // --- STEP 1: MESH NETWORKING REGISTRY ---
         document.getElementById('btn-start').addEventListener('click', () => {
             myName = document.getElementById('name-input').value.trim() || "User_" + Math.floor(Math.random()*90+10);
             const roomCode = document.getElementById('room-input').value.trim();
             if (!roomCode) return alert("A channel code is required.");
             
             myChannel = 'bbship_v6_room_' + roomCode;
+            setupChannelSubscription();
+        });
+
+        function setupChannelSubscription() {
             document.getElementById('your-board-header').innerText = `${myName}'s Fleet`;
-            
             globalPlayers[myId] = { name: myName, active: true, ready: false, lost: false, boardHits: Array(100).fill(0), initialFleet: Array(100).fill(0) };
 
             pubnub.addListener({
@@ -213,7 +233,6 @@
                     const data = event.message;
                     
                     if (data.type === 'sync-identity') {
-                        // Anti-Intrusion Rule: Reject joining node if game has already kicked off
                         if (matchIsActive) {
                             pubnub.publish({ channel: myChannel, message: { type: 'room-locked-rejection', targetUser: data.sender } });
                             return;
@@ -247,9 +266,7 @@
                         evaluateHostInitiatedStart();
                     }
                     else if (data.type === 'start-match') {
-                        // Step 1: Initialize match variables
                         executeGlobalMatchActivation(data.order);
-                        // Step 2: Instantly broadcast local layouts across the mesh to secure stable ghost views
                         pubnub.publish({ channel: myChannel, message: { type: 'ghost-sync-payload', mapBlueprint: yourFleetLocations, sender: myId } });
                     }
                     else if (data.type === 'ghost-sync-payload') {
@@ -264,6 +281,13 @@
                         }
                     } 
                     else if (data.type === 'result') {
+                        // Append to global combat log matrix for tactical spectator mapping
+                        globalCombatStrikeLog.push({
+                            attacker: data.attackerId,
+                            target: data.targetId,
+                            coord: data.coord,
+                            hit: data.isHit
+                        });
                         handleShotFeedback(data.attackerId, data.targetId, data.coord, data.isHit, data.sunkShipName, data.matchIsLost);
                     }
                     else if (data.type === 'global-ship-sunk') {
@@ -285,10 +309,22 @@
                             renderSelectedOpponentGrid();
                         }
                     }
+                    else if (data.type === 'broadcast-global-match-over') {
+                        handleGlobalMatchOverBroadcast(data.winnerName, data.finalMetricsMatrix);
+                    }
+                    else if (data.type === 'signal-room-rematch') {
+                        if (globalPlayers[data.sender]) {
+                            globalPlayers[data.sender].ready = false;
+                            globalPlayers[data.sender].lost = false;
+                            globalPlayers[data.sender].boardHits = Array(100).fill(0);
+                            globalPlayers[data.sender].initialFleet = Array(100).fill(0);
+                            delete globalPlayers[data.sender].finalFleetMap;
+                        }
+                        rebuildTargetDropdown();
+                    }
                 }
             });
             pubnub.subscribe({ channels: [myChannel] });
-
             pubnub.publish({ channel: myChannel, message: { type: 'sync-identity', name: myName, sender: myId } });
 
             document.getElementById('lobby-screen').classList.add('hidden');
@@ -300,7 +336,7 @@
             initFleetStructures();
             buildDeploymentDock();
             renderGrid('your-board', handleFleetDeploymentClick, true);
-        });
+        }
 
         function initFleetStructures() {
             shipTypes = JSON.parse(JSON.stringify(shipTypesArr));
@@ -310,6 +346,7 @@
             statShotsFired = 0;
             statHitsLanded = 0;
             statIncomingShotsByPlayer = {};
+            globalCombatStrikeLog = [];
         }
 
         function rebuildTargetDropdown() {
@@ -336,7 +373,7 @@
 
         document.getElementById('enemy-target-picker').addEventListener('change', renderSelectedOpponentGrid);
 
-        // --- STEP 2: FLEET PREPARATION WITH INTERACTIVE RE-PICKUP ---
+        // --- STEP 2: FLEET PREPARATION ---
         function buildDeploymentDock() {
             const container = document.getElementById('ship-buttons-container');
             container.innerHTML = '';
@@ -503,7 +540,6 @@
         }
 
         function executeGlobalMatchActivation(verifiedOrderArray) {
-            if (matchIsActive) return;
             matchIsActive = true;
             
             activeTurnOrder = verifiedOrderArray;
@@ -511,6 +547,8 @@
 
             document.getElementById('opponent-container').classList.remove('hidden');
             document.getElementById('board-divider').classList.remove('hidden');
+            document.getElementById('spectator-action-container').classList.add('hidden');
+            document.getElementById('game-over-container').classList.add('hidden');
             
             rebuildTargetDropdown();
             renderSelectedOpponentGrid();
@@ -518,7 +556,7 @@
             updateVisualDisplays();
         }
 
-        // --- STEP 4: GHOST VIEW & SPECTATOR RENDERING ENGINE ---
+        // --- STEP 4: GRID INTERACTIONS & INTERACTIVE GHOST VIEW ---
         function renderSelectedOpponentGrid() {
             const targetId = document.getElementById('enemy-target-picker').value;
             if (!targetId) return;
@@ -530,16 +568,17 @@
             const iAmSpectator = globalPlayers[myId] && globalPlayers[myId].lost;
 
             oppCells.forEach((cell, i) => {
-                // Render established impact marks
                 if (targetProfile.boardHits[i] === 1) cell.className = 'cell hit';
                 else if (targetProfile.boardHits[i] === 2) cell.className = 'cell miss';
-                
-                // FIXED GHOST VIEW PRIVILEGE: Displays background-buffered un-hit ship locations instantly
                 else if (iAmSpectator && targetProfile.initialFleet && targetProfile.initialFleet[i] === 1) {
                     cell.className = 'cell spectator-ship';
                 }
                 
-                // Fallback endgame parameters
+                // If it's a spectator ship AND has been hit, ensure class compounding matches styles
+                if (iAmSpectator && targetProfile.initialFleet && targetProfile.initialFleet[i] === 1 && targetProfile.boardHits[i] === 1) {
+                    cell.className = 'cell spectator-ship hit';
+                }
+
                 if (targetProfile.finalFleetMap && targetProfile.finalFleetMap[i] === 1 && targetProfile.boardHits[i] === 0) {
                     cell.className = 'cell revealed-ship';
                 }
@@ -602,11 +641,16 @@
         }
 
         function handleMyStrikeClick(coord) {
-            if (globalPlayers[myId].lost) return; 
-            if (!matchIsActive || currentTurnUserId !== myId) return;
-            
             const targetId = document.getElementById('enemy-target-picker').value;
             if (!targetId) return;
+
+            // --- INTERACTIVE SPECTATOR ROUTING LAYER ---
+            if (globalPlayers[myId].lost) {
+                analyzeAndDisplaySpectatorShipMetrics(targetId, coord);
+                return; 
+            }
+            
+            if (!matchIsActive || currentTurnUserId !== myId) return;
             if (globalPlayers[targetId].lost) return alert("This fleet is already scuttled! Choose a living target.");
             if (globalPlayers[targetId].boardHits[coord] !== 0) return; 
             
@@ -617,6 +661,118 @@
                 channel: myChannel, 
                 message: { type: 'shot', coord: coord, targetId: targetId, sender: myId } 
             });
+        }
+
+        // --- SPECTATOR INTEL PROCESSING MATRIX ---
+        function analyzeAndDisplaySpectatorShipMetrics(targetUserId, clickedCoord) {
+            const targetProfile = globalPlayers[targetUserId];
+            if (!targetProfile || !targetProfile.initialFleet) return;
+
+            // 1. Verify if a vessel occupies this specific tile location
+            if (targetProfile.initialFleet[clickedCoord] !== 1) {
+                showModal("TACTICAL INFO", `<p>Coordinate <strong>${clickedCoord}</strong> is empty open water.</p>`, "sunk-theme");
+                return;
+            }
+
+            // 2. Local reconstruction to map coordinate back to its specific ship type
+            // Ships were placed sequentially using standard lengths from shipTypesArr
+            let deducedShipName = "Unknown Combat Vessel";
+            let shipCoordinatedGroup = [];
+
+            // A helper scanning contiguous components to identify bounded ships dynamically
+            let visited = Array(100).fill(false);
+            let targetFleetMap = targetProfile.initialFleet;
+
+            function discoverShipCluster(start) {
+                let cluster = [start];
+                let queue = [start];
+                visited[start] = true;
+
+                while(queue.length > 0) {
+                    let curr = queue.shift();
+                    let r = Math.floor(curr / 10);
+                    let c = curr % 10;
+                    
+                    let neighbors = [];
+                    if (r > 0) neighbors.push(curr - 10);
+                    if (r < 9) neighbors.push(curr + 10);
+                    if (c > 0) neighbors.push(curr - 1);
+                    if (c < 9) neighbors.push(curr + 1);
+
+                    neighbors.forEach(n => {
+                        if (!visited[n] && targetFleetMap[n] === 1) {
+                            visited[n] = true;
+                            cluster.push(n);
+                            queue.push(n);
+                        }
+                    });
+                }
+                return cluster;
+            }
+
+            // Locate containing component cluster
+            for(let i=0; i<100; i++) {
+                if (targetFleetMap[i] === 1 && !visited[i]) {
+                    let currentCluster = discoverShipCluster(i);
+                    if (currentCluster.includes(clickedCoord)) {
+                        shipCoordinatedGroup = currentCluster;
+                        break;
+                    }
+                }
+            }
+
+            // Match cluster size to static fleet asset definitions
+            const clusterSize = shipCoordinatedGroup.length;
+            const matchedAsset = shipTypesArr.find(s => s.size === clusterSize);
+            if (matchedAsset) deducedShipName = matchedAsset.name;
+
+            // 3. Compile structural damage parameters and aggressor scoring points
+            let totalHitsOnThisVessel = 0;
+            let damageDealersMap = {};
+
+            shipCoordinatedGroup.forEach(coord => {
+                if (targetProfile.boardHits[coord] === 1) {
+                    totalHitsOnThisVessel++;
+                }
+                
+                // Track down matching records from global transaction history
+                globalCombatStrikeLog.forEach(log => {
+                    if (log.target === targetUserId && log.coord === coord && log.hit) {
+                        damageDealersMap[log.attacker] = (damageDealersMap[log.attacker] || 0) + 1;
+                    }
+                });
+            });
+
+            const isSunk = totalHitsOnThisVessel === clusterSize;
+            const healthStatusString = isSunk 
+                ? "<span style='color:#e74c3c; font-weight:bold;'>CRITICAL - DESTRUCTED</span>" 
+                : `<span style='color:#f1c40f; font-weight:bold;'>OPERATIONAL (${totalHitsOnThisVessel}/${clusterSize} Damage Points)</span>`;
+
+            // 4. Synthesize analytical layout
+            let feedbackHtml = `
+                <p>Target Profile: <strong>${targetProfile.name}</strong></p>
+                <table class="stats-table">
+                    <tr><td>Vessel Class</td><td class="stats-highlight">${deducedShipName}</td></tr>
+                    <tr><td>Hull Integrity</td><td>${healthStatusString}</td></tr>
+                </table>
+                <h4 style="margin:15px 0 5px 0; text-align:left; color:#3498db; font-size:0.9rem;">DAMAGE LOG LEDGER</h4>
+                <table class="stats-table">
+                    <tr><th>Aggressor Force</th><th>Scored Points (Hits)</th></tr>
+            `;
+
+            let damageLogged = false;
+            for (let attackerId in damageDealersMap) {
+                const name = globalPlayers[attackerId] ? globalPlayers[attackerId].name : "Unknown Fleet";
+                feedbackHtml += `<tr><td>${name}</td><td class="stats-highlight">+${damageDealersMap[attackerId]} Pts</td></tr>`;
+                damageLogged = true;
+            }
+
+            if (!damageLogged) {
+                feedbackHtml += `<tr><td colspan="2" style="text-align:center; color:#777;">No points scored on this vessel yet.</td></tr>`;
+            }
+            feedbackHtml += `</table>`;
+
+            showModal("TACTICAL INTEL OVERLAY", feedbackHtml, isSunk ? "sunk-theme" : "victory-theme");
         }
 
         function handleIncomingShot(coord) {
@@ -668,10 +824,7 @@
                 statusBox.innerText = "YOUR FLEET WAS ANNIHILATED!";
                 
                 pubnub.publish({ channel: myChannel, message: { type: 'endgame-reveal', fleetLocations: yourFleetLocations, sender: myId } });
-                
-                // LOCKDOWN CONDITION: Display spectator controls, do NOT show the Reset/Lobby button yet
                 document.getElementById('spectator-action-container').classList.remove('hidden');
-                triggerCombatMetricsDisplay("ELIMINATION BREAKDOWN");
             }
         }
 
@@ -685,16 +838,10 @@
 
             if (attackerId === myId) {
                 if (isHit) statHitsLanded++;
-                
                 const targetedName = globalPlayers[targetId].name;
-                if (targetLostHandshake) {
-                    showModal("TARGET ELIMINATED!", `<p>Spectacular shot! You completely scuttled <strong>${targetedName}</strong>'s fleet!</p>`, "victory-theme");
-                } else if (sunkShipName) {
+                if (!targetLostHandshake && sunkShipName) {
                     showModal("VEHICLE SUNK", `<p>Direct Hit! You completely sunk <strong>${targetedName}</strong>'s <strong>${sunkShipName}</strong>!</p>`, "victory-theme");
-                } else {
-                    statusBox.innerText = isHit ? "Direct Hit logged on enemy lines!" : "Splash. Ordnance missed targets.";
                 }
-                
                 checkVictoryConditions();
             }
 
@@ -727,37 +874,90 @@
                 if (!globalPlayers[pId].lost) livingPlayers.push(pId);
             }
 
-            // End game when only 1 surviving operator remains
-            if (livingPlayers.length === 1) {
+            if (livingPlayers.length === 1 && matchIsActive) {
                 matchIsActive = false;
-                const winnerName = globalPlayers[livingPlayers[0]].name;
-                statusBox.style.color = "#2ecc71";
-                statusBox.innerText = `WAR ROOM OVER: ${winnerName} IS VICTORIOUS!`;
-                
-                if (livingPlayers[0] === myId) {
-                    showModal("CHAMPION", `<p>You have wiped out all opposing naval operations in this theater of war! Total Victory!</p>`, "victory-theme");
+                const winnerId = livingPlayers[0];
+                const winnerName = globalPlayers[winnerId].name;
+
+                // Build statistical snapshot for compiling across network nodes
+                let finalMetricsMatrix = [];
+                for (let pId in globalPlayers) {
+                    let accuracy = 0;
+                    let launched = 0;
+                    let landed = 0;
+                    
+                    if (pId === myId) {
+                        launched = statShotsFired;
+                        landed = statHitsLanded;
+                    } else {
+                        launched = globalPlayers[pId].boardHits.filter(x => x !== 0).length;
+                        landed = globalPlayers[pId].boardHits.filter(x => x === 1).length;
+                    }
+                    accuracy = launched > 0 ? Math.round((landed / launched) * 100) : 0;
+                    
+                    finalMetricsMatrix.push({
+                        name: globalPlayers[pId].name,
+                        shotsFired: launched,
+                        hitsLanded: landed,
+                        accuracy: accuracy,
+                        status: globalPlayers[pId].lost ? "ELIMINATED" : "VICTORIOUS"
+                    });
                 }
-                
-                // UNLOCK LOBBY ACCESS: Hide mid-game spec row, expose master restart engine buttons to all players
-                document.getElementById('spectator-action-container').classList.add('hidden');
-                document.getElementById('game-over-container').classList.remove('hidden');
-                triggerCombatMetricsDisplay("FINAL MATCH PERFORMANCE");
+
+                pubnub.publish({
+                    channel: myChannel,
+                    message: { 
+                        type: 'broadcast-global-match-over', 
+                        winnerName: winnerName, 
+                        finalMetricsMatrix: finalMetricsMatrix, 
+                        sender: myId 
+                    }
+                });
             }
         }
 
-        // --- STEP 5: STATISTICS PANEL ---
+        // --- STEP 5: GLOBAL ENDGAME STATISTICS PRESENTATION ---
+        function handleGlobalMatchOverBroadcast(winnerName, analyticsData) {
+            matchIsActive = false;
+            statusBox.style.color = "#2ecc71";
+            statusBox.innerText = `WAR ROOM OVER: ${winnerName} IS VICTORIOUS!`;
+            
+            document.getElementById('spectator-action-container').classList.add('hidden');
+            document.getElementById('game-over-container').classList.remove('hidden');
+
+            let htmlPayload = `
+                <p>The conflict has concluded. Final server mesh combat data logs:</p>
+                <table class="stats-table">
+                    <tr><th>Player</th><th>Status</th><th>Shots</th><th>Hits</th><th>Acc %</th></tr>
+            `;
+
+            analyticsData.forEach(row => {
+                const highlightStyle = row.status === "VICTORIOUS" ? "style='color:#2ecc71; font-weight:bold;'" : "";
+                htmlPayload += `
+                    <tr ${highlightStyle}>
+                        <td>${row.name}</td>
+                        <td>${row.status}</td>
+                        <td class="stats-highlight">${row.shotsFired}</td>
+                        <td>${row.hitsLanded}</td>
+                        <td class="stats-highlight">${row.accuracy}%</td>
+                    </tr>
+                `;
+            });
+            htmlPayload += `</table><p style="font-size:0.85rem; color:#f1c40f;">Select your next movement path below on the main screen.</p>`;
+
+            showModal(`VICTORY DECLARED: ${winnerName.toUpperCase()}`, htmlPayload, "victory-theme");
+        }
+
         function triggerCombatMetricsDisplay(cardTitle) {
             const accuracy = statShotsFired > 0 ? Math.round((statHitsLanded / statShotsFired) * 100) : 0;
-            
             let htmlPayload = `
-                <p>Real-time performance overview ledger for <strong>${myName}</strong>:</p>
                 <table class="stats-table">
                     <tr><th>Metric Parameters</th><th>Value Data</th></tr>
                     <tr><td>Total Artillery Launched</td><td class="stats-highlight">${statShotsFired}</td></tr>
                     <tr><td>Confirmed Payload Hits</td><td style="color:#2ecc71; font-weight:bold;">${statHitsLanded}</td></tr>
                     <tr><td>Weapons Fire Accuracy</td><td class="stats-highlight">${accuracy}%</td></tr>
                 </table>
-                <h4 style="margin:20px 0 5px 0; text-align:left; color:#e74c3c; font-size:0.9rem; letter-spacing:0.5px;">INCOMING ASSAULT PROFILE VECTOR</h4>
+                <h4 style="margin:15px 0 5px 0; text-align:left; color:#e74c3c; font-size:0.9rem;">INCOMING ASSAULT PROFILE VECTOR</h4>
                 <table class="stats-table">
                     <tr><th>Aggressor Source Identity</th><th>Projectiles Received</th></tr>
             `;
@@ -766,29 +966,24 @@
             for (let pId in globalPlayers) {
                 if (pId === myId) continue;
                 const count = statIncomingShotsByPlayer[pId] || 0;
-                const name = globalPlayers[pId].name;
-                htmlPayload += `<tr><td>${name}</td><td class="stats-highlight">${count}</td></tr>`;
+                htmlPayload += `<tr><td>${globalPlayers[pId].name}</td><td class="stats-highlight">${count}</td></tr>`;
                 if (count > 0) hasIncomingData = true;
             }
-            
-            if (!hasIncomingData) {
-                htmlPayload += `<tr><td colspan="2" style="text-align:center; color:#777;">No targeted fire detected on your matrix grid coordinates yet.</td></tr>`;
-            }
+            if (!hasIncomingData) htmlPayload += `<tr><td colspan="2" style="text-align:center; color:#777;">No incoming data.</td></tr>`;
             htmlPayload += `</table>`;
 
-            showModal(cardTitle || "COMBAT PARAMETERS BREAKDOWN", htmlPayload, "victory-theme");
+            showModal(cardTitle, htmlPayload, "victory-theme");
         }
 
-        document.getElementById('btn-view-stats').addEventListener('click', () => triggerCombatMetricsDisplay("COMBAT PERFORMANCE LOGS"));
         document.getElementById('btn-spec-stats').addEventListener('click', () => triggerCombatMetricsDisplay("SPECTATOR METRICS LOGS"));
 
-        // --- STEP 6: RESET STATE ---
-        document.getElementById('btn-reset').addEventListener('click', () => {
+        // --- STEP 6: BRANCHING DECISION ENGINE RESET ---
+        document.getElementById('btn-play-again').addEventListener('click', () => {
             initFleetStructures();
             iamReady = false;
             matchIsActive = false;
             activeTurnOrder = [];
-            
+
             for (let pId in globalPlayers) {
                 globalPlayers[pId].ready = false;
                 globalPlayers[pId].lost = false;
@@ -797,7 +992,6 @@
                 delete globalPlayers[pId].finalFleetMap;
             }
 
-            document.getElementById('spectator-action-container').classList.add('hidden');
             document.getElementById('game-over-container').classList.add('hidden');
             document.getElementById('opponent-container').classList.add('hidden');
             document.getElementById('board-divider').classList.add('hidden');
@@ -805,13 +999,34 @@
             document.getElementById('deployment-dock').classList.remove('hidden');
             
             statusBox.style.color = "#00ffca";
-            statusBox.innerText = "Reset complete. Deploy your fleet vessels to start a new match.";
+            statusBox.innerText = "Re-deploy fleet vessels to request matchmaking validation.";
             
             buildDeploymentDock();
             renderGrid('your-board', handleFleetDeploymentClick, true);
             updateVisualDisplays();
+
+            pubnub.publish({ channel: myChannel, message: { type: 'signal-room-rematch', sender: myId } });
+        });
+
+        document.getElementById('btn-exit-lobby').addEventListener('click', () => {
+            pubnub.unsubscribe({ channels: [myChannel] });
             
-            pubnub.publish({ channel: myChannel, message: { type: 'sync-identity', name: myName, sender: myId } });
+            globalPlayers = {};
+            activeTurnOrder = [];
+            currentTurnUserId = null;
+            iamReady = false;
+            matchIsActive = false;
+            initFleetStructures();
+
+            document.getElementById('game-over-container').classList.add('hidden');
+            document.getElementById('opponent-container').classList.add('hidden');
+            document.getElementById('board-divider').classList.add('hidden');
+            document.getElementById('target-selector-container').classList.add('hidden');
+            document.getElementById('game-screen').classList.add('hidden');
+            
+            document.getElementById('lobby-screen').classList.remove('hidden');
+            statusBox.style.color = "#00ffca";
+            statusBox.innerText = "System Reset. Disconnected from channel instance.";
         });
     </script>
 </body>
