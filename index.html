@@ -46,7 +46,7 @@
         .board-title { font-size: 0.95rem; color: #aaa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; font-weight: bold; }
         .grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; width: 100%; aspect-ratio: 1; margin: 0 auto; box-sizing: border-box; background: #151515; padding: 4px; border-radius: 6px; }
         
-        /* Cell States & expanded views */
+        /* Cell States */
         .cell { background: #262626; aspect-ratio: 1; border-radius: 3px; border: 1px solid #111; position: relative; cursor: pointer; }
         .cell.ship { background: #555; border: 1px solid #777; }
         .cell.hit { background: #ff3838; }
@@ -72,7 +72,7 @@
 </head>
 <body>
 
-    <h1>Battleships Pro (Multiplayer)</h1>
+    <h1>Battleships Pro (Multiplayer) V2</h1>
     <div id="status-box" class="status">Initializing System...</div>
 
     <div id="game-modal" class="modal-overlay hidden">
@@ -141,8 +141,7 @@
         let pubnub, myChannel, myName;
         let myId = "user_" + Math.random().toString(36).substring(2, 7);
         
-        // Multiplayer State Registries
-        let globalPlayers = {}; // Structure: { userId: { name, active, ready, lost, boardHits: [] } }
+        let globalPlayers = {}; 
         let currentTurnUserId = null;
         let iamReady = false;
         let matchIsActive = false;
@@ -190,7 +189,6 @@
             myChannel = 'bbship_v6_room_' + roomCode;
             document.getElementById('your-board-header').innerText = `${myName}'s Fleet`;
             
-            // Register local profile entry
             globalPlayers[myId] = { name: myName, active: true, ready: false, lost: false, boardHits: Array(100).fill(0) };
 
             pubnub.addListener({
@@ -217,7 +215,6 @@
                         checkMatchActivation();
                     }
                     else if (data.type === 'shot') {
-                        // ANONYMOUS MECHANIC RULE: We receive data.targetId, but don't output who data.sender was!
                         if (data.targetId === myId) {
                             handleIncomingShot(data.coord);
                         }
@@ -233,7 +230,6 @@
                         if (globalPlayers[data.sender]) {
                             globalPlayers[data.sender].finalFleetMap = data.fleetLocations;
                         }
-                        // Refresh grid view immediately if currently looking at this dead player
                         if (document.getElementById('enemy-target-picker').value === data.sender) {
                             renderSelectedOpponentGrid();
                         }
@@ -242,7 +238,6 @@
             });
             pubnub.subscribe({ channels: [myChannel] });
 
-            // Broadcast introduction beacon across the peer group
             pubnub.publish({ channel: myChannel, message: { type: 'sync-identity', name: myName, sender: myId } });
 
             document.getElementById('lobby-screen').classList.add('hidden');
@@ -270,7 +265,7 @@
             
             let elementsAdded = 0;
             for (let pId in globalPlayers) {
-                if (pId === myId) continue; // Keep your own name out of your weapon lock matrix
+                if (pId === myId) continue; 
                 const opt = document.createElement('option');
                 opt.value = pId;
                 opt.innerText = globalPlayers[pId].name + (globalPlayers[pId].lost ? " (ELIMINATED)" : "");
@@ -287,7 +282,7 @@
 
         document.getElementById('enemy-target-picker').addEventListener('change', renderSelectedOpponentGrid);
 
-        // --- STEP 2: PLACEMENT & READY CHECKS ---
+        // --- STEP 2: PLACEMENT ENGINE ---
         function buildDeploymentDock() {
             const container = document.getElementById('ship-buttons-container');
             container.innerHTML = '';
@@ -300,7 +295,6 @@
                 container.appendChild(btn);
             });
 
-            // Ensure baseline directions clean out cleanly
             document.getElementById('btn-dir').onclick = (e) => {
                 placementOrientation = placementOrientation === "H" ? "V" : "H";
                 e.target.innerText = `Direction: ${placementOrientation === "H" ? "HORIZONTAL" : "VERTICAL"}`;
@@ -408,21 +402,17 @@
         }
 
         function checkMatchActivation() {
-            // Count registered player nodes inside memory space
             let totalPlayers = Object.keys(globalPlayers).length;
-            if (totalPlayers < 2) return; // Keep waiting for a peer to discover the channel room
+            if (totalPlayers < 2) return; 
 
-            // Confirm that every discovered player has tapped "Commence Battle"
             for (let pId in globalPlayers) {
                 if (!globalPlayers[pId].ready) return;
             }
 
             if (!matchIsActive) {
                 matchIsActive = true;
-                
-                // Establish absolute sorted sequence array loop order cleanly
                 let sortedIds = Object.keys(globalPlayers).sort();
-                currentTurnUserId = sortedIds[0]; // First alphabetical player opens fire
+                currentTurnUserId = sortedIds[0]; 
                 
                 document.getElementById('opponent-container').classList.remove('hidden');
                 document.getElementById('board-divider').classList.remove('hidden');
@@ -434,22 +424,19 @@
             }
         }
 
-        // --- STEP 3: RING TURN ENGINE & SELECTION CORES ---
+        // --- STEP 3: ASYNC-SAFE MULTIPLAYER GAME ENGINE ---
         function renderSelectedOpponentGrid() {
             const targetId = document.getElementById('enemy-target-picker').value;
             if (!targetId) return;
             
-            // Build the grid frame layout
             renderGrid('opponent-board', handleMyStrikeClick, false);
             
-            // Paint hit matrices map matching that enemy node target profile
             const targetProfile = globalPlayers[targetId];
             const oppCells = document.querySelectorAll('#opponent-board .cell');
             oppCells.forEach((cell, i) => {
                 if (targetProfile.boardHits[i] === 1) cell.className = 'cell hit';
                 if (targetProfile.boardHits[i] === 2) cell.className = 'cell miss';
                 
-                // End game visualization check: display unhit ships in orange if they shared data
                 if (targetProfile.finalFleetMap && targetProfile.finalFleetMap[i] === 1 && targetProfile.boardHits[i] === 0) {
                     cell.className = 'cell revealed-ship';
                 }
@@ -509,9 +496,9 @@
             const targetId = document.getElementById('enemy-target-picker').value;
             if (!targetId) return;
             if (globalPlayers[targetId].lost) return alert("This fleet is already scuttled! Choose a living system target.");
-            if (globalPlayers[targetId].boardHits[coord] !== 0) return; // Prevent clicking already shot cells
+            if (globalPlayers[targetId].boardHits[coord] !== 0) return; 
             
-            statusBox.innerText = "Firing weapon systems anonymously...";
+            statusBox.innerText = "Firing ordnance tracking vectors...";
             
             pubnub.publish({ 
                 channel: myChannel, 
@@ -542,7 +529,7 @@
                 channel: myChannel, 
                 message: { 
                     type: 'result', 
-                    attackerId: currentTurnUserId, // Broadcast back down channel map explicitly
+                    attackerId: currentTurnUserId, 
                     targetId: myId,
                     coord: coord, 
                     isHit: isHit, 
@@ -560,9 +547,6 @@
                 showModal("DEFEAT", "All your vessels have been scuttled. Broadcasting your ship locations to all surviving players...", "sunk-theme");
                 
                 pubnub.publish({ channel: myChannel, message: { type: 'endgame-reveal', fleetLocations: yourFleetLocations, sender: myId } });
-                
-                // Give up turn token immediately if we were hit out of nowhere
-                passTurnToNextPlayer();
             } else {
                 if (sunkShipName) {
                     showModal("SHIP DESTROYED", `An anonymous projectile completely sunk your ${sunkShipName}!`, "sunk-theme");
@@ -571,7 +555,7 @@
         }
 
         function handleShotFeedback(attackerId, targetId, coord, isHit, sunkShipName, targetLostHandshake) {
-            // Update tracking grid map globally across all observers
+            // 1. Update matching data matrix registries safely across all connected peers
             if (globalPlayers[targetId]) {
                 globalPlayers[targetId].boardHits[coord] = isHit ? 1 : 2;
                 if (targetLostHandshake) globalPlayers[targetId].lost = true;
@@ -579,19 +563,23 @@
             
             updateVisualDisplays();
 
-            // Run status outputs strictly if we were the attacker who initiated the firing call
+            // 2. Output custom alert UI cards if you were the individual who sent the firing shot
             if (attackerId === myId) {
                 const targetedName = globalPlayers[targetId].name;
                 if (targetLostHandshake) {
                     showModal("TARGET ELIMINATED!", `Spectacular shot! You completely broke ${targetedName}'s final lines and scuttled their fleet!`, "victory-theme");
                 } else if (sunkShipName) {
                     showModal("VEHICLE SUNK", `Direct Hit! You completely sunk ${targetedName}'s ${sunkShipName}!`, "victory-theme");
+                } else {
+                    statusBox.innerText = isHit ? "Direct Hit logged on enemy lines!" : "Splash. Ordnance missed targets.";
                 }
                 
-                // Check if we are the last player standing in the room
                 checkVictoryConditions();
-                
-                // Move turn loop sequence token forward explicitly
+            }
+
+            // 3. TO PREVENT LOCKOUT: Only the player who was targeted and hit handles calculating the next turn 
+            // once their local data state is fully updated.
+            if (targetId === myId) {
                 passTurnToNextPlayer();
             }
         }
@@ -602,7 +590,6 @@
             let foundNext = false;
             let loopCounter = 0;
 
-            // Find the next active living player down the alphabetical line
             while (!foundNext && loopCounter < sortedIds.length) {
                 currentIndex = (currentIndex + 1) % sortedIds.length;
                 let evaluationId = sortedIds[currentIndex];
@@ -613,11 +600,8 @@
                 loopCounter++;
             }
 
-            // Only the current player broadcasts the turn handoff packet to keep things perfectly in sync
-            if (myId === sortedIds[sortedIds.indexOf(currentTurnUserId === myId ? myId : currentTurnUserId)]) {
-                pubnub.publish({ channel: myChannel, message: { type: 'pass-turn', nextUserId: currentTurnUserId, sender: myId } });
-            }
-            updateTurnHeader();
+            // Publish the turn pass over-the-air to sync all player screens
+            pubnub.publish({ channel: myChannel, message: { type: 'pass-turn', nextUserId: currentTurnUserId, sender: myId } });
         }
 
         function checkVictoryConditions() {
@@ -636,19 +620,16 @@
                     showModal("CHAMPION", "You have wiped out all opposing naval operations in this theater of war! Total Victory!", "victory-theme");
                 }
                 
-                // Expose New Game Button
                 document.getElementById('game-over-container').classList.remove('hidden');
             }
         }
 
         // --- STEP 4: CLEAN RESET ENGINE ---
         document.getElementById('btn-reset').addEventListener('click', () => {
-            // Wipe your own maps
             initFleetStructures();
             iamReady = false;
             matchIsActive = false;
             
-            // Clean global peer maps while keeping names intact
             for (let pId in globalPlayers) {
                 globalPlayers[pId].ready = false;
                 globalPlayers[pId].lost = false;
@@ -656,7 +637,6 @@
                 delete globalPlayers[pId].finalFleetMap;
             }
 
-            // UI panel resetting state shifts
             document.getElementById('game-over-container').classList.add('hidden');
             document.getElementById('opponent-container').classList.add('hidden');
             document.getElementById('board-divider').classList.add('hidden');
@@ -670,7 +650,6 @@
             renderGrid('your-board', handleFleetDeploymentClick, true);
             updateVisualDisplays();
             
-            // Broadcast your fresh join request across the existing group wire
             pubnub.publish({ channel: myChannel, message: { type: 'sync-identity', name: myName, sender: myId } });
         });
     </script>
