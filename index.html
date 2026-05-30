@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Serverless Battleships</title>
+    <title>100% Serverless Battleships</title>
     
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 
@@ -22,27 +21,37 @@
         .cell.hit { background: red; }
         .cell.miss { background: blue; }
         button { background: #3498db; color: white; border: none; padding: 12px 24px; border-radius: 5px; cursor: pointer; font-size: 1rem; margin: 5px; font-weight: bold; }
-        button:active { background: #2980b9; }
+        textarea { width: 80%; max-width: 300px; background: #222; color: #fff; border: 1px solid #444; padding: 5px; border-radius: 4px; }
     </style>
 </head>
 <body>
 
-    <h1>WebRTC Battleships</h1>
-    <div id="status-box" class="status">Initializing...</div>
+    <h1>Pure P2P Battleships</h1>
+    <div id="status-box" class="status">System Ready. Choose Role.</div>
 
-    <div id="connection-flow" class="hidden">
+    <div id="connection-flow">
         <button id="btn-host">Host Game</button>
         <button id="btn-join">Join Game</button>
         
         <div id="host-ui" class="hidden">
-            <p>Phone A: Displaying Join Token</p>
+            <p><strong>Step 1:</strong> Phone B must scan this QR code:</p>
             <div id="qrcode" class="qr-area"></div>
-            <p>Keep this screen open while Phone B scans.</p>
+            <hr style="border-color: #333;">
+            <p><strong>Step 3:</strong> Once Phone B generates their Answer QR, scan it using the button below:</p>
+            <button id="btn-host-scan-answer">Scan Phone B Answer</button>
+            <div id="host-reader-container" class="hidden">
+                <div id="host-reader"></div>
+            </div>
         </div>
 
         <div id="join-ui" class="hidden">
-            <p>Phone B: Align camera to scan Phone A</p>
+            <p><strong>Step 2:</strong> Scan Phone A's QR code:</p>
             <div id="reader"></div>
+            
+            <div id="joiner-answer-ui" class="hidden">
+                <p><strong>Step 2 Cont:</strong> Phone A must now scan this Answer QR to finalize connection:</p>
+                <div id="qrcode-answer" class="qr-area"></div>
+            </div>
         </div>
     </div>
 
@@ -58,101 +67,117 @@
     <script>
         const statusBox = document.getElementById('status-box');
         const turnDisplay = document.getElementById('turn-display');
-        let peer, conn, html5QrcodeScanner;
+        let localConnection, dataChannel;
         let myRole, myTurn = false;
         
         const boardSize = 10;
         let opponentBoardHits = Array(boardSize * boardSize).fill(0);
         let yourFleetLocations = Array(boardSize * boardSize).fill(0);
 
-        function initPeer() {
-            // Instantiates connecting loop using defaults to standard PeerJS infrastructure
-            peer = new Peer();
+        // Native, zero-cloud WebRTC Configuration
+        const rtcConfig = { iceServers: [] }; // Empty array forces local-only networking without querying STUN servers
 
-            peer.on('open', (id) => {
-                statusBox.innerText = "System Ready. Choose Role.";
-                document.getElementById('connection-flow').classList.remove('hidden');
-                initHostFlow(id);
-                initJoinFlow();
+        // --- HOST LOGIC ---
+        document.getElementById('btn-host').addEventListener('click', () => {
+            myRole = 'host';
+            document.getElementById('host-ui').classList.remove('hidden');
+            document.getElementById('btn-join').classList.add('hidden');
+            document.getElementById('btn-host').classList.add('hidden');
+            statusBox.innerText = "Generating local host offer...";
+
+            localConnection = new RTCPeerConnection(rtcConfig);
+            
+            // Create the data pipeline
+            dataChannel = localConnection.createDataChannel("battleship-channel");
+            setupDataChannelSignals(dataChannel);
+
+            // Generate Connection Token
+            localConnection.createOffer().then(offer => localConnection.setLocalDescription(offer)).then(() => {
+                // Encode the local description token into base64 to put cleanly inside a QR code
+                const hostToken = btoa(JSON.stringify(localConnection.localDescription));
+                new QRCode(document.getElementById("qrcode"), { text: hostToken, width: 250, height: 250 });
+                statusBox.innerText = "Host QR Ready. Awaiting Phone B Scan.";
             });
 
-            peer.on('error', (err) => {
-                statusBox.style.color = "#ff4444";
-                statusBox.innerText = `PeerJS Cloud Error: ${err.type}`;
-                console.error(err);
-            });
-        }
-
-        // HOST FLOW (Phone A)
-        function initHostFlow(hostId) {
-            document.getElementById('btn-host').addEventListener('click', () => {
-                myRole = 'host';
-                document.getElementById('host-ui').classList.remove('hidden');
-                document.getElementById('join-ui').classList.add('hidden');
-                statusBox.innerText = "Waiting for Player 2 to scan...";
-                
-                document.getElementById("qrcode").innerHTML = "";
-                new QRCode(document.getElementById("qrcode"), {
-                    text: hostId, width: 250, height: 250
-                });
-            });
-
-            peer.on('connection', (c) => {
-                setupConnection(c);
-            });
-        }
-
-        // JOIN FLOW (Phone B)
-        function initJoinFlow() {
-            document.getElementById('btn-join').addEventListener('click', () => {
-                myRole = 'client';
-                document.getElementById('join-ui').classList.remove('hidden');
-                document.getElementById('host-ui').classList.add('hidden');
-                statusBox.innerText = "Starting Camera Engine...";
-
-                // Instantiating the unified html5Qrcode API
-                html5QrcodeScanner = new Html5Qrcode("reader");
-                
-                html5QrcodeScanner.start(
-                    { facingMode: "environment" }, 
-                    { fps: 10, qrbox: { width: 250, height: 250 } },
+            // Handle scanning the response back from the client
+            document.getElementById('btn-host-scan-answer').addEventListener('click', () => {
+                document.getElementById('host-reader-container').classList.remove('hidden');
+                let hostScanner = new Html5Qrcode("host-reader");
+                hostScanner.start(
+                    { facingMode: "environment" },
+                    { fps: 10, qrbox: 230 },
                     (decodedText) => {
-                        // Success Callback: Token Intercepted!
-                        html5QrcodeScanner.stop().then(() => {
-                            document.getElementById('join-ui').classList.add('hidden');
-                            connectToHost(decodedText);
-                        }).catch(err => console.error("Failed to stop scanner cleanly", err));
+                        hostScanner.stop().then(() => {
+                            document.getElementById('host-reader-container').classList.add('hidden');
+                            const answerDesc = new RTCSessionDescription(JSON.parse(atob(decodedText)));
+                            localConnection.setRemoteDescription(answerDesc);
+                        });
                     },
-                    (errorMessage) => { /* Ignore standard video frame focus warnings */ }
-                ).catch(err => {
-                    statusBox.style.color = "#ff4444";
-                    statusBox.innerText = "Camera failed. Check HTTPS context or site permissions.";
-                    console.error(err);
-                });
+                    () => {}
+                );
             });
-        }
+        });
 
-        function connectToHost(hostId) {
-            statusBox.innerText = `Connecting to Host...`;
-            conn = peer.connect(hostId);
-            setupConnection(conn);
-        }
+        // --- CLIENT LOGIC ---
+        document.getElementById('btn-join').addEventListener('click', () => {
+            myRole = 'client';
+            document.getElementById('join-ui').classList.remove('hidden');
+            document.getElementById('btn-join').classList.add('hidden');
+            document.getElementById('btn-host').classList.add('hidden');
+            statusBox.innerText = "Awaiting camera frame validation...";
 
-        function setupConnection(connection) {
-            conn = connection;
-            conn.on('open', () => {
+            localConnection = new RTCPeerConnection(rtcConfig);
+            
+            // Listen for the data pipeline from the host
+            localConnection.ondatachannel = (event) => {
+                dataChannel = event.channel;
+                setupDataChannelSignals(dataChannel);
+            };
+
+            let clientScanner = new Html5Qrcode("reader");
+            clientScanner.start(
+                { facingMode: "environment" },
+                { fps: 10, qrbox: 230 },
+                (decodedText) => {
+                    clientScanner.stop().then(() => {
+                        document.getElementById('reader').classList.add('hidden');
+                        statusBox.innerText = "Processing Host Offer...";
+                        
+                        const offerDesc = new RTCSessionDescription(JSON.parse(atob(decodedText)));
+                        localConnection.setRemoteDescription(offerDesc).then(() => {
+                            return localConnection.createAnswer();
+                        }).then(answer => {
+                            return localConnection.setLocalDescription(answer);
+                        }).then(() => {
+                            // Generate client's answer back token
+                            const clientToken = btoa(JSON.stringify(localConnection.localDescription));
+                            document.getElementById('joiner-answer-ui').classList.remove('hidden');
+                            new QRCode(document.getElementById("qrcode-answer"), { text: clientToken, width: 250, height: 250 });
+                            statusBox.innerText = "Answer Token Created! Show this to Phone A.";
+                        });
+                    });
+                },
+                () => {}
+            );
+        });
+
+        // --- DATA CHANNEL EVENT ROUTING ---
+        function setupDataChannelSignals(channel) {
+            channel.onopen = () => {
                 document.getElementById('connection-flow').classList.add('hidden');
                 document.getElementById('game-ui').classList.remove('hidden');
-                statusBox.innerText = `Connected! Let's play.`;
+                statusBox.innerText = "Local P2P Connected!";
                 initialiseGame();
-            });
+            };
 
-            conn.on('data', (data) => {
+            channel.onmessage = (event) => {
+                const data = JSON.parse(event.data);
                 if (data.type === 'shot') handleOpponentShot(data.coord);
                 if (data.type === 'result') handleShotResult(data.coord, data.isHit);
-            });
+            };
         }
 
+        // --- CORE GAME ENGINE ---
         function initialiseGame() {
             if (myRole === 'host') {
                 myTurn = true;
@@ -162,7 +187,7 @@
                 turnDisplay.innerText = "Opponent's Turn";
             }
 
-            // Put 5 mock ship coordinates down for initial configuration verification
+            // Scatter 5 ships for testing
             for (let i = 0; i < 5; i++) {
                 yourFleetLocations[Math.floor(Math.random() * 100)] = 1;
             }
@@ -198,14 +223,14 @@
 
         function handleMyShot(coord) {
             if (!myTurn || opponentBoardHits[coord] !== 0) return;
-            conn.send({ type: 'shot', coord: coord });
+            dataChannel.send(JSON.stringify({ type: 'shot', coord: coord }));
             myTurn = false;
-            turnDisplay.innerText = "Waiting for result...";
+            turnDisplay.innerText = "Opponent's Turn";
         }
 
         function handleOpponentShot(coord) {
             const isHit = yourFleetLocations[coord] === 1;
-            conn.send({ type: 'result', coord: coord, isHit: isHit });
+            dataChannel.send(JSON.stringify({ type: 'result', coord: coord, isHit: isHit }));
             myTurn = true;
             turnDisplay.innerText = "Your Turn";
         }
@@ -213,35 +238,7 @@
         function handleShotResult(coord, isHit) {
             opponentBoardHits[coord] = isHit ? 1 : 2;
             updateBoardDisplays();
-            turnDisplay.innerText = "Opponent's Turn";
         }
-
-        // Diagnostic Initialization Snippet
-        window.addEventListener('load', () => {
-            statusBox.innerText = "Connecting to PeerJS Cloud...";
-            try {
-                if (typeof Peer === 'undefined') {
-                    statusBox.style.color = "#ff4444";
-                    statusBox.innerText = "Error: peerjs.min.js failed to load. Check file name formatting.";
-                    return;
-                }
-                if (typeof QRCode === 'undefined') {
-                    statusBox.style.color = "#ff4444";
-                    statusBox.innerText = "Error: qrcode.min.js failed to load. Check file name formatting.";
-                    return;
-                }
-                if (typeof Html5Qrcode === 'undefined') {
-                    statusBox.style.color = "#ff4444";
-                    statusBox.innerText = "Error: html5-qrcode.min.js failed to load. Check file name formatting.";
-                    return;
-                }
-                initPeer();
-            } catch (e) {
-                statusBox.style.color = "#ff4444";
-                statusBox.innerText = `Crash during file verification: ${e.message}`;
-                console.error(e);
-            }
-        });
     </script>
 </body>
 </html>
