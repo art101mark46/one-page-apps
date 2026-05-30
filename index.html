@@ -3,204 +3,171 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>100% Serverless Battleships</title>
+    <title>Battleships Room-Code Edition</title>
     
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+    <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.7.2.2.min.js"></script>
 
     <style>
         body { font-family: -apple-system, sans-serif; background: #121212; color: #fff; text-align: center; margin: 0; padding: 15px; }
         .hidden { display: none; }
         h1 { font-size: 1.5rem; margin-bottom: 5px; }
-        .status { background: #222; padding: 10px; border-radius: 8px; margin: 10px 0; font-weight: bold; color: #00ffca; }
-        .qr-area { background: #fff; padding: 10px; border-radius: 8px; max-width: 250px; margin: 15px auto; display: flex; justify-content: center; }
-        #reader { max-width: 300px; margin: 15px auto; background: #222; border-radius: 8px; overflow: hidden; }
-        .grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; max-width: 350px; aspect-ratio: 1; margin: 15px auto; }
-        .cell { background: #333; aspect-ratio: 1; border-radius: 2px; }
-        .cell.target { background: #ff4444; }
-        .cell.hit { background: red; }
-        .cell.miss { background: blue; }
-        button { background: #3498db; color: white; border: none; padding: 12px 24px; border-radius: 5px; cursor: pointer; font-size: 1rem; margin: 5px; font-weight: bold; }
-        textarea { width: 80%; max-width: 300px; background: #222; color: #fff; border: 1px solid #444; padding: 5px; border-radius: 4px; }
+        .status { background: #222; padding: 10px; border-radius: 8px; margin: 10px 0; font-weight: bold; color: #00ffca; min-height: 20px; }
+        
+        /* Room System Styling */
+        .setup-card { background: #1a1a1a; padding: 20px; border-radius: 12px; max-width: 320px; margin: 20px auto; border: 1px solid #333; }
+        input { background: #333; color: #fff; border: 1px solid #555; padding: 12px; border-radius: 6px; font-size: 1.2rem; width: 80%; text-align: center; margin-bottom: 10px; }
+        
+        /* Grid Layouts */
+        .grid-container { display: flex; flex-direction: column; align-items: center; gap: 15px; margin-top: 15px; }
+        .board-title { font-size: 0.9rem; color: #aaa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
+        .grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; width: 100%; max-width: 320px; aspect-ratio: 1; margin: 0 auto; }
+        
+        /* Cell States */
+        .cell { background: #262626; aspect-ratio: 1; border-radius: 2px; border: 1px solid #1a1a1a; transition: background 0.2s; }
+        .cell.ship { background: #555; border: 1px solid #888; } /* Your un-hit ships */
+        .cell.hit { background: #ff3838; position: relative; } /* Hit targets */
+        .cell.miss { background: #3867ff; } /* Missed targets */
+        
+        /* Little visual indicator dots inside cells */
+        .cell.hit::after { content: '×'; color: #fff; font-size: 14px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-weight: bold; }
+        
+        button { background: #3498db; color: white; border: none; padding: 14px 28px; border-radius: 6px; cursor: pointer; font-size: 1rem; font-weight: bold; width: 85%; margin: 8px 0; }
+        button:active { background: #2980b9; }
     </style>
 </head>
 <body>
 
-    <h1>Pure P2P Battleships</h1>
-    <div id="status-box" class="status">System Ready. Choose Role.</div>
+    <h1>Battleships P2P</h1>
+    <div id="status-box" class="status">Connecting to network cluster...</div>
 
-    <div id="connection-flow">
-        <button id="btn-host">Host Game</button>
-        <button id="btn-join">Join Game</button>
-        
-        <div id="host-ui" class="hidden">
-            <p><strong>Step 1:</strong> Phone B must scan this QR code:</p>
-            <div id="qrcode" class="qr-area"></div>
-            <hr style="border-color: #333;">
-            <p><strong>Step 3:</strong> Once Phone B generates their Answer QR, scan it using the button below:</p>
-            <button id="btn-host-scan-answer">Scan Phone B Answer</button>
-            <div id="host-reader-container" class="hidden">
-                <div id="host-reader"></div>
-            </div>
-        </div>
-
-        <div id="join-ui" class="hidden">
-            <p><strong>Step 2:</strong> Scan Phone A's QR code:</p>
-            <div id="reader"></div>
-            
-            <div id="joiner-answer-ui" class="hidden">
-                <p><strong>Step 2 Cont:</strong> Phone A must now scan this Answer QR to finalize connection:</p>
-                <div id="qrcode-answer" class="qr-area"></div>
-            </div>
+    <div id="lobby-screen" class="hidden">
+        <div class="setup-card">
+            <h3>Create or Join Game</h3>
+            <p style="color: #aaa; font-size: 0.9rem;">Enter a matching 4-digit code on both devices to pair instantly.</p>
+            <input type="number" id="room-input" pattern="[0-9]*" placeholder="Enter 4-Digit Code" max="9999">
+            <button id="btn-start">Connect & Play</button>
         </div>
     </div>
 
-    <div id="game-ui" class="hidden">
-        <h3>Game Active!</h3>
-        <p>Turn: <span id="turn-display">Waiting...</span></p>
-        <div id="opponent-board" class="grid"></div>
-        <hr>
-        <h4>Your Fleet</h4>
-        <div id="your-board" class="grid"></div>
+    <div id="game-screen" class="hidden">
+        <div class="grid-container">
+            <div>
+                <div class="board-title">Opponent's Fleet (Your Target)</div>
+                <div id="opponent-board" class="grid"></div>
+            </div>
+            <hr style="width: 100%; border: 0; border-top: 1px solid #222; margin: 5px 0;">
+            <div>
+                <div class="board-title">Your Fleet & Incoming Attacks</div>
+                <div id="your-board" class="grid"></div>
+            </div>
+        </div>
     </div>
 
     <script>
         const statusBox = document.getElementById('status-box');
-        const turnDisplay = document.getElementById('turn-display');
-        let localConnection, dataChannel;
-        let myRole, myTurn = false;
+        let pubnub, myChannel, roomCode;
+        let myRole = null; // 'host' or 'guest'
+        let myTurn = false;
         
         const boardSize = 10;
-        let opponentBoardHits = Array(boardSize * boardSize).fill(0);
-        let yourFleetLocations = Array(boardSize * boardSize).fill(0);
+        
+        // Tracking states
+        let opponentBoardHits = Array(100).fill(0); // What WE did to them (0=empty, 1=hit, 2=miss)
+        let yourFleetLocations = Array(100).fill(0); // 0=water, 1=ship, 2=incoming miss, 3=incoming hit
 
-        // Native, zero-cloud WebRTC Configuration
-        const rtcConfig = { iceServers: [] }; // Empty array forces local-only networking without querying STUN servers
-
-        // --- HOST LOGIC ---
-        document.getElementById('btn-host').addEventListener('click', () => {
-            myRole = 'host';
-            document.getElementById('host-ui').classList.remove('hidden');
-            document.getElementById('btn-join').classList.add('hidden');
-            document.getElementById('btn-host').classList.add('hidden');
-            statusBox.innerText = "Generating local host offer...";
-
-            localConnection = new RTCPeerConnection(rtcConfig);
-            
-            // Create the data pipeline
-            dataChannel = localConnection.createDataChannel("battleship-channel");
-            setupDataChannelSignals(dataChannel);
-
-            // Generate Connection Token
-            localConnection.createOffer().then(offer => localConnection.setLocalDescription(offer)).then(() => {
-                // Encode the local description token into base64 to put cleanly inside a QR code
-                const hostToken = btoa(JSON.stringify(localConnection.localDescription));
-                new QRCode(document.getElementById("qrcode"), { text: hostToken, width: 250, height: 250 });
-                statusBox.innerText = "Host QR Ready. Awaiting Phone B Scan.";
+        // Connect to a global test pipeline instantly
+        function initNetwork() {
+            pubnub = new PubNub({
+                publishKey: 'pub-c-8fa82b54-bc70-4d51-9c86-17fa003e8c11', // Public open developer tokens
+                subscribeKey: 'sub-c-1a5ddbc5-fa80-4df2-a3bd-a5b50d53513a',
+                userId: "user_" + Math.random().toString(36).substring(2, 7)
             });
-
-            // Handle scanning the response back from the client
-            document.getElementById('btn-host-scan-answer').addEventListener('click', () => {
-                document.getElementById('host-reader-container').classList.remove('hidden');
-                let hostScanner = new Html5Qrcode("host-reader");
-                hostScanner.start(
-                    { facingMode: "environment" },
-                    { fps: 10, qrbox: 230 },
-                    (decodedText) => {
-                        hostScanner.stop().then(() => {
-                            document.getElementById('host-reader-container').classList.add('hidden');
-                            const answerDesc = new RTCSessionDescription(JSON.parse(atob(decodedText)));
-                            localConnection.setRemoteDescription(answerDesc);
-                        });
-                    },
-                    () => {}
-                );
-            });
-        });
-
-        // --- CLIENT LOGIC ---
-        document.getElementById('btn-join').addEventListener('click', () => {
-            myRole = 'client';
-            document.getElementById('join-ui').classList.remove('hidden');
-            document.getElementById('btn-join').classList.add('hidden');
-            document.getElementById('btn-host').classList.add('hidden');
-            statusBox.innerText = "Awaiting camera frame validation...";
-
-            localConnection = new RTCPeerConnection(rtcConfig);
             
-            // Listen for the data pipeline from the host
-            localConnection.ondatachannel = (event) => {
-                dataChannel = event.channel;
-                setupDataChannelSignals(dataChannel);
-            };
-
-            let clientScanner = new Html5Qrcode("reader");
-            clientScanner.start(
-                { facingMode: "environment" },
-                { fps: 10, qrbox: 230 },
-                (decodedText) => {
-                    clientScanner.stop().then(() => {
-                        document.getElementById('reader').classList.add('hidden');
-                        statusBox.innerText = "Processing Host Offer...";
-                        
-                        const offerDesc = new RTCSessionDescription(JSON.parse(atob(decodedText)));
-                        localConnection.setRemoteDescription(offerDesc).then(() => {
-                            return localConnection.createAnswer();
-                        }).then(answer => {
-                            return localConnection.setLocalDescription(answer);
-                        }).then(() => {
-                            // Generate client's answer back token
-                            const clientToken = btoa(JSON.stringify(localConnection.localDescription));
-                            document.getElementById('joiner-answer-ui').classList.remove('hidden');
-                            new QRCode(document.getElementById("qrcode-answer"), { text: clientToken, width: 250, height: 250 });
-                            statusBox.innerText = "Answer Token Created! Show this to Phone A.";
-                        });
-                    });
-                },
-                () => {}
-            );
-        });
-
-        // --- DATA CHANNEL EVENT ROUTING ---
-        function setupDataChannelSignals(channel) {
-            channel.onopen = () => {
-                document.getElementById('connection-flow').classList.add('hidden');
-                document.getElementById('game-ui').classList.remove('hidden');
-                statusBox.innerText = "Local P2P Connected!";
-                initialiseGame();
-            };
-
-            channel.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-                if (data.type === 'shot') handleOpponentShot(data.coord);
-                if (data.type === 'result') handleShotResult(data.coord, data.isHit);
-            };
+            statusBox.innerText = "Connected. Enter a room code below.";
+            document.getElementById('lobby-screen').classList.remove('hidden');
         }
 
-        // --- CORE GAME ENGINE ---
+        document.getElementById('btn-start').addEventListener('click', () => {
+            roomCode = document.getElementById('room-input').value.trim();
+            if (roomCode.length < 2) {
+                alert("Please enter a valid code.");
+                return;
+            }
+            
+            myChannel = 'game_room_' + roomCode;
+            statusBox.innerText = `Entering Room ${roomCode}...`;
+            
+            // Listen for communications inside this room channel
+            pubnub.addListener({
+                message: function(event) {
+                    const data = event.message;
+                    if (event.publisher === pubnub.getUserId()) return; // Ignore your own broadcast echoing back
+
+                    if (data.type === 'ping' && myRole === 'host') {
+                        // Guest arrived! Host responds confirming structure
+                        myTurn = true;
+                        statusBox.innerText = "Player 2 Connected! Your turn to strike.";
+                        pubnub.publish({ channel: myChannel, message: { type: 'ack' } });
+                        initialiseGame();
+                    }
+                    else if (data.type === 'ack' && myRole === 'guest') {
+                        // Host responded to our discovery signal
+                        statusBox.innerText = "Connected to Host. Opponent's turn.";
+                        myTurn = false;
+                        initialiseGame();
+                    }
+                    else if (data.type === 'shot') {
+                        handleIncomingShot(data.coord);
+                    }
+                    else if (data.type === 'result') {
+                        handleShotFeedback(data.coord, data.isHit);
+                    }
+                }
+            });
+
+            pubnub.subscribe({ channels: [myChannel] });
+
+            // The first device to shout into the channel claims 'host'. 
+            // If someone is already there, you become the 'guest'.
+            myRole = 'host'; 
+            
+            // Broadcast your presence down the channel line
+            setTimeout(() => {
+                myRole = 'guest'; // Default down to guest during probe
+                pubnub.publish({ channel: myChannel, message: { type: 'ping' } });
+                
+                // Set a short fallback window. If no host responds within 1 second, secure the Host role.
+                setTimeout(() => {
+                    if (statusBox.innerText.includes("Entering Room")) {
+                        myRole = 'host';
+                        statusBox.innerText = `Room ${roomCode}: Waiting for opponent to enter same code...`;
+                    }
+                }, 1000);
+            }, 500);
+        });
+
+        // --- GAME ENGINE ---
         function initialiseGame() {
-            if (myRole === 'host') {
-                myTurn = true;
-                turnDisplay.innerText = "Your Turn";
-            } else {
-                myTurn = false;
-                turnDisplay.innerText = "Opponent's Turn";
-            }
+            document.getElementById('lobby-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('hidden');
 
-            // Scatter 5 ships for testing
-            for (let i = 0; i < 5; i++) {
-                yourFleetLocations[Math.floor(Math.random() * 100)] = 1;
-            }
+            // Set up a basic template fleet (5 arbitrary test plots)
+            // Replace with interactive placements later
+            yourFleetLocations[12] = 1;
+            yourFleetLocations[25] = 1;
+            yourFleetLocations[44] = 1;
+            yourFleetLocations[57] = 1;
+            yourFleetLocations[81] = 1;
 
-            renderGrid('opponent-board', handleMyShot);
+            renderGrid('opponent-board', handleMyStrikeClick);
             renderGrid('your-board', null);
-            updateBoardDisplays();
+            updateVisualDisplays();
         }
 
         function renderGrid(containerId, clickHandler) {
             const container = document.getElementById(containerId);
             container.innerHTML = '';
-            for (let i = 0; i < boardSize * boardSize; i++) {
+            for (let i = 0; i < 100; i++) {
                 const cell = document.createElement('div');
                 cell.className = 'cell';
                 if (clickHandler) cell.addEventListener('click', () => clickHandler(i));
@@ -208,37 +175,61 @@
             }
         }
 
-        function updateBoardDisplays() {
+        function updateVisualDisplays() {
+            // Update upper attacking targeting grid
             const oppCells = document.querySelectorAll('#opponent-board .cell');
             oppCells.forEach((cell, i) => {
+                cell.className = 'cell';
                 if (opponentBoardHits[i] === 1) cell.className = 'cell hit';
                 if (opponentBoardHits[i] === 2) cell.className = 'cell miss';
             });
 
+            // Update your base fleet layout AND reflect incoming strikes
             const yourCells = document.querySelectorAll('#your-board .cell');
             yourCells.forEach((cell, i) => {
-                if (yourFleetLocations[i] === 1) cell.className = 'cell target';
+                cell.className = 'cell';
+                
+                if (yourFleetLocations[i] === 1) cell.className = 'cell ship'; // Healthy ship
+                if (yourFleetLocations[i] === 2) cell.className = 'cell miss'; // They targeted here but missed
+                if (yourFleetLocations[i] === 3) cell.className = 'cell hit';  // They targeted here and CRASHED your ship!
             });
         }
 
-        function handleMyShot(coord) {
+        function handleMyStrikeClick(coord) {
             if (!myTurn || opponentBoardHits[coord] !== 0) return;
-            dataChannel.send(JSON.stringify({ type: 'shot', coord: coord }));
+            
+            statusBox.innerText = "Firing shell...";
             myTurn = false;
-            turnDisplay.innerText = "Opponent's Turn";
+            
+            pubnub.publish({ channel: myChannel, message: { type: 'shot', coord: coord } });
         }
 
-        function handleOpponentShot(coord) {
+        function handleIncomingShot(coord) {
+            // Check if they successfully hit one of our layout plots
             const isHit = yourFleetLocations[coord] === 1;
-            dataChannel.send(JSON.stringify({ type: 'result', coord: coord, isHit: isHit }));
+            
+            // Mark our fleet map state dynamically to reflect the hit/miss on our lower board
+            yourFleetLocations[coord] = isHit ? 3 : 2; 
+            updateVisualDisplays();
+
+            // Send feedback back to the attacker immediately
+            pubnub.publish({ channel: myChannel, message: { type: 'result', coord: coord, isHit: isHit } });
+            
             myTurn = true;
-            turnDisplay.innerText = "Your Turn";
+            statusBox.style.color = "#00ffca";
+            statusBox.innerText = "Your Turn to Strike!";
         }
 
-        function handleShotResult(coord, isHit) {
+        function handleShotFeedback(coord, isHit) {
+            // Process the result of the strike WE threw
             opponentBoardHits[coord] = isHit ? 1 : 2;
-            updateBoardDisplays();
+            updateVisualDisplays();
+            
+            statusBox.style.color = "#ffb300";
+            statusBox.innerText = "Opponent's Turn. Defend your fleet.";
         }
+
+        window.addEventListener('load', initNetwork);
     </script>
 </body>
 </html>
