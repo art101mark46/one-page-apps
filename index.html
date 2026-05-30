@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Battleships Ultimate P2P</title>
+    <title>Battleships Pro Ultimate</title>
     
     <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.7.2.2.min.js"></script>
 
@@ -50,20 +50,38 @@
         .cell.ship { background: #555; border: 1px solid #777; }
         .cell.hit { background: #ff3838; }
         .cell.miss { background: #3867ff; }
+        .cell.revealed-ship { background: #d35400; border: 1px solid #e67e22; opacity: 0.85; } /* End game verification style */
         
         .cell.preview-valid { background: #9b59b6 !important; border: 1px solid #e040fb; opacity: 0.9; }
         .cell.preview-invalid { background: #c0392b !important; border: 1px solid #ff0000; opacity: 0.6; }
         
         .cell.hit::after { content: '×'; color: #fff; font-size: 18px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-weight: bold; }
+        .cell.revealed-ship::after { content: '▰'; color: #fff; font-size: 12px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
         
         .main-btn { background: #3498db; color: white; border: none; padding: 16px; border-radius: 6px; cursor: pointer; font-size: 1.1rem; font-weight: bold; width: 100%; box-sizing: border-box; margin-top: 10px; }
         .main-btn:disabled { background: #333; color: #666; cursor: not-allowed; border: 1px dashed #444; }
+
+        /* Custom Theme Modal Overlays */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; box-sizing: border-box; }
+        .modal-content { background: #1a1a1a; border: 2px solid #3498db; border-radius: 12px; max-width: 360px; width: 100%; padding: 25px; box-sizing: border-box; text-align: center; box-shadow: 0 0 20px rgba(52, 152, 219, 0.4); }
+        .modal-content.sunk-theme { border-color: #e74c3c; box-shadow: 0 0 20px rgba(231, 76, 60, 0.4); }
+        .modal-content.victory-theme { border-color: #2ecc71; box-shadow: 0 0 20px rgba(46, 204, 113, 0.4); }
+        .modal-content h3 { margin-top: 0; font-size: 1.4rem; color: #fff; }
+        .modal-content p { color: #ccc; line-height: 1.4; margin: 15px 0; }
     </style>
 </head>
 <body>
 
-    <h1>Battleships Pro Named</h1>
+    <h1>Battleships Deploy</h1>
     <div id="status-box" class="status">Initializing System Setup...</div>
+
+    <div id="game-modal" class="modal-overlay hidden">
+        <div id="modal-card" class="modal-content">
+            <h3 id="modal-title">Alert</h3>
+            <p id="modal-body">Message contents...</p>
+            <button class="main-btn" style="margin-top:10px; padding:12px;" onclick="closeModal()">Acknowledge</button>
+        </div>
+    </div>
 
     <div id="lobby-screen" class="hidden">
         <div class="setup-card">
@@ -95,14 +113,14 @@
 
     <div id="game-screen" class="hidden">
         <div class="grid-container">
-            <div class="board-wrapper">
+            <div class="board-wrapper hidden" id="opponent-container">
                 <div class="board-title" id="attack-header">Opponent's Fleet</div>
                 <div id="opponent-board" class="grid"></div>
             </div>
             
-            <hr style="width: 100%; max-width: 400px; border: 0; border-top: 1px solid #222; margin: 5px 0;">
+            <hr id="board-divider" class="hidden" style="width: 100%; max-width: 400px; border: 0; border-top: 1px solid #222; margin: 5px 0;">
             
-            <div class="board-wrapper">
+            <div class="board-wrapper hidden" id="your-container">
                 <div class="board-title" id="your-board-header">Your Fleet Map</div>
                 <div id="your-board" class="grid"></div>
             </div>
@@ -117,20 +135,22 @@
         let myTurn = false; 
         let iamReady = false;
         let opponentReady = false;
+        let matchIsActive = false;
 
         const shipTypes = [
-            { name: "Aircraft Carrier", size: 5 },
-            { name: "Battleship", size: 4 },
-            { name: "Cruiser", size: 3 },
-            { name: "Submarine", size: 3 },
-            { name: "Destroyer", size: 2 }
+            { name: "Aircraft Carrier", size: 5, hitsLogged: 0 },
+            { name: "Battleship", size: 4, hitsLogged: 0 },
+            { name: "Cruiser", size: 3, hitsLogged: 0 },
+            { name: "Submarine", size: 3, hitsLogged: 0 },
+            { name: "Destroyer", size: 2, hitsLogged: 0 }
         ];
 
         let currentSelectedShipIndex = null;
         let placementOrientation = "H"; 
 
         let opponentBoardHits = Array(100).fill(0); 
-        let yourFleetLocations = Array(100).fill(0); 
+        let yourFleetLocations = Array(100).fill(0); // 0=water, 1=ship, 2=miss, 3=hit
+        let cellToShipMap = {}; // Maps index positions to ship object references for sinking detection
 
         pubnub = new PubNub({ publishKey: 'demo', subscribeKey: 'demo', userId: myId });
         
@@ -139,23 +159,37 @@
             document.getElementById('lobby-screen').classList.remove('hidden');
         });
 
-        // --- STEP 1: NETWORK REGISTRATION & METADATA HANDSHAKE ---
+        // --- CUSTOM THEMED MODAL SYSTEM ---
+        function showModal(title, bodyText, themeStyle) {
+            const overlay = document.getElementById('game-modal');
+            const card = document.getElementById('modal-card');
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-body').innerText = bodyText;
+            
+            card.className = "modal-content " + (themeStyle || "");
+            overlay.classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('game-modal').classList.add('hidden');
+        }
+
+        // --- STEP 1: LOBBY IDENTITY LINKING ---
         document.getElementById('btn-start').addEventListener('click', () => {
             myName = document.getElementById('name-input').value.trim() || "Player_" + Math.floor(Math.random()*90+10);
             const roomCode = document.getElementById('room-input').value.trim();
             if (!roomCode) return alert("A channel code is required.");
             
-            myChannel = 'bbship_v4_room_' + roomCode;
+            myChannel = 'bbship_v5_room_' + roomCode;
             document.getElementById('your-board-header').innerText = `${myName}'s Fleet`;
             
             pubnub.addListener({
                 message: function(event) {
                     const data = event.message;
-                    if (data.sender === myId) return; // Drop echoing packets
+                    if (data.sender === myId) return; 
                     
                     if (data.type === 'sync-identity') {
                         opponentName = data.name;
-                        // Directly return validation echo packet
                         pubnub.publish({ channel: myChannel, message: { type: 'ack-identity', name: myName, sender: myId } });
                         evaluateTurnPriorities(data.sender);
                     }
@@ -171,30 +205,34 @@
                         handleIncomingShot(data.coord);
                     } 
                     else if (data.type === 'result') {
-                        handleShotFeedback(data.coord, data.isHit);
+                        handleShotFeedback(data.coord, data.isHit, data.sunkShipName);
+                    }
+                    else if (data.type === 'endgame-reveal') {
+                        revealWinningFleetMap(data.fleetLocations);
                     }
                 }
             });
             pubnub.subscribe({ channels: [myChannel] });
 
-            // Push identity synchronization profile onto network pipeline
             pubnub.publish({ channel: myChannel, message: { type: 'sync-identity', name: myName, sender: myId } });
 
             document.getElementById('lobby-screen').classList.add('hidden');
             document.getElementById('deployment-dock').classList.remove('hidden');
             document.getElementById('game-screen').classList.remove('hidden');
-            statusBox.innerText = "Position vessels on lower fleet layout map.";
+            
+            // Layout Isolation Rule: Only render your lower base workspace map during deployment phase
+            document.getElementById('your-container').classList.remove('hidden');
+            statusBox.innerText = "Position vessels on your fleet map grid.";
             
             buildDeploymentDock();
             renderGrid('your-board', handleFleetDeploymentClick, true);
         });
 
         function evaluateTurnPriorities(theirId) {
-            // String sorting fallback sequence ensures turn assignment syncs instantly on both sides
             myTurn = myId < theirId;
         }
 
-        // --- STEP 2: PLACEMENT INTERACTION LAYER ---
+        // --- STEP 2: HOVER ENGINE & PLACEMENT SYSTEM ---
         function buildDeploymentDock() {
             const container = document.getElementById('ship-buttons-container');
             container.innerHTML = '';
@@ -217,7 +255,7 @@
             document.getElementById('btn-commence').addEventListener('click', () => {
                 iamReady = true;
                 document.getElementById('deployment-dock').classList.add('hidden');
-                renderGrid('your-board', null, false); // Kill setup handlers
+                renderGrid('your-board', null, false); // Detach layout placement controls
                 
                 pubnub.publish({ channel: myChannel, message: { type: 'player-ready', sender: myId } });
                 statusBox.innerText = "Tactical readiness submitted. Awaiting opponent...";
@@ -281,7 +319,10 @@
             const validCoords = checkPlacementValidity(coord, ship.size, placementOrientation);
             if (!validCoords) return;
 
-            validCoords.forEach(c => { yourFleetLocations[c] = 1; });
+            validCoords.forEach(c => { 
+                yourFleetLocations[c] = 1; 
+                cellToShipMap[c] = ship; // Establish direct cell-to-object linkage
+            });
             ship.placed = true;
             
             document.getElementById(`ship-btn-${currentSelectedShipIndex}`).className = 'ship-btn placed';
@@ -292,6 +333,7 @@
 
         function autoDeployAllShips() {
             yourFleetLocations.fill(0);
+            cellToShipMap = {};
             shipTypes.forEach(s => s.placed = false);
             
             shipTypes.forEach((ship) => {
@@ -302,7 +344,10 @@
                     let validCoords = checkPlacementValidity(randCoord, ship.size, randDir);
                     
                     if (validCoords) {
-                        validCoords.forEach(c => { yourFleetLocations[c] = 1; });
+                        validCoords.forEach(c => { 
+                            yourFleetLocations[c] = 1; 
+                            cellToShipMap[c] = ship;
+                        });
                         ship.placed = true;
                         placed = true;
                     }
@@ -326,7 +371,12 @@
 
         function checkMatchActivation() {
             if (iamReady && opponentReady) {
-                // Initialize top tracking boards
+                matchIsActive = true;
+                
+                // Layout State Shift: Reveal attack grid UI wrappers only when game starts
+                document.getElementById('opponent-container').classList.remove('hidden');
+                document.getElementById('board-divider').classList.remove('hidden');
+                
                 renderGrid('opponent-board', handleMyStrikeClick, false);
                 updateTurnHeader();
                 updateVisualDisplays();
@@ -356,6 +406,9 @@
             const oppCells = document.querySelectorAll('#opponent-board .cell');
             oppCells.forEach((cell, i) => {
                 if (!cell) return;
+                // Preserve revealed end-game grids
+                if (cell.classList.contains('revealed-ship')) return;
+                
                 cell.className = 'cell';
                 if (opponentBoardHits[i] === 1) cell.className = 'cell hit';
                 if (opponentBoardHits[i] === 2) cell.className = 'cell miss';
@@ -373,10 +426,6 @@
 
         function updateTurnHeader() {
             const attackHeader = document.getElementById('attack-header');
-            
-            // Forces the target grid view to always be visible once game is live
-            document.getElementById('opponent-board').parentElement.classList.remove('hidden');
-
             if (myTurn) {
                 statusBox.style.color = "#00ffca";
                 statusBox.innerText = "Your Turn to Strike!";
@@ -391,7 +440,7 @@
         }
 
         function handleMyStrikeClick(coord) {
-            if (!myTurn || opponentBoardHits[coord] !== 0) return;
+            if (!matchIsActive || !myTurn || opponentBoardHits[coord] !== 0) return;
             
             myTurn = false; 
             updateTurnHeader();
@@ -404,26 +453,91 @@
         }
 
         function handleIncomingShot(coord) {
-            const isHit = yourFleetLocations[coord] === 1 || yourFleetLocations[coord] === 3;
-            yourFleetLocations[coord] = isHit ? 3 : 2; 
+            const currentCellState = yourFleetLocations[coord];
+            let isHit = currentCellState === 1 || currentCellState === 3;
+            let sunkShipName = null;
+
+            if (currentCellState === 1) { // Fresh hit logged
+                yourFleetLocations[coord] = 3; 
+                const targetedShip = cellToShipMap[coord];
+                if (targetedShip) {
+                    targetedShip.hitsLogged++;
+                    if (targetedShip.hitsLogged >= targetedShip.size) {
+                        sunkShipName = targetedShip.name;
+                    }
+                }
+            } else if (currentCellState === 0) {
+                yourFleetLocations[coord] = 2; // Miss logged
+            }
+            
             updateVisualDisplays();
+
+            // Check if our entire fleet layout has been annihilated
+            const matchIsLost = shipTypes.every(s => s.hitsLogged >= s.size);
 
             pubnub.publish({ 
                 channel: myChannel, 
-                message: { type: 'result', coord: coord, isHit: isHit, sender: myId } 
+                message: { 
+                    type: 'result', 
+                    coord: coord, 
+                    isHit: isHit, 
+                    sunkShipName: sunkShipName,
+                    matchIsLost: matchIsLost,
+                    sender: myId 
+                } 
             });
             
-            myTurn = true;
-            updateTurnHeader();
+            if (matchIsLost) {
+                matchIsActive = false;
+                statusBox.style.color = "#ff3838";
+                statusBox.innerText = "TACTICAL DEFEAT: Fleet Destroyed.";
+                showModal("DEFEAT", "All your vessels have been scuttled. Transmitting your fleet map coordinates to the winner...", "sunk-theme");
+                
+                // Transmit layout data over-the-air to the winner
+                pubnub.publish({ channel: myChannel, message: { type: 'endgame-reveal', fleetLocations: yourFleetLocations, sender: myId } });
+            } else {
+                myTurn = true;
+                updateTurnHeader();
+                if (sunkShipName) {
+                    showModal("SHIP LOST", `Your ${sunkShipName} has been completely sunk!`, "sunk-theme");
+                }
+            }
         }
 
-        function handleShotFeedback(coord, isHit) {
+        function handleShotFeedback(coord, isHit, sunkShipName) {
             opponentBoardHits[coord] = isHit ? 1 : 2;
             updateVisualDisplays();
             
             myTurn = false; 
-            statusBox.innerText = isHit ? "Impact logged! Awaiting retaliatory strike..." : "Splash. Miss recorded. Awaiting retaliatory strike...";
             updateTurnHeader();
+
+            // Read operational metadata back from the message engine payload
+            const data = event ? event.message : {}; 
+            
+            if (data.matchIsLost) {
+                matchIsActive = false;
+                statusBox.style.color = "#2ecc71";
+                statusBox.innerText = "VICTORY: Enemy Fleet Eradicated!";
+                showModal("VICTORY!", `You have completely obliterated ${opponentName}'s fleet! Awaiting enemy coordinate data broadcast...`, "victory-theme");
+            } else {
+                if (sunkShipName) {
+                    statusBox.innerText = `CRITICAL HIT: You sunk ${opponentName}'s ${sunkShipName}!`;
+                    showModal("VEHICLE SUNK", `Excellent shot! You successfully sunk ${opponentName}'s ${sunkShipName}!`, "victory-theme");
+                } else {
+                    statusBox.innerText = isHit ? "DIRECT HIT! Awaiting retaliation..." : "Splash. Miss recorded. Awaiting retaliation...";
+                }
+            }
+        }
+
+        function revealWinningFleetMap(loserFleetLocations) {
+            const oppCells = document.querySelectorAll('#opponent-board .cell');
+            oppCells.forEach((cell, i) => {
+                // If it was an unhit enemy ship position (1) highlight it dynamically on the firing grid
+                if (loserFleetLocations[i] === 1) {
+                    cell.className = 'cell revealed-ship';
+                }
+            });
+            statusBox.innerText = "Match Over. Unhit enemy vessels are revealed in orange.";
         }
     </script>
 </body>
