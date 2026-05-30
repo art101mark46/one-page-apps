@@ -72,7 +72,7 @@
 </head>
 <body>
 
-    <h1>Battleships Pro (Multiplayer) V2</h1>
+    <h1>Battleships Pro (Multiplayer) V3</h1>
     <div id="status-box" class="status">Initializing System...</div>
 
     <div id="game-modal" class="modal-overlay hidden">
@@ -142,6 +142,7 @@
         let myId = "user_" + Math.random().toString(36).substring(2, 7);
         
         let globalPlayers = {}; 
+        let activeTurnOrder = []; // final verified layout sequence structure
         let currentTurnUserId = null;
         let iamReady = false;
         let matchIsActive = false;
@@ -180,7 +181,7 @@
         });
         function closeModal() { document.getElementById('game-modal').classList.add('hidden'); }
 
-        // --- STEP 1: MULTIPLAYER MESH REGISTRATION ---
+        // --- STEP 1: MESH NETWORKING REGISTRY ---
         document.getElementById('btn-start').addEventListener('click', () => {
             myName = document.getElementById('name-input').value.trim() || "User_" + Math.floor(Math.random()*90+10);
             const roomCode = document.getElementById('room-input').value.trim();
@@ -212,7 +213,10 @@
                     }
                     else if (data.type === 'player-ready') {
                         if (globalPlayers[data.sender]) globalPlayers[data.sender].ready = true;
-                        checkMatchActivation();
+                        evaluateHostInitiatedStart();
+                    }
+                    else if (data.type === 'start-match') {
+                        executeGlobalMatchActivation(data.order);
                     }
                     else if (data.type === 'shot') {
                         if (data.targetId === myId) {
@@ -221,6 +225,14 @@
                     } 
                     else if (data.type === 'result') {
                         handleShotFeedback(data.attackerId, data.targetId, data.coord, data.isHit, data.sunkShipName, data.matchIsLost);
+                    }
+                    else if (data.type === 'global-ship-sunk') {
+                        // Crucial global notification update rule: notifies everyone when ANY player drops a vessel
+                        if (data.ownerId !== myId) {
+                            statusBox.style.color = "#ff3838";
+                            statusBox.innerText = `ALERT: ${data.ownerName}'s ${data.shipName} was completely SUNK!`;
+                            showModal("VESSEL SCUTTLED", `Tactical Feed Update:\n${data.ownerName} has lost their ${data.shipName}!`, "sunk-theme");
+                        }
                     }
                     else if (data.type === 'pass-turn') {
                         currentTurnUserId = data.nextUserId;
@@ -282,7 +294,7 @@
 
         document.getElementById('enemy-target-picker').addEventListener('change', renderSelectedOpponentGrid);
 
-        // --- STEP 2: PLACEMENT ENGINE ---
+        // --- STEP 2: FLEET PREPARATION ---
         function buildDeploymentDock() {
             const container = document.getElementById('ship-buttons-container');
             container.innerHTML = '';
@@ -308,8 +320,8 @@
                 renderGrid('your-board', null, false); 
                 
                 pubnub.publish({ channel: myChannel, message: { type: 'player-ready', sender: myId } });
-                statusBox.innerText = "Ready submitted. Awaiting remaining fleet connections...";
-                checkMatchActivation();
+                statusBox.innerText = "Awaiting other battle fleets...";
+                evaluateHostInitiatedStart();
             };
         }
 
@@ -401,30 +413,45 @@
             commenceBtn.disabled = !allPlaced;
         }
 
-        function checkMatchActivation() {
-            let totalPlayers = Object.keys(globalPlayers).length;
-            if (totalPlayers < 2) return; 
+        // --- STEP 3: HANDSHAKE ORDER OF BATTLE ENGINE ---
+        function evaluateHostInitiatedStart() {
+            let playerIds = Object.keys(globalPlayers);
+            if (playerIds.length < 2) return;
 
+            // Confirm every single connected network node is flagging as ready
             for (let pId in globalPlayers) {
                 if (!globalPlayers[pId].ready) return;
             }
 
-            if (!matchIsActive) {
-                matchIsActive = true;
-                let sortedIds = Object.keys(globalPlayers).sort();
-                currentTurnUserId = sortedIds[0]; 
-                
-                document.getElementById('opponent-container').classList.remove('hidden');
-                document.getElementById('board-divider').classList.remove('hidden');
-                
-                rebuildTargetDropdown();
-                renderSelectedOpponentGrid();
-                updateTurnHeader();
-                updateVisualDisplays();
+            // The alphabetical first user establishes room sync authority
+            let sortedIds = [...playerIds].sort();
+            if (myId === sortedIds[0] && !matchIsActive) {
+                // Generate a randomized definitive loop deployment path sequence order
+                let shuffleOrder = [...sortedIds].sort(() => Math.random() - 0.5);
+                pubnub.publish({
+                    channel: myChannel,
+                    message: { type: 'start-match', order: shuffleOrder, sender: myId }
+                });
             }
         }
 
-        // --- STEP 3: ASYNC-SAFE MULTIPLAYER GAME ENGINE ---
+        function executeGlobalMatchActivation(verifiedOrderArray) {
+            if (matchIsActive) return;
+            matchIsActive = true;
+            
+            activeTurnOrder = verifiedOrderArray;
+            currentTurnUserId = activeTurnOrder[0];
+
+            document.getElementById('opponent-container').classList.remove('hidden');
+            document.getElementById('board-divider').classList.remove('hidden');
+            
+            rebuildTargetDropdown();
+            renderSelectedOpponentGrid();
+            updateTurnHeader();
+            updateVisualDisplays();
+        }
+
+        // --- STEP 4: REAL-TIME WARFARE INSTANCES ---
         function renderSelectedOpponentGrid() {
             const targetId = document.getElementById('enemy-target-picker').value;
             if (!targetId) return;
@@ -516,7 +543,9 @@
                 const targetedShip = cellToShipMap[coord];
                 if (targetedShip) {
                     targetedShip.hitsLogged++;
-                    if (targetedShip.hitsLogged >= targetedShip.size) sunkShipName = targetedShip.name;
+                    if (targetedShip.hitsLogged >= targetedShip.size) {
+                        sunkShipName = targetedShip.name;
+                    }
                 }
             } else if (currentCellState === 0) {
                 yourFleetLocations[coord] = 2; 
@@ -525,6 +554,7 @@
             updateVisualDisplays();
             const matchIsLost = shipTypes.every(s => s.hitsLogged >= s.size);
 
+            // Broadcast immediate direct action feedback loop map results payload
             pubnub.publish({ 
                 channel: myChannel, 
                 message: { 
@@ -539,23 +569,26 @@
                 } 
             });
             
+            // Global Notification Engine Check: Broadcast sunk announcement outward instantly
+            if (sunkShipName) {
+                pubnub.publish({
+                    channel: myChannel,
+                    message: { type: 'global-ship-sunk', ownerId: myId, ownerName: myName, shipName: sunkShipName, sender: myId }
+                });
+                showModal("SHIP DESTROYED", `An anonymous projectile completely sunk your ${sunkShipName}!`, "sunk-theme");
+            }
+
             if (matchIsLost) {
                 matchIsActive = false;
                 globalPlayers[myId].lost = true;
                 statusBox.style.color = "#ff3838";
                 statusBox.innerText = "YOUR FLEET WAS ANNIHILATED!";
-                showModal("DEFEAT", "All your vessels have been scuttled. Broadcasting your ship locations to all surviving players...", "sunk-theme");
                 
                 pubnub.publish({ channel: myChannel, message: { type: 'endgame-reveal', fleetLocations: yourFleetLocations, sender: myId } });
-            } else {
-                if (sunkShipName) {
-                    showModal("SHIP DESTROYED", `An anonymous projectile completely sunk your ${sunkShipName}!`, "sunk-theme");
-                }
             }
         }
 
         function handleShotFeedback(attackerId, targetId, coord, isHit, sunkShipName, targetLostHandshake) {
-            // 1. Update matching data matrix registries safely across all connected peers
             if (globalPlayers[targetId]) {
                 globalPlayers[targetId].boardHits[coord] = isHit ? 1 : 2;
                 if (targetLostHandshake) globalPlayers[targetId].lost = true;
@@ -563,7 +596,6 @@
             
             updateVisualDisplays();
 
-            // 2. Output custom alert UI cards if you were the individual who sent the firing shot
             if (attackerId === myId) {
                 const targetedName = globalPlayers[targetId].name;
                 if (targetLostHandshake) {
@@ -577,22 +609,20 @@
                 checkVictoryConditions();
             }
 
-            // 3. TO PREVENT LOCKOUT: Only the player who was targeted and hit handles calculating the next turn 
-            // once their local data state is fully updated.
+            // Loop safety rule: The device that just sustained fire dictates the next loop token handoff safely
             if (targetId === myId) {
                 passTurnToNextPlayer();
             }
         }
 
         function passTurnToNextPlayer() {
-            let sortedIds = Object.keys(globalPlayers).sort();
-            let currentIndex = sortedIds.indexOf(currentTurnUserId);
+            let currentIndex = activeTurnOrder.indexOf(currentTurnUserId);
             let foundNext = false;
             let loopCounter = 0;
 
-            while (!foundNext && loopCounter < sortedIds.length) {
-                currentIndex = (currentIndex + 1) % sortedIds.length;
-                let evaluationId = sortedIds[currentIndex];
+            while (!foundNext && loopCounter < activeTurnOrder.length) {
+                currentIndex = (currentIndex + 1) % activeTurnOrder.length;
+                let evaluationId = activeTurnOrder[currentIndex];
                 if (!globalPlayers[evaluationId].lost) {
                     currentTurnUserId = evaluationId;
                     foundNext = true;
@@ -600,7 +630,6 @@
                 loopCounter++;
             }
 
-            // Publish the turn pass over-the-air to sync all player screens
             pubnub.publish({ channel: myChannel, message: { type: 'pass-turn', nextUserId: currentTurnUserId, sender: myId } });
         }
 
@@ -624,11 +653,12 @@
             }
         }
 
-        // --- STEP 4: CLEAN RESET ENGINE ---
+        // --- STEP 5: SYSTEM CLEAN RESET DOCK ---
         document.getElementById('btn-reset').addEventListener('click', () => {
             initFleetStructures();
             iamReady = false;
             matchIsActive = false;
+            activeTurnOrder = [];
             
             for (let pId in globalPlayers) {
                 globalPlayers[pId].ready = false;
