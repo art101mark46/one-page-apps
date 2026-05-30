@@ -30,7 +30,6 @@
         input, select { background: #333; color: #fff; border: 1px solid #555; padding: 14px; border-radius: 6px; font-size: 1.1rem; width: 100%; text-align: center; margin: 6px 0 18px 0; box-sizing: border-box; }
         select { text-align-last: center; cursor: pointer; }
         
-        /* Deployment Dock Layout */
         .dock { background: #1a1a1a; padding: 12px; border-radius: 8px; max-width: 400px; margin: 10px auto; text-align: left; box-sizing: border-box; border: 1px solid #333; }
         .dock h4 { margin: 0 0 4px 0; text-align: center; font-size: 0.95rem; letter-spacing: 1px; color: #aaa; }
         .dock p { margin: 0 0 10px 0; text-align: center; font-size: 0.8rem; color: #777; }
@@ -41,28 +40,25 @@
         .controls { display: flex; justify-content: space-between; max-width: 400px; margin: 8px auto; gap: 8px; }
         .sub-btn { background: #7f8c8d; padding: 12px; font-size: 0.9rem; flex: 1; border-radius: 4px; border: none; color: white; font-weight: bold; cursor: pointer; }
 
-        /* Multi-Target Grid Frameworks */
         .grid-container { display: flex; flex-direction: column; align-items: center; gap: 15px; margin-top: 10px; width: 100%; }
         .board-wrapper { width: 100%; max-width: 400px; }
         .board-title { font-size: 0.95rem; color: #aaa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; font-weight: bold; }
         .grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; width: 100%; aspect-ratio: 1; margin: 0 auto; box-sizing: border-box; background: #151515; padding: 4px; border-radius: 6px; }
         
-        /* Cell States */
         .cell { background: #262626; aspect-ratio: 1; border-radius: 3px; border: 1px solid #111; position: relative; cursor: pointer; }
         .cell.ship { background: #555; border: 1px solid #777; }
         .cell.hit { background: #ff3838; }
         .cell.miss { background: #3867ff; }
         .cell.revealed-ship { background: #d35400; border: 1px solid #e67e22; opacity: 0.85; } 
-        .cell.spectator-ship { background: #2e7d32; border: 1px solid #4caf50; opacity: 0.6; } /* Ghost View Mode color */
+        .cell.spectator-ship { background: #1b5e20; border: 1px solid #2e7d32; opacity: 0.7; } 
         
         .cell.preview-valid { background: #9b59b6 !important; border: 1px solid #e040fb; opacity: 0.9; }
         .cell.preview-invalid { background: #c0392b !important; border: 1px solid #ff0000; opacity: 0.6; }
         
         .cell.hit::after { content: '×'; color: #fff; font-size: 18px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-weight: bold; }
         .cell.revealed-ship::after { content: '▰'; color: #fff; font-size: 12px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
-        .cell.spectator-ship::after { content: '▰'; color: #4caf50; font-size: 12px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        .cell.spectator-ship::after { content: '▰'; color: #81c784; font-size: 10px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
         
-        /* Stats Panel Styling */
         .stats-table { width: 100%; border-collapse: collapse; margin-top: 15px; background: #111; border-radius: 6px; overflow: hidden; font-size: 0.9rem; }
         .stats-table th { background: #2c3e50; color: #fff; padding: 10px; font-weight: bold; text-align: left; }
         .stats-table td { padding: 10px; border-bottom: 1px solid #222; text-align: left; color: #ccc; }
@@ -81,7 +77,7 @@
 </head>
 <body>
 
-    <h1>Battleships - Stats V4</h1>
+    <h1>Battleships Pro Multikill</h1>
     <div id="status-box" class="status">Initializing System...</div>
 
     <div id="game-modal" class="modal-overlay hidden">
@@ -140,6 +136,10 @@
                 <div id="your-board" class="grid"></div>
             </div>
 
+            <div class="board-wrapper hidden" id="spectator-action-container">
+                <button class="main-btn" style="background: #34495e; margin-bottom: 8px;" id="btn-spec-stats">Review Combat Metrics</button>
+            </div>
+
             <div class="board-wrapper hidden" id="game-over-container">
                 <button class="main-btn" style="background: #34495e; margin-bottom: 8px;" id="btn-view-stats">Review Combat Metrics</button>
                 <button class="main-btn" style="background: #e67e22;" id="btn-reset">Return to Strategic Lobby</button>
@@ -158,10 +158,10 @@
         let iamReady = false;
         let matchIsActive = false;
 
-        // Analytics Ledger Matrix Structures
+        // Metrics Ledger
         let statShotsFired = 0;
         let statHitsLanded = 0;
-        let statIncomingShotsByPlayer = {}; // Maps: { playerUniqueId: shotCount }
+        let statIncomingShotsByPlayer = {}; 
 
         const shipTypesArr = [
             { name: "Aircraft Carrier", size: 5 },
@@ -197,7 +197,7 @@
         });
         function closeModal() { document.getElementById('game-modal').classList.add('hidden'); }
 
-        // --- STEP 1: MESH NETWORKING REGISTRY ---
+        // --- STEP 1: MESH NETWORKING REGISTRY & SECURITY ROOM LOCK ---
         document.getElementById('btn-start').addEventListener('click', () => {
             myName = document.getElementById('name-input').value.trim() || "User_" + Math.floor(Math.random()*90+10);
             const roomCode = document.getElementById('room-input').value.trim();
@@ -213,6 +213,11 @@
                     const data = event.message;
                     
                     if (data.type === 'sync-identity') {
+                        // Anti-Intrusion Rule: Reject joining node if game has already kicked off
+                        if (matchIsActive) {
+                            pubnub.publish({ channel: myChannel, message: { type: 'room-locked-rejection', targetUser: data.sender } });
+                            return;
+                        }
                         if (!globalPlayers[data.sender]) {
                             globalPlayers[data.sender] = { name: data.name, active: true, ready: false, lost: false, boardHits: Array(100).fill(0), initialFleet: Array(100).fill(0) };
                             rebuildTargetDropdown();
@@ -221,8 +226,18 @@
                             pubnub.publish({ channel: myChannel, message: { type: 'ack-identity', name: myName, sender: myId } });
                         }
                     }
+                    else if (data.type === 'room-locked-rejection') {
+                        if (data.targetUser === myId && !matchIsActive) {
+                            pubnub.unsubscribe({ channels: [myChannel] });
+                            showModal("CHANNEL LOCKED", "<p>This strategic encounter is currently in progress. Access denied to protect sync metrics.</p>", "sunk-theme");
+                            statusBox.innerText = "Error: Room Locked.";
+                            document.getElementById('lobby-screen').classList.remove('hidden');
+                            document.getElementById('deployment-dock').classList.add('hidden');
+                            document.getElementById('game-screen').classList.add('hidden');
+                        }
+                    }
                     else if (data.type === 'ack-identity') {
-                        if (!globalPlayers[data.sender]) {
+                        if (!matchIsActive && !globalPlayers[data.sender]) {
                             globalPlayers[data.sender] = { name: data.name, active: true, ready: false, lost: false, boardHits: Array(100).fill(0), initialFleet: Array(100).fill(0) };
                             rebuildTargetDropdown();
                         }
@@ -232,10 +247,17 @@
                         evaluateHostInitiatedStart();
                     }
                     else if (data.type === 'start-match') {
+                        // Step 1: Initialize match variables
                         executeGlobalMatchActivation(data.order);
+                        // Step 2: Instantly broadcast local layouts across the mesh to secure stable ghost views
+                        pubnub.publish({ channel: myChannel, message: { type: 'ghost-sync-payload', mapBlueprint: yourFleetLocations, sender: myId } });
+                    }
+                    else if (data.type === 'ghost-sync-payload') {
+                        if (globalPlayers[data.sender]) {
+                            globalPlayers[data.sender].initialFleet = [...data.mapBlueprint];
+                        }
                     }
                     else if (data.type === 'shot') {
-                        // Analytics Engine Logging Rule: Log incoming metrics across targets globally
                         if (data.targetId === myId) {
                             statIncomingShotsByPlayer[data.sender] = (statIncomingShotsByPlayer[data.sender] || 0) + 1;
                             handleIncomingShot(data.coord);
@@ -258,8 +280,6 @@
                     else if (data.type === 'endgame-reveal') {
                         if (globalPlayers[data.sender]) {
                             globalPlayers[data.sender].finalFleetMap = data.fleetLocations;
-                            // Archive the initial map layout configuration state for spectator spying mechanics
-                            globalPlayers[data.sender].initialFleet = [...data.fleetLocations];
                         }
                         if (document.getElementById('enemy-target-picker').value === data.sender) {
                             renderSelectedOpponentGrid();
@@ -316,7 +336,7 @@
 
         document.getElementById('enemy-target-picker').addEventListener('change', renderSelectedOpponentGrid);
 
-        // --- STEP 2: INTERACTIVE FLEET PREPARATION & PICKUP ---
+        // --- STEP 2: FLEET PREPARATION WITH INTERACTIVE RE-PICKUP ---
         function buildDeploymentDock() {
             const container = document.getElementById('ship-buttons-container');
             container.innerHTML = '';
@@ -325,13 +345,9 @@
                 btn.className = 'ship-btn' + (ship.placed ? ' placed' : '');
                 btn.id = `ship-btn-${idx}`;
                 btn.innerText = `${ship.name} (${ship.size})`;
-                // If already placed, click tool selects it for moving
                 btn.addEventListener('click', () => {
-                    if (ship.placed) {
-                        pickupAndMoveShip(idx);
-                    } else {
-                        selectShipForPlacement(idx);
-                    }
+                    if (ship.placed) pickupAndMoveShip(idx);
+                    else selectShipForPlacement(idx);
                 });
                 container.appendChild(btn);
             });
@@ -345,7 +361,6 @@
             document.getElementById('btn-commence').onclick = () => {
                 iamReady = true;
                 globalPlayers[myId].ready = true;
-                globalPlayers[myId].initialFleet = [...yourFleetLocations]; // Preserve local baseline map state
                 document.getElementById('deployment-dock').classList.add('hidden');
                 renderGrid('your-board', null, false); 
                 
@@ -366,7 +381,6 @@
             const ship = shipTypes[idx];
             if (!ship.placed) return;
 
-            // Scrub this specific vessel from matching deployment state layers
             ship.coordinatedCoords.forEach(c => {
                 yourFleetLocations[c] = 0;
                 delete cellToShipMap[c];
@@ -376,8 +390,6 @@
 
             updateVisualDisplays();
             verifyDeploymentCompletion();
-            
-            // Immediately activate it as the cursor tool for placement adjusting
             selectShipForPlacement(idx);
         }
 
@@ -418,7 +430,6 @@
         }
 
         function handleFleetDeploymentClick(coord) {
-            // REDEPLOYMENT PICKUP MECHANIC: If no tool selected and user clicked a placed asset cell, pull it up!
             if (currentSelectedShipIndex === null) {
                 if (yourFleetLocations[coord] === 1 && cellToShipMap[coord]) {
                     const matchedShipInstance = cellToShipMap[coord];
@@ -507,7 +518,7 @@
             updateVisualDisplays();
         }
 
-        // --- STEP 4: WAR ZONE GRID SPEC ENGINE ---
+        // --- STEP 4: GHOST VIEW & SPECTATOR RENDERING ENGINE ---
         function renderSelectedOpponentGrid() {
             const targetId = document.getElementById('enemy-target-picker').value;
             if (!targetId) return;
@@ -516,21 +527,19 @@
             
             const targetProfile = globalPlayers[targetId];
             const oppCells = document.querySelectorAll('#opponent-board .cell');
-            
-            // Determine if local client has ghost observation privileges
             const iAmSpectator = globalPlayers[myId] && globalPlayers[myId].lost;
 
             oppCells.forEach((cell, i) => {
-                // 1. Map established impact marks safely
+                // Render established impact marks
                 if (targetProfile.boardHits[i] === 1) cell.className = 'cell hit';
                 else if (targetProfile.boardHits[i] === 2) cell.className = 'cell miss';
                 
-                // 2. GHOST VIEW privilege rule: If local node is out, map living target ship layout footprints dynamically
+                // FIXED GHOST VIEW PRIVILEGE: Displays background-buffered un-hit ship locations instantly
                 else if (iAmSpectator && targetProfile.initialFleet && targetProfile.initialFleet[i] === 1) {
                     cell.className = 'cell spectator-ship';
                 }
                 
-                // 3. Fallback tracking reveal matrices
+                // Fallback endgame parameters
                 if (targetProfile.finalFleetMap && targetProfile.finalFleetMap[i] === 1 && targetProfile.boardHits[i] === 0) {
                     cell.className = 'cell revealed-ship';
                 }
@@ -593,12 +602,12 @@
         }
 
         function handleMyStrikeClick(coord) {
-            if (globalPlayers[myId].lost) return; // Spectators cannot fire
+            if (globalPlayers[myId].lost) return; 
             if (!matchIsActive || currentTurnUserId !== myId) return;
             
             const targetId = document.getElementById('enemy-target-picker').value;
             if (!targetId) return;
-            if (globalPlayers[targetId].lost) return alert("This fleet is already scuttled! Choose a living system target.");
+            if (globalPlayers[targetId].lost) return alert("This fleet is already scuttled! Choose a living target.");
             if (globalPlayers[targetId].boardHits[coord] !== 0) return; 
             
             statShotsFired++;
@@ -654,15 +663,14 @@
             }
 
             if (matchIsLost) {
-                matchIsActive = false;
                 globalPlayers[myId].lost = true;
                 statusBox.style.color = "#ff3838";
                 statusBox.innerText = "YOUR FLEET WAS ANNIHILATED!";
                 
-                // Package initial fleet data over air to authorize retrospective data syncing
                 pubnub.publish({ channel: myChannel, message: { type: 'endgame-reveal', fleetLocations: yourFleetLocations, sender: myId } });
                 
-                document.getElementById('game-over-container').classList.remove('hidden');
+                // LOCKDOWN CONDITION: Display spectator controls, do NOT show the Reset/Lobby button yet
+                document.getElementById('spectator-action-container').classList.remove('hidden');
                 triggerCombatMetricsDisplay("ELIMINATION BREAKDOWN");
             }
         }
@@ -671,11 +679,6 @@
             if (globalPlayers[targetId]) {
                 globalPlayers[targetId].boardHits[coord] = isHit ? 1 : 2;
                 if (targetLostHandshake) globalPlayers[targetId].lost = true;
-                
-                // Track historical footprints for spectator ghost views
-                if (isHit && globalPlayers[targetId].initialFleet) {
-                    globalPlayers[targetId].initialFleet[coord] = 3; // Mark hit on cached map layout
-                }
             }
             
             updateVisualDisplays();
@@ -685,7 +688,7 @@
                 
                 const targetedName = globalPlayers[targetId].name;
                 if (targetLostHandshake) {
-                    showModal("TARGET ELIMINATED!", `<p>Spectacular shot! You completely broke <strong>${targetedName}</strong>'s lines and scuttled their fleet!</p>`, "victory-theme");
+                    showModal("TARGET ELIMINATED!", `<p>Spectacular shot! You completely scuttled <strong>${targetedName}</strong>'s fleet!</p>`, "victory-theme");
                 } else if (sunkShipName) {
                     showModal("VEHICLE SUNK", `<p>Direct Hit! You completely sunk <strong>${targetedName}</strong>'s <strong>${sunkShipName}</strong>!</p>`, "victory-theme");
                 } else {
@@ -724,6 +727,7 @@
                 if (!globalPlayers[pId].lost) livingPlayers.push(pId);
             }
 
+            // End game when only 1 surviving operator remains
             if (livingPlayers.length === 1) {
                 matchIsActive = false;
                 const winnerName = globalPlayers[livingPlayers[0]].name;
@@ -734,17 +738,19 @@
                     showModal("CHAMPION", `<p>You have wiped out all opposing naval operations in this theater of war! Total Victory!</p>`, "victory-theme");
                 }
                 
+                // UNLOCK LOBBY ACCESS: Hide mid-game spec row, expose master restart engine buttons to all players
+                document.getElementById('spectator-action-container').classList.add('hidden');
                 document.getElementById('game-over-container').classList.remove('hidden');
                 triggerCombatMetricsDisplay("FINAL MATCH PERFORMANCE");
             }
         }
 
-        // --- STEP 5: REAL-TIME STATISTICS GENERATION PANEL ---
+        // --- STEP 5: STATISTICS PANEL ---
         function triggerCombatMetricsDisplay(cardTitle) {
             const accuracy = statShotsFired > 0 ? Math.round((statHitsLanded / statShotsFired) * 100) : 0;
             
             let htmlPayload = `
-                <p>Real-time data synchronization feed ledger for <strong>${myName}</strong>:</p>
+                <p>Real-time performance overview ledger for <strong>${myName}</strong>:</p>
                 <table class="stats-table">
                     <tr><th>Metric Parameters</th><th>Value Data</th></tr>
                     <tr><td>Total Artillery Launched</td><td class="stats-highlight">${statShotsFired}</td></tr>
@@ -774,8 +780,9 @@
         }
 
         document.getElementById('btn-view-stats').addEventListener('click', () => triggerCombatMetricsDisplay("COMBAT PERFORMANCE LOGS"));
+        document.getElementById('btn-spec-stats').addEventListener('click', () => triggerCombatMetricsDisplay("SPECTATOR METRICS LOGS"));
 
-        // --- STEP 6: CLEAN SYSTEM STATE ENGINE RESET ---
+        // --- STEP 6: RESET STATE ---
         document.getElementById('btn-reset').addEventListener('click', () => {
             initFleetStructures();
             iamReady = false;
@@ -790,6 +797,7 @@
                 delete globalPlayers[pId].finalFleetMap;
             }
 
+            document.getElementById('spectator-action-container').classList.add('hidden');
             document.getElementById('game-over-container').classList.add('hidden');
             document.getElementById('opponent-container').classList.add('hidden');
             document.getElementById('board-divider').classList.add('hidden');
