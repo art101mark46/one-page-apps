@@ -3,55 +3,66 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Advanced P2P Battleships</title>
+    <title>Battleships Pro P2P</title>
     
     <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.7.2.2.min.js"></script>
 
     <style>
         body { font-family: -apple-system, sans-serif; background: #121212; color: #fff; text-align: center; margin: 0; padding: 10px; }
         .hidden { display: none !important; }
-        h1 { font-size: 1.4rem; margin: 5px 0; }
-        .status { background: #222; padding: 12px; border-radius: 8px; margin: 10px auto; font-weight: bold; color: #00ffca; max-width: 340px; box-sizing: border-box; }
+        h1 { font-size: 1.4rem; margin: 5px 0; color: #f1c40f; }
+        .status { background: #222; padding: 12px; border-radius: 8px; margin: 10px auto; font-weight: bold; color: #00ffca; max-width: 340px; box-sizing: border-box; border: 1px solid #333; }
         
-        .setup-card { background: #1a1a1a; padding: 20px; border-radius: 12px; max-width: 320px; margin: 20px auto; border: 1px solid #333; }
-        input { background: #333; color: #fff; border: 1px solid #555; padding: 12px; border-radius: 6px; font-size: 1.2rem; width: 80%; text-align: center; margin-bottom: 10px; }
+        .setup-card { background: #1a1a1a; padding: 20px; border-radius: 12px; max-width: 320px; margin: 20px auto; border: 1px solid #333; text-align: left; }
+        .setup-card label { font-size: 0.85rem; color: #aaa; font-weight: bold; display: block; margin-top: 10px; text-transform: uppercase; }
+        input { background: #333; color: #fff; border: 1px solid #555; padding: 12px; border-radius: 6px; font-size: 1.1rem; width: 100%; text-align: center; margin: 5px 0 15px 0; box-sizing: border-box; }
         
-        /* Placement Dock Styling */
+        /* Deployment Dock Layout */
         .dock { background: #1a1a1a; padding: 10px; border-radius: 8px; max-width: 340px; margin: 10px auto; text-align: left; box-sizing: border-box; border: 1px solid #333; }
         .dock h4 { margin: 0 0 8px 0; text-align: center; font-size: 0.9rem; letter-spacing: 1px; color: #aaa; }
         .ship-btn { background: #2c3e50; color: #fff; padding: 6px 10px; margin: 3px; border-radius: 4px; font-size: 0.8rem; border: 1px solid #455a64; display: inline-block; cursor: pointer; }
         .ship-btn.selected { background: #e67e22; border-color: #d35400; }
-        .ship-btn.placed { background: #27ae60; border-color: #2196f3; opacity: 0.6; cursor: not-allowed; }
+        .ship-btn.placed { background: #27ae60; border-color: #2196f3; opacity: 0.5; cursor: not-allowed; }
         .controls { display: flex; justify-content: space-between; max-width: 340px; margin: 5px auto; gap: 5px; }
-        .sub-btn { background: #7f8c8d; padding: 8px; font-size: 0.85rem; flex: 1; border-radius: 4px; border: none; color: white; font-weight: bold; cursor: pointer; }
-        .sub-btn.active { background: #9b59b6; }
+        .sub-btn { background: #7f8c8d; padding: 10px; font-size: 0.85rem; flex: 1; border-radius: 4px; border: none; color: white; font-weight: bold; cursor: pointer; }
 
-        /* Grid Layouts */
+        /* Grid Frameworks */
         .grid-container { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 10px; }
-        .board-title { font-size: 0.85rem; color: #aaa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 3px; }
+        .board-title { font-size: 0.85rem; color: #aaa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 3px; font-weight: bold; }
         .grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; width: 100%; max-width: 340px; aspect-ratio: 1; margin: 0 auto; box-sizing: border-box; }
         
-        /* Cell Properties */
+        /* Cell States & Preview Styling */
         .cell { background: #262626; aspect-ratio: 1; border-radius: 2px; border: 1px solid #1a1a1a; position: relative; }
         .cell.ship { background: #555; border: 1px solid #777; }
         .cell.hit { background: #ff3838; }
         .cell.miss { background: #3867ff; }
+        
+        /* Dynamic Placement Outlines */
+        .cell.preview-valid { background: #9b59b6 !important; border: 1px solid #e040fb; opacity: 0.8; }
+        .cell.preview-invalid { background: #c0392b !important; border: 1px solid #ff0000; opacity: 0.5; }
+        
         .cell.hit::after { content: '×'; color: #fff; font-size: 14px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-weight: bold; }
         
-        .main-btn { background: #3498db; color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; font-size: 1rem; font-weight: bold; width: 100%; box-sizing: border-box; }
+        .main-btn { background: #3498db; color: white; border: none; padding: 14px; border-radius: 6px; cursor: pointer; font-size: 1.05rem; font-weight: bold; width: 100%; box-sizing: border-box; margin-top: 10px; }
         .main-btn:disabled { background: #333; color: #666; cursor: not-allowed; border: 1px dashed #444; }
     </style>
 </head>
 <body>
 
-    <h1>Battleships P2P - SHIPS</h1>
-    <div id="status-box" class="status">System Ready.</div>
+    <h1>Battleships Pro P2P - who's who</h1>
+    <div id="status-box" class="status">Initializing Network Client...</div>
 
-    <div id="lobby-screen">
+    <div id="lobby-screen" class="hidden">
         <div class="setup-card">
-            <h3>Enter Room Number</h3>
-            <input type="number" id="room-input" pattern="[0-9]*" placeholder="e.g. 5566">
-            <button class="main-btn" id="btn-start">Connect to Room</button>
+            <h3 style="margin-top:0; text-align:center; color:#f1c40f;">Matchmaking Lobby</h3>
+            
+            <label for="name-input">Your Name</label>
+            <input type="text" id="name-input" placeholder="Enter Your Nickname" maxlength="12">
+            
+            <label for="room-input">Room Code</label>
+            <input type="number" id="room-input" pattern="[0-9]*" placeholder="e.g. 8899">
+            
+            <button class="main-btn" id="btn-start">Connect & Deploy</button>
         </div>
     </div>
 
@@ -61,8 +72,8 @@
             <div id="ship-buttons-container"></div>
         </div>
         <div class="controls">
-            <button class="sub-btn active" id="btn-dir">Orientation: HORIZONTAL</button>
-            <button class="sub-btn" id="btn-auto" style="background: #27ae60;">Auto Deploy Fleet</button>
+            <button class="sub-btn" id="btn-dir" style="background:#8e44ad;">Direction: HORIZONTAL</button>
+            <button class="sub-btn" id="btn-auto" style="background: #27ae60;">Auto Deploy</button>
         </div>
         <div style="max-width: 340px; margin: 10px auto;">
             <button class="main-btn" id="btn-commence" disabled>Commence Battle (0/5 Placed)</button>
@@ -72,11 +83,11 @@
     <div id="game-screen" class="hidden">
         <div class="grid-container">
             <div id="opponent-container" class="hidden">
-                <div class="board-title" id="attack-header">Opponent's Fleet (Attack Grid)</div>
+                <div class="board-title" id="attack-header">Waiting for Opponent...</div>
                 <div id="opponent-board" class="grid"></div>
             </div>
             <div>
-                <div class="board-title">Your Fleet & Incoming Strikes</div>
+                <div class="board-title" id="your-board-header">Your Fleet Setup</div>
                 <div id="your-board" class="grid"></div>
             </div>
         </div>
@@ -84,11 +95,14 @@
 
     <script>
         const statusBox = document.getElementById('status-box');
-        let pubnub, myChannel;
-        let myTurn = true; 
-        const myId = "user_" + Math.random().toString(36).substring(2, 7);
+        let pubnub, myChannel, myName, opponentName = "Opponent";
+        let myId = "user_" + Math.random().toString(36).substring(2, 7);
+        
+        // Match Engine Settings
+        let myTurn = false; 
+        let iamReady = false;
+        let opponentReady = false;
 
-        // Core Configuration Maps
         const shipTypes = [
             { name: "Aircraft Carrier", size: 5 },
             { name: "Battleship", size: 4 },
@@ -98,45 +112,78 @@
         ];
 
         let currentSelectedShipIndex = null;
-        let placementOrientation = "H"; // H = Horizontal, V = Vertical
+        let placementOrientation = "H"; 
 
         let opponentBoardHits = Array(100).fill(0); 
-        let yourFleetLocations = Array(100).fill(0); // 0=water, 1=ship, 2=miss, 3=hit
-        let placedShipsTracking = []; // Array tracking locations of explicitly deployed items
+        let yourFleetLocations = Array(100).fill(0); 
 
         pubnub = new PubNub({ publishKey: 'demo', subscribeKey: 'demo', userId: myId });
+        
+        window.addEventListener('load', () => {
+            statusBox.innerText = "System Ready.";
+            document.getElementById('lobby-screen').classList.remove('hidden');
+        });
 
-        // --- STEP 1: INITIAL ROOM SETUP ---
+        // --- STEP 1: ROOM SETUP & IDENTITY HANDSHAKE ---
         document.getElementById('btn-start').addEventListener('click', () => {
+            myName = document.getElementById('name-input').value.trim() || "Player_" + Math.floor(Math.random()*900+100);
             const roomCode = document.getElementById('room-input').value.trim();
-            if (!roomCode) return alert("Please enter a room number.");
+            if (!roomCode) return alert("Please specify a room code.");
             
-            myChannel = 'bbship_room_v2_' + roomCode;
+            myChannel = 'bbship_v3_room_' + roomCode;
+            document.getElementById('your-board-header').innerText = `${myName}'s Fleet`;
             
             pubnub.addListener({
                 message: function(event) {
                     if (event.message.sender === myId) return;
                     const data = event.message;
                     
-                    if (data.type === 'shot') {
+                    if (data.type === 'sync-identity') {
+                        opponentName = data.name;
+                        // Acknowledge identity exchange back
+                        pubnub.publish({ channel: myChannel, message: { type: 'ack-identity', name: myName } });
+                        evaluateTurnPriorities(data.sender);
+                    }
+                    else if (data.type === 'ack-identity') {
+                        opponentName = data.name;
+                        evaluateTurnPriorities(data.sender);
+                    }
+                    else if (data.type === 'player-ready') {
+                        opponentReady = true;
+                        checkMatchActivation();
+                    }
+                    else if (data.type === 'shot') {
                         handleIncomingShot(data.coord);
-                    } else if (data.type === 'result') {
+                    } 
+                    else if (data.type === 'result') {
                         handleShotFeedback(data.coord, data.isHit);
                     }
                 }
             });
             pubnub.subscribe({ channels: [myChannel] });
 
+            // Broadcast your identity down the pipeline immediately
+            pubnub.publish({ channel: myChannel, message: { type: 'sync-identity', name: myName, sender: myId } });
+
             document.getElementById('lobby-screen').classList.add('hidden');
             document.getElementById('deployment-dock').classList.remove('hidden');
             document.getElementById('game-screen').classList.remove('hidden');
-            statusBox.innerText = "Deploy your fleet to step into battle.";
+            statusBox.innerText = "Deploy your multi-tile vessels.";
             
             buildDeploymentDock();
-            renderGrid('your-board', handleFleetDeploymentClick);
+            renderGrid('your-board', handleFleetDeploymentClick, true); // Active placement hover behaviors enabled
         });
 
-        // --- STEP 2: PLACEMENT LOGIC ENGINE ---
+        // Determines starting turn order seamlessly by string comparison of unique IDs
+        function evaluateTurnPriorities(theirId) {
+            if (myId < theirId) {
+                myTurn = true; 
+            } else {
+                myTurn = false;
+            }
+        }
+
+        // --- STEP 2: HOVER ENGINE & VALIDATION PACKS ---
         function buildDeploymentDock() {
             const container = document.getElementById('ship-buttons-container');
             container.innerHTML = '';
@@ -144,31 +191,32 @@
                 const btn = document.createElement('div');
                 btn.className = 'ship-btn';
                 btn.id = `ship-btn-${idx}`;
-                btn.innerText = `${ship.name} - ${ship.size}`;
+                btn.innerText = `${ship.name} (${ship.size})`;
                 btn.addEventListener('click', () => selectShipForPlacement(idx));
                 container.appendChild(btn);
             });
 
-            // Toggle Direction Button
             document.getElementById('btn-dir').addEventListener('click', (e) => {
                 placementOrientation = placementOrientation === "H" ? "V" : "H";
-                e.target.innerText = `Orientation: ${placementOrientation === "H" ? "HORIZONTAL" : "VERTICAL"}`;
+                e.target.innerText = `Direction: ${placementOrientation === "H" ? "HORIZONTAL" : "VERTICAL"}`;
             });
 
-            // Auto Placement Handler
             document.getElementById('btn-auto').addEventListener('click', autoDeployAllShips);
             
-            // Commence Battle Switch Trigger
             document.getElementById('btn-commence').addEventListener('click', () => {
+                iamReady = true;
                 document.getElementById('deployment-dock').classList.add('hidden');
-                document.getElementById('opponent-container').classList.remove('hidden');
-                renderGrid('opponent-board', handleMyStrikeClick);
-                statusBox.innerText = "Match Joined! Tap upper grid to fire when ready.";
+                // Lock out placement triggers
+                renderGrid('your-board', null, false);
+                
+                pubnub.publish({ channel: myChannel, message: { type: 'player-ready', sender: myId } });
+                statusBox.innerText = "Ready submitted! Waiting for opponent to place ships...";
+                checkMatchActivation();
             });
         }
 
         function selectShipForPlacement(idx) {
-            if (shipTypes[idx].placed) return; // Prevent double placements
+            if (shipTypes[idx].placed) return;
             currentSelectedShipIndex = idx;
             document.querySelectorAll('.ship-btn').forEach(b => b.classList.remove('selected'));
             document.getElementById(`ship-btn-${idx}`).classList.add('selected');
@@ -184,14 +232,40 @@
                 let curRow = Math.floor(currentCoord / 10);
                 let curCol = currentCoord % 10;
 
-                if (currentCoord < 0 || currentCoord >= 100) return false; // Bounds check
-                if (orientation === "H" && curRow !== row) return false; // Row wrap check
-                if (orientation === "V" && curCol !== col) return false; // Column split check
-                if (yourFleetLocations[currentCoord] !== 0) return false; // Collision check
+                if (currentCoord < 0 || currentCoord >= 100) return false; 
+                if (orientation === "H" && curRow !== row) return false; 
+                if (orientation === "V" && curCol !== col) return false; 
+                if (yourFleetLocations[currentCoord] !== 0) return false; 
                 
                 coords.push(currentCoord);
             }
             return coords;
+        }
+
+        function handleHoverFeedback(startCoord, isEntering) {
+            if (currentSelectedShipIndex === null) return;
+            const size = shipTypes[currentSelectedShipIndex].size;
+            
+            const validCoords = checkPlacementValidity(startCoord, size, placementOrientation);
+            
+            // Loop through potential coordinate indices
+            for (let i = 0; i < size; i++) {
+                let c = placementOrientation === "H" ? startCoord + i : startCoord + (i * 10);
+                let row = Math.floor(startCoord / 10);
+                let targetRow = Math.floor(c / 10);
+                
+                // Keep rendering operations bounded within visible grid dimensions
+                if (c >= 0 && c < 100 && (placementOrientation === "V" || row === targetRow)) {
+                    const targetCell = document.querySelector(`#your-board [data-index="${c}"]`);
+                    if (targetCell) {
+                        if (isEntering) {
+                            targetCell.classList.add(validCoords ? 'preview-valid' : 'preview-invalid');
+                        } else {
+                            targetCell.classList.remove('preview-valid', 'preview-invalid');
+                        }
+                    }
+                }
+            }
         }
 
         function handleFleetDeploymentClick(coord) {
@@ -199,26 +273,22 @@
             const ship = shipTypes[currentSelectedShipIndex];
             
             const validCoords = checkPlacementValidity(coord, ship.size, placementOrientation);
-            if (!validCoords) return; // Silent discard invalid clicks
+            if (!validCoords) return;
 
-            // Map variables inside space
             validCoords.forEach(c => { yourFleetLocations[c] = 1; });
             ship.placed = true;
             
-            const targetBtn = document.getElementById(`ship-btn-${currentSelectedShipIndex}`);
-            targetBtn.className = 'ship-btn placed';
-            
+            document.getElementById(`ship-btn-${currentSelectedShipIndex}`).className = 'ship-btn placed';
             currentSelectedShipIndex = null;
             updateVisualDisplays();
             verifyDeploymentCompletion();
         }
 
         function autoDeployAllShips() {
-            // Reset existing plotting frames
             yourFleetLocations.fill(0);
             shipTypes.forEach(s => s.placed = false);
             
-            shipTypes.forEach((ship, idx) => {
+            shipTypes.forEach((ship) => {
                 let placed = false;
                 while (!placed) {
                     let randCoord = Math.floor(Math.random() * 100);
@@ -233,10 +303,7 @@
                 }
             });
 
-            // Set UI components down cleanly
-            shipTypes.forEach((s, idx) => {
-                document.getElementById(`ship-btn-${idx}`).className = 'ship-btn placed';
-            });
+            shipTypes.forEach((s, idx) => { document.getElementById(`ship-btn-${idx}`).className = 'ship-btn placed'; });
             currentSelectedShipIndex = null;
             updateVisualDisplays();
             verifyDeploymentCompletion();
@@ -254,14 +321,30 @@
             }
         }
 
-        // --- STEP 3: PLAY MECHANICS ENGINE ---
-        function renderGrid(containerId, clickHandler) {
+        function checkMatchActivation() {
+            if (iamReady && opponentReady) {
+                document.getElementById('opponent-container').classList.remove('hidden');
+                renderGrid('opponent-board', handleMyStrikeClick, false);
+                updateTurnHeader();
+                updateVisualDisplays();
+            }
+        }
+
+        // --- STEP 3: PLAY LOGIC ENGINE ---
+        function renderGrid(containerId, clickHandler, enableHovers) {
             const container = document.getElementById(containerId);
             container.innerHTML = '';
             for (let i = 0; i < 100; i++) {
                 const cell = document.createElement('div');
                 cell.className = 'cell';
+                cell.setAttribute('data-index', i);
+                
                 if (clickHandler) cell.addEventListener('click', () => clickHandler(i));
+                
+                if (enableHovers) {
+                    cell.addEventListener('mouseenter', () => handleHoverFeedback(i, true));
+                    cell.addEventListener('mouseleave', () => handleHoverFeedback(i, false));
+                }
                 container.appendChild(cell);
             }
         }
@@ -277,6 +360,7 @@
 
             const yourCells = document.querySelectorAll('#your-board .cell');
             yourCells.forEach((cell, i) => {
+                if (!cell) return;
                 cell.className = 'cell';
                 if (yourFleetLocations[i] === 1) cell.className = 'cell ship';
                 if (yourFleetLocations[i] === 2) cell.className = 'cell miss'; 
@@ -284,11 +368,30 @@
             });
         }
 
+        function updateTurnHeader() {
+            const attackHeader = document.getElementById('attack-header');
+            if (myTurn) {
+                statusBox.style.color = "#00ffca";
+                statusBox.innerText = "Your Turn to Strike!";
+                attackHeader.innerText = `${opponentName}'s Fleet (OPEN FIRE)`;
+                attackHeader.style.color = "#00ffca";
+            } else {
+                statusBox.style.color = "#ffb300";
+                statusBox.innerText = `Waiting for ${opponentName} to strike...`;
+                attackHeader.innerText = `${opponentName}'s Fleet (LOCKED)`;
+                attackHeader.style.color = "#7f8c8d";
+            }
+        }
+
         function handleMyStrikeClick(coord) {
+            // STRICT TURN LOCKING GUARD: Drop executions instantly if it's not your turn
             if (!myTurn || opponentBoardHits[coord] !== 0) return;
             
-            statusBox.innerText = "Shell away! Awaiting target analysis...";
-            myTurn = false;
+            // Instantly freeze the interface
+            myTurn = false; 
+            updateTurnHeader();
+            
+            statusBox.innerText = "Firing weapon systems...";
             
             pubnub.publish({ 
                 channel: myChannel, 
@@ -301,20 +404,26 @@
             yourFleetLocations[coord] = isHit ? 3 : 2; 
             updateVisualDisplays();
 
+            // Fire response back to notify attacker
             pubnub.publish({ 
                 channel: myChannel, 
                 message: { type: 'result', coord: coord, isHit: isHit, sender: myId } 
             });
             
+            // Hand over priority control safely
             myTurn = true;
-            statusBox.innerText = "Incoming impact logged. Your turn to fire!";
+            updateTurnHeader();
         }
 
         function handleShotFeedback(coord, isHit) {
             opponentBoardHits[coord] = isHit ? 1 : 2;
             updateVisualDisplays();
-            myTurn = true; 
-            statusBox.innerText = isHit ? "DIRECT HIT! Fire again." : "Splash. Missed target. Opponent's turn.";
+            
+            // Keep myTurn set to FALSE here. It only unlocks when the opponent takes their shot!
+            myTurn = false; 
+            
+            statusBox.innerText = isHit ? "DIRECT HIT! Waiting for opponent..." : "Miss. Waiting for opponent...";
+            updateTurnHeader();
         }
     </script>
 </body>
