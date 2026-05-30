@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Simplified Battleships V3</title>
+    <title>Simplified Battleships V4</title>
     
     <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.7.2.2.min.js"></script>
 
@@ -32,7 +32,7 @@
 </head>
 <body>
 
-    <h1>Battleships Lite</h1>
+    <h1>Battleships Lite - Random Fleets</h1>
     <div id="status-box" class="status">System Ready.</div>
 
     <div id="lobby-screen">
@@ -61,13 +61,12 @@
     <script>
         const statusBox = document.getElementById('status-box');
         let pubnub, myChannel;
-        let myTurn = true; // Both screens start ready to click to avoid lockouts!
+        let myTurn = true; 
         
         let opponentBoardHits = Array(100).fill(0); 
         let yourFleetLocations = Array(100).fill(0); 
         const myId = "user_" + Math.random().toString(36).substring(2, 7);
 
-        // Fallback production tokens that don't restrict basic text publishing
         pubnub = new PubNub({
             publishKey: 'demo', 
             subscribeKey: 'demo',
@@ -80,10 +79,9 @@
             
             myChannel = 'bbship_room_' + roomCode;
             
-            // Listen for room broadcasts
             pubnub.addListener({
                 message: function(event) {
-                    if (event.message.sender === myId) return; // Drop own echoes
+                    if (event.message.sender === myId) return; 
                     
                     const data = event.message;
                     if (data.type === 'shot') {
@@ -96,7 +94,6 @@
 
             pubnub.subscribe({ channels: [myChannel] });
             
-            // Switch screens instantly
             document.getElementById('lobby-screen').classList.add('hidden');
             document.getElementById('game-screen').classList.remove('hidden');
             statusBox.innerText = `Connected to Room ${roomCode}! Fire when ready.`;
@@ -105,12 +102,20 @@
         });
 
         function initialiseGame() {
-            // Setup identical test ship positions on both phones for validation
-            yourFleetLocations[12] = 1;
-            yourFleetLocations[25] = 1;
-            yourFleetLocations[44] = 1;
-            yourFleetLocations[57] = 1;
-            yourFleetLocations[81] = 1;
+            // Clear out any old configuration entirely
+            yourFleetLocations.fill(0);
+
+            // Dynamically place 5 unique random ships on this device's board
+            let shipsPlaced = 0;
+            while (shipsPlaced < 5) {
+                let randomCoord = Math.floor(Math.random() * 100);
+                
+                // Only place a ship if this square is empty
+                if (yourFleetLocations[randomCoord] === 0) {
+                    yourFleetLocations[randomCoord] = 1; // 1 = Healthy Ship
+                    shipsPlaced++;
+                }
+            }
 
             renderGrid('opponent-board', handleMyStrikeClick);
             renderGrid('your-board', null);
@@ -149,7 +154,7 @@
             if (!myTurn || opponentBoardHits[coord] !== 0) return;
             
             statusBox.innerText = "Shell fired! Awaiting feedback...";
-            myTurn = false; // Pause actions until they respond
+            myTurn = false; 
             
             pubnub.publish({ 
                 channel: myChannel, 
@@ -162,7 +167,6 @@
             yourFleetLocations[coord] = isHit ? 3 : 2; 
             updateVisualDisplays();
 
-            // Broadcast back immediately
             pubnub.publish({ 
                 channel: myChannel, 
                 message: { type: 'result', coord: coord, isHit: isHit, sender: myId } 
@@ -175,7 +179,7 @@
         function handleShotFeedback(coord, isHit) {
             opponentBoardHits[coord] = isHit ? 1 : 2;
             updateVisualDisplays();
-            myTurn = true; // Unlock turning
+            myTurn = true; 
             statusBox.innerText = isHit ? "It's a HIT! Go again." : "Missed. Opponent's turn.";
         }
     </script>
