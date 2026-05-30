@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Battleships Room-Code Edition v2</title>
+    <title>Simplified Battleships V3</title>
     
     <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.7.2.2.min.js"></script>
 
@@ -11,7 +11,7 @@
         body { font-family: -apple-system, sans-serif; background: #121212; color: #fff; text-align: center; margin: 0; padding: 15px; }
         .hidden { display: none; }
         h1 { font-size: 1.5rem; margin-bottom: 5px; }
-        .status { background: #222; padding: 10px; border-radius: 8px; margin: 10px 0; font-weight: bold; color: #00ffca; min-height: 20px; }
+        .status { background: #222; padding: 12px; border-radius: 8px; margin: 10px 0; font-weight: bold; color: #00ffca; }
         
         .setup-card { background: #1a1a1a; padding: 20px; border-radius: 12px; max-width: 320px; margin: 20px auto; border: 1px solid #333; }
         input { background: #333; color: #fff; border: 1px solid #555; padding: 12px; border-radius: 6px; font-size: 1.2rem; width: 80%; text-align: center; margin-bottom: 10px; }
@@ -20,7 +20,7 @@
         .board-title { font-size: 0.9rem; color: #aaa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
         .grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; width: 100%; max-width: 320px; aspect-ratio: 1; margin: 0 auto; }
         
-        .cell { background: #262626; aspect-ratio: 1; border-radius: 2px; border: 1px solid #1a1a1a; transition: background 0.2s; position: relative; }
+        .cell { background: #262626; aspect-ratio: 1; border-radius: 2px; border: 1px solid #1a1a1a; position: relative; }
         .cell.ship { background: #555; border: 1px solid #888; }
         .cell.hit { background: #ff3838; }
         .cell.miss { background: #3867ff; }
@@ -28,27 +28,26 @@
         .cell.hit::after { content: '×'; color: #fff; font-size: 14px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-weight: bold; }
         
         button { background: #3498db; color: white; border: none; padding: 14px 28px; border-radius: 6px; cursor: pointer; font-size: 1rem; font-weight: bold; width: 85%; margin: 8px 0; }
-        button:active { background: #2980b9; }
     </style>
 </head>
 <body>
 
-    <h1>Battleships P2P</h1>
-    <div id="status-box" class="status">Connecting to network cluster...</div>
+    <h1>Battleships Lite</h1>
+    <div id="status-box" class="status">System Ready.</div>
 
-    <div id="lobby-screen" class="hidden">
+    <div id="lobby-screen">
         <div class="setup-card">
-            <h3>Create or Join Game</h3>
-            <p style="color: #aaa; font-size: 0.9rem;">Enter a matching code on both devices to link up instantly.</p>
-            <input type="number" id="room-input" pattern="[0-9]*" placeholder="Enter Room Code">
-            <button id="btn-start">Connect & Play</button>
+            <h3>Enter a Room Number</h3>
+            <p style="color: #aaa; font-size: 0.9rem;">Match numbers on both devices to target each other instantly.</p>
+            <input type="number" id="room-input" pattern="[0-9]*" placeholder="e.g. 1234">
+            <button id="btn-start">Join Room</button>
         </div>
     </div>
 
     <div id="game-screen" class="hidden">
         <div class="grid-container">
             <div>
-                <div class="board-title" id="opponent-board-header">Opponent's Fleet</div>
+                <div class="board-title">Opponent's Fleet (Attack Here)</div>
                 <div id="opponent-board" class="grid"></div>
             </div>
             <hr style="width: 100%; border: 0; border-top: 1px solid #222; margin: 5px 0;">
@@ -61,102 +60,52 @@
 
     <script>
         const statusBox = document.getElementById('status-box');
-        let pubnub, myChannel, roomCode;
-        let myRole = null; 
-        let myTurn = false;
+        let pubnub, myChannel;
+        let myTurn = true; // Both screens start ready to click to avoid lockouts!
         
         let opponentBoardHits = Array(100).fill(0); 
         let yourFleetLocations = Array(100).fill(0); 
+        const myId = "user_" + Math.random().toString(36).substring(2, 7);
 
-        function initNetwork() {
-            // Initializing the connection using open global test tokens
-            pubnub = new PubNub({
-                publishKey: 'pub-c-8fa82b54-bc70-4d51-9c86-17fa003e8c11', 
-                subscribeKey: 'sub-c-1a5ddbc5-fa80-4df2-a3bd-a5b50d53513a',
-                userId: "user_" + Math.random().toString(36).substring(2, 7)
-            });
-            
-            statusBox.innerText = "Connected. Enter a room code below.";
-            document.getElementById('lobby-screen').classList.remove('hidden');
-        }
-
-        document.getElementById('btn-start').addEventListener('click', () => {
-            roomCode = document.getElementById('room-input').value.trim();
-            if (!roomCode) return alert("Please enter a room code.");
-            
-            myChannel = 'game_room_' + roomCode;
-            statusBox.innerText = "Querying room occupancy status...";
-
-            // Check how many people are in the room right now
-            pubnub.hereNow({
-                channels: [myChannel],
-                includeUUIDs: false
-            }).then((response) => {
-                const occupantCount = response.channels[myChannel] ? response.channels[myChannel].occupancy : 0;
-                
-                if (occupantCount === 0) {
-                    myRole = 'host';
-                    myTurn = true;
-                    statusBox.innerText = `Room ${roomCode}: You are Player 1. Waiting for Player 2...`;
-                } else if (occupantCount === 1) {
-                    myRole = 'guest';
-                    myTurn = false;
-                    statusBox.innerText = `Room ${roomCode}: You are Player 2. Connecting...`;
-                } else {
-                    statusBox.innerText = "This room is full! Try a different code.";
-                    return;
-                }
-
-                // Register network operational triggers
-                setupRoomSubscription();
-            }).catch((error) => {
-                console.error(error);
-                statusBox.innerText = "Network look-up timeout. Try connecting again.";
-            });
+        // Fallback production tokens that don't restrict basic text publishing
+        pubnub = new PubNub({
+            publishKey: 'demo', 
+            subscribeKey: 'demo',
+            userId: myId
         });
 
-        function setupRoomSubscription() {
+        document.getElementById('btn-start').addEventListener('click', () => {
+            const roomCode = document.getElementById('room-input').value.trim();
+            if (!roomCode) return alert("Please enter a number.");
+            
+            myChannel = 'bbship_room_' + roomCode;
+            
+            // Listen for room broadcasts
             pubnub.addListener({
-                status: function(statusEvent) {
-                    if (statusEvent.category === "PNConnectedCategory" && myRole === 'guest') {
-                        // Guest is inside. Signal Host that we are ready to activate.
-                        pubnub.publish({ channel: myChannel, message: { type: 'join-sync' } });
-                    }
-                },
                 message: function(event) {
+                    if (event.message.sender === myId) return; // Drop own echoes
+                    
                     const data = event.message;
-                    if (event.publisher === pubnub.getUserId()) return; // Prevent echoing self
-
-                    if (data.type === 'join-sync' && myRole === 'host') {
-                        // Host hears the guest arrive. Trigger game launch.
-                        statusBox.innerText = "Player 2 Connected! Your turn to strike.";
-                        pubnub.publish({ channel: myChannel, message: { type: 'game-start-trigger' } });
-                        initialiseGame();
-                    }
-                    else if (data.type === 'game-start-trigger' && myRole === 'guest') {
-                        // Guest gets game initialization clearance from Host
-                        statusBox.innerText = "Match Found! Opponent's turn.";
-                        initialiseGame();
-                    }
-                    else if (data.type === 'shot') {
+                    if (data.type === 'shot') {
                         handleIncomingShot(data.coord);
-                    }
-                    else if (data.type === 'result') {
+                    } else if (data.type === 'result') {
                         handleShotFeedback(data.coord, data.isHit);
                     }
                 }
             });
 
             pubnub.subscribe({ channels: [myChannel] });
-        }
-
-        // --- CORE GAME ENGINE ---
-        function initialiseGame() {
+            
+            // Switch screens instantly
             document.getElementById('lobby-screen').classList.add('hidden');
             document.getElementById('game-screen').classList.remove('hidden');
-            updateTurnHeader();
+            statusBox.innerText = `Connected to Room ${roomCode}! Fire when ready.`;
+            
+            initialiseGame();
+        });
 
-            // Mocking out 5 ship plots across fleet space
+        function initialiseGame() {
+            // Setup identical test ship positions on both phones for validation
             yourFleetLocations[12] = 1;
             yourFleetLocations[25] = 1;
             yourFleetLocations[44] = 1;
@@ -196,24 +145,16 @@
             });
         }
 
-        function updateTurnHeader() {
-            if (myTurn) {
-                statusBox.style.color = "#00ffca";
-                statusBox.innerText = "Your Turn to Strike!";
-                document.getElementById('opponent-board-header').innerText = "Opponent's Fleet (READY TO FIRE)";
-            } else {
-                statusBox.style.color = "#ffb300";
-                statusBox.innerText = "Opponent's Turn. Defend your fleet.";
-                document.getElementById('opponent-board-header').innerText = "Opponent's Fleet (WAITING...)";
-            }
-        }
-
         function handleMyStrikeClick(coord) {
             if (!myTurn || opponentBoardHits[coord] !== 0) return;
             
-            myTurn = false;
-            updateTurnHeader();
-            pubnub.publish({ channel: myChannel, message: { type: 'shot', coord: coord } });
+            statusBox.innerText = "Shell fired! Awaiting feedback...";
+            myTurn = false; // Pause actions until they respond
+            
+            pubnub.publish({ 
+                channel: myChannel, 
+                message: { type: 'shot', coord: coord, sender: myId } 
+            });
         }
 
         function handleIncomingShot(coord) {
@@ -221,19 +162,22 @@
             yourFleetLocations[coord] = isHit ? 3 : 2; 
             updateVisualDisplays();
 
-            pubnub.publish({ channel: myChannel, message: { type: 'result', coord: coord, isHit: isHit } });
+            // Broadcast back immediately
+            pubnub.publish({ 
+                channel: myChannel, 
+                message: { type: 'result', coord: coord, isHit: isHit, sender: myId } 
+            });
             
             myTurn = true;
-            updateTurnHeader();
+            statusBox.innerText = "Your turn to attack!";
         }
 
         function handleShotFeedback(coord, isHit) {
             opponentBoardHits[coord] = isHit ? 1 : 2;
             updateVisualDisplays();
-            updateTurnHeader();
+            myTurn = true; // Unlock turning
+            statusBox.innerText = isHit ? "It's a HIT! Go again." : "Missed. Opponent's turn.";
         }
-
-        window.addEventListener('load', initNetwork);
     </script>
 </body>
 </html>
