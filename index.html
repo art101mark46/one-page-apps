@@ -3,56 +3,80 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Simplified Battleships V4</title>
+    <title>Advanced P2P Battleships</title>
     
     <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.7.2.2.min.js"></script>
 
     <style>
-        body { font-family: -apple-system, sans-serif; background: #121212; color: #fff; text-align: center; margin: 0; padding: 15px; }
-        .hidden { display: none; }
-        h1 { font-size: 1.5rem; margin-bottom: 5px; }
-        .status { background: #222; padding: 12px; border-radius: 8px; margin: 10px 0; font-weight: bold; color: #00ffca; }
+        body { font-family: -apple-system, sans-serif; background: #121212; color: #fff; text-align: center; margin: 0; padding: 10px; }
+        .hidden { display: none !important; }
+        h1 { font-size: 1.4rem; margin: 5px 0; }
+        .status { background: #222; padding: 12px; border-radius: 8px; margin: 10px auto; font-weight: bold; color: #00ffca; max-width: 340px; box-sizing: border-box; }
         
         .setup-card { background: #1a1a1a; padding: 20px; border-radius: 12px; max-width: 320px; margin: 20px auto; border: 1px solid #333; }
         input { background: #333; color: #fff; border: 1px solid #555; padding: 12px; border-radius: 6px; font-size: 1.2rem; width: 80%; text-align: center; margin-bottom: 10px; }
         
-        .grid-container { display: flex; flex-direction: column; align-items: center; gap: 15px; margin-top: 15px; }
-        .board-title { font-size: 0.9rem; color: #aaa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
-        .grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; width: 100%; max-width: 320px; aspect-ratio: 1; margin: 0 auto; }
+        /* Placement Dock Styling */
+        .dock { background: #1a1a1a; padding: 10px; border-radius: 8px; max-width: 340px; margin: 10px auto; text-align: left; box-sizing: border-box; border: 1px solid #333; }
+        .dock h4 { margin: 0 0 8px 0; text-align: center; font-size: 0.9rem; letter-spacing: 1px; color: #aaa; }
+        .ship-btn { background: #2c3e50; color: #fff; padding: 6px 10px; margin: 3px; border-radius: 4px; font-size: 0.8rem; border: 1px solid #455a64; display: inline-block; cursor: pointer; }
+        .ship-btn.selected { background: #e67e22; border-color: #d35400; }
+        .ship-btn.placed { background: #27ae60; border-color: #2196f3; opacity: 0.6; cursor: not-allowed; }
+        .controls { display: flex; justify-content: space-between; max-width: 340px; margin: 5px auto; gap: 5px; }
+        .sub-btn { background: #7f8c8d; padding: 8px; font-size: 0.85rem; flex: 1; border-radius: 4px; border: none; color: white; font-weight: bold; cursor: pointer; }
+        .sub-btn.active { background: #9b59b6; }
+
+        /* Grid Layouts */
+        .grid-container { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 10px; }
+        .board-title { font-size: 0.85rem; color: #aaa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 3px; }
+        .grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; width: 100%; max-width: 340px; aspect-ratio: 1; margin: 0 auto; box-sizing: border-box; }
         
+        /* Cell Properties */
         .cell { background: #262626; aspect-ratio: 1; border-radius: 2px; border: 1px solid #1a1a1a; position: relative; }
-        .cell.ship { background: #555; border: 1px solid #888; }
+        .cell.ship { background: #555; border: 1px solid #777; }
         .cell.hit { background: #ff3838; }
         .cell.miss { background: #3867ff; }
-        
         .cell.hit::after { content: '×'; color: #fff; font-size: 14px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-weight: bold; }
         
-        button { background: #3498db; color: white; border: none; padding: 14px 28px; border-radius: 6px; cursor: pointer; font-size: 1rem; font-weight: bold; width: 85%; margin: 8px 0; }
+        .main-btn { background: #3498db; color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; font-size: 1rem; font-weight: bold; width: 100%; box-sizing: border-box; }
+        .main-btn:disabled { background: #333; color: #666; cursor: not-allowed; border: 1px dashed #444; }
     </style>
 </head>
 <body>
 
-    <h1>Battleships Lite - Random Fleets</h1>
+    <h1>Battleships P2P - SHIPS</h1>
     <div id="status-box" class="status">System Ready.</div>
 
     <div id="lobby-screen">
         <div class="setup-card">
-            <h3>Enter a Room Number</h3>
-            <p style="color: #aaa; font-size: 0.9rem;">Match numbers on both devices to target each other instantly.</p>
-            <input type="number" id="room-input" pattern="[0-9]*" placeholder="e.g. 1234">
-            <button id="btn-start">Join Room</button>
+            <h3>Enter Room Number</h3>
+            <input type="number" id="room-input" pattern="[0-9]*" placeholder="e.g. 5566">
+            <button class="main-btn" id="btn-start">Connect to Room</button>
+        </div>
+    </div>
+
+    <div id="deployment-dock" class="hidden">
+        <div class="dock">
+            <h4>FLEET MANAGEMENT DOCK</h4>
+            <div id="ship-buttons-container"></div>
+        </div>
+        <div class="controls">
+            <button class="sub-btn active" id="btn-dir">Orientation: HORIZONTAL</button>
+            <button class="sub-btn" id="btn-auto" style="background: #27ae60;">Auto Deploy Fleet</button>
+        </div>
+        <div style="max-width: 340px; margin: 10px auto;">
+            <button class="main-btn" id="btn-commence" disabled>Commence Battle (0/5 Placed)</button>
         </div>
     </div>
 
     <div id="game-screen" class="hidden">
         <div class="grid-container">
-            <div>
-                <div class="board-title">Opponent's Fleet (Attack Here)</div>
+            <div id="opponent-container" class="hidden">
+                <div class="board-title" id="attack-header">Opponent's Fleet (Attack Grid)</div>
                 <div id="opponent-board" class="grid"></div>
             </div>
-            <hr style="width: 100%; border: 0; border-top: 1px solid #222; margin: 5px 0;">
             <div>
-                <div class="board-title">Your Fleet & Incoming Attacks</div>
+                <div class="board-title">Your Fleet & Incoming Strikes</div>
                 <div id="your-board" class="grid"></div>
             </div>
         </div>
@@ -62,28 +86,38 @@
         const statusBox = document.getElementById('status-box');
         let pubnub, myChannel;
         let myTurn = true; 
-        
-        let opponentBoardHits = Array(100).fill(0); 
-        let yourFleetLocations = Array(100).fill(0); 
         const myId = "user_" + Math.random().toString(36).substring(2, 7);
 
-        pubnub = new PubNub({
-            publishKey: 'demo', 
-            subscribeKey: 'demo',
-            userId: myId
-        });
+        // Core Configuration Maps
+        const shipTypes = [
+            { name: "Aircraft Carrier", size: 5 },
+            { name: "Battleship", size: 4 },
+            { name: "Cruiser", size: 3 },
+            { name: "Submarine", size: 3 },
+            { name: "Destroyer", size: 2 }
+        ];
 
+        let currentSelectedShipIndex = null;
+        let placementOrientation = "H"; // H = Horizontal, V = Vertical
+
+        let opponentBoardHits = Array(100).fill(0); 
+        let yourFleetLocations = Array(100).fill(0); // 0=water, 1=ship, 2=miss, 3=hit
+        let placedShipsTracking = []; // Array tracking locations of explicitly deployed items
+
+        pubnub = new PubNub({ publishKey: 'demo', subscribeKey: 'demo', userId: myId });
+
+        // --- STEP 1: INITIAL ROOM SETUP ---
         document.getElementById('btn-start').addEventListener('click', () => {
             const roomCode = document.getElementById('room-input').value.trim();
-            if (!roomCode) return alert("Please enter a number.");
+            if (!roomCode) return alert("Please enter a room number.");
             
-            myChannel = 'bbship_room_' + roomCode;
+            myChannel = 'bbship_room_v2_' + roomCode;
             
             pubnub.addListener({
                 message: function(event) {
-                    if (event.message.sender === myId) return; 
-                    
+                    if (event.message.sender === myId) return;
                     const data = event.message;
+                    
                     if (data.type === 'shot') {
                         handleIncomingShot(data.coord);
                     } else if (data.type === 'result') {
@@ -91,37 +125,136 @@
                     }
                 }
             });
-
             pubnub.subscribe({ channels: [myChannel] });
-            
+
             document.getElementById('lobby-screen').classList.add('hidden');
+            document.getElementById('deployment-dock').classList.remove('hidden');
             document.getElementById('game-screen').classList.remove('hidden');
-            statusBox.innerText = `Connected to Room ${roomCode}! Fire when ready.`;
+            statusBox.innerText = "Deploy your fleet to step into battle.";
             
-            initialiseGame();
+            buildDeploymentDock();
+            renderGrid('your-board', handleFleetDeploymentClick);
         });
 
-        function initialiseGame() {
-            // Clear out any old configuration entirely
-            yourFleetLocations.fill(0);
+        // --- STEP 2: PLACEMENT LOGIC ENGINE ---
+        function buildDeploymentDock() {
+            const container = document.getElementById('ship-buttons-container');
+            container.innerHTML = '';
+            shipTypes.forEach((ship, idx) => {
+                const btn = document.createElement('div');
+                btn.className = 'ship-btn';
+                btn.id = `ship-btn-${idx}`;
+                btn.innerText = `${ship.name} - ${ship.size}`;
+                btn.addEventListener('click', () => selectShipForPlacement(idx));
+                container.appendChild(btn);
+            });
 
-            // Dynamically place 5 unique random ships on this device's board
-            let shipsPlaced = 0;
-            while (shipsPlaced < 5) {
-                let randomCoord = Math.floor(Math.random() * 100);
-                
-                // Only place a ship if this square is empty
-                if (yourFleetLocations[randomCoord] === 0) {
-                    yourFleetLocations[randomCoord] = 1; // 1 = Healthy Ship
-                    shipsPlaced++;
-                }
-            }
+            // Toggle Direction Button
+            document.getElementById('btn-dir').addEventListener('click', (e) => {
+                placementOrientation = placementOrientation === "H" ? "V" : "H";
+                e.target.innerText = `Orientation: ${placementOrientation === "H" ? "HORIZONTAL" : "VERTICAL"}`;
+            });
 
-            renderGrid('opponent-board', handleMyStrikeClick);
-            renderGrid('your-board', null);
-            updateVisualDisplays();
+            // Auto Placement Handler
+            document.getElementById('btn-auto').addEventListener('click', autoDeployAllShips);
+            
+            // Commence Battle Switch Trigger
+            document.getElementById('btn-commence').addEventListener('click', () => {
+                document.getElementById('deployment-dock').classList.add('hidden');
+                document.getElementById('opponent-container').classList.remove('hidden');
+                renderGrid('opponent-board', handleMyStrikeClick);
+                statusBox.innerText = "Match Joined! Tap upper grid to fire when ready.";
+            });
         }
 
+        function selectShipForPlacement(idx) {
+            if (shipTypes[idx].placed) return; // Prevent double placements
+            currentSelectedShipIndex = idx;
+            document.querySelectorAll('.ship-btn').forEach(b => b.classList.remove('selected'));
+            document.getElementById(`ship-btn-${idx}`).classList.add('selected');
+        }
+
+        function checkPlacementValidity(startCoord, size, orientation) {
+            let coords = [];
+            let row = Math.floor(startCoord / 10);
+            let col = startCoord % 10;
+
+            for (let i = 0; i < size; i++) {
+                let currentCoord = orientation === "H" ? startCoord + i : startCoord + (i * 10);
+                let curRow = Math.floor(currentCoord / 10);
+                let curCol = currentCoord % 10;
+
+                if (currentCoord < 0 || currentCoord >= 100) return false; // Bounds check
+                if (orientation === "H" && curRow !== row) return false; // Row wrap check
+                if (orientation === "V" && curCol !== col) return false; // Column split check
+                if (yourFleetLocations[currentCoord] !== 0) return false; // Collision check
+                
+                coords.push(currentCoord);
+            }
+            return coords;
+        }
+
+        function handleFleetDeploymentClick(coord) {
+            if (currentSelectedShipIndex === null) return;
+            const ship = shipTypes[currentSelectedShipIndex];
+            
+            const validCoords = checkPlacementValidity(coord, ship.size, placementOrientation);
+            if (!validCoords) return; // Silent discard invalid clicks
+
+            // Map variables inside space
+            validCoords.forEach(c => { yourFleetLocations[c] = 1; });
+            ship.placed = true;
+            
+            const targetBtn = document.getElementById(`ship-btn-${currentSelectedShipIndex}`);
+            targetBtn.className = 'ship-btn placed';
+            
+            currentSelectedShipIndex = null;
+            updateVisualDisplays();
+            verifyDeploymentCompletion();
+        }
+
+        function autoDeployAllShips() {
+            // Reset existing plotting frames
+            yourFleetLocations.fill(0);
+            shipTypes.forEach(s => s.placed = false);
+            
+            shipTypes.forEach((ship, idx) => {
+                let placed = false;
+                while (!placed) {
+                    let randCoord = Math.floor(Math.random() * 100);
+                    let randDir = Math.random() > 0.5 ? "H" : "V";
+                    let validCoords = checkPlacementValidity(randCoord, ship.size, randDir);
+                    
+                    if (validCoords) {
+                        validCoords.forEach(c => { yourFleetLocations[c] = 1; });
+                        ship.placed = true;
+                        placed = true;
+                    }
+                }
+            });
+
+            // Set UI components down cleanly
+            shipTypes.forEach((s, idx) => {
+                document.getElementById(`ship-btn-${idx}`).className = 'ship-btn placed';
+            });
+            currentSelectedShipIndex = null;
+            updateVisualDisplays();
+            verifyDeploymentCompletion();
+        }
+
+        function verifyDeploymentCompletion() {
+            const allPlaced = shipTypes.every(s => s.placed);
+            const commenceBtn = document.getElementById('btn-commence');
+            const totalPlacedCount = shipTypes.filter(s => s.placed).length;
+            
+            commenceBtn.innerText = `Commence Battle (${totalPlacedCount}/5 Placed)`;
+            if (allPlaced) {
+                commenceBtn.disabled = false;
+                commenceBtn.style.background = "#27ae60";
+            }
+        }
+
+        // --- STEP 3: PLAY MECHANICS ENGINE ---
         function renderGrid(containerId, clickHandler) {
             const container = document.getElementById(containerId);
             container.innerHTML = '';
@@ -136,6 +269,7 @@
         function updateVisualDisplays() {
             const oppCells = document.querySelectorAll('#opponent-board .cell');
             oppCells.forEach((cell, i) => {
+                if (!cell) return;
                 cell.className = 'cell';
                 if (opponentBoardHits[i] === 1) cell.className = 'cell hit';
                 if (opponentBoardHits[i] === 2) cell.className = 'cell miss';
@@ -153,8 +287,8 @@
         function handleMyStrikeClick(coord) {
             if (!myTurn || opponentBoardHits[coord] !== 0) return;
             
-            statusBox.innerText = "Shell fired! Awaiting feedback...";
-            myTurn = false; 
+            statusBox.innerText = "Shell away! Awaiting target analysis...";
+            myTurn = false;
             
             pubnub.publish({ 
                 channel: myChannel, 
@@ -163,7 +297,7 @@
         }
 
         function handleIncomingShot(coord) {
-            const isHit = yourFleetLocations[coord] === 1;
+            const isHit = yourFleetLocations[coord] === 1 || yourFleetLocations[coord] === 3;
             yourFleetLocations[coord] = isHit ? 3 : 2; 
             updateVisualDisplays();
 
@@ -173,14 +307,14 @@
             });
             
             myTurn = true;
-            statusBox.innerText = "Your turn to attack!";
+            statusBox.innerText = "Incoming impact logged. Your turn to fire!";
         }
 
         function handleShotFeedback(coord, isHit) {
             opponentBoardHits[coord] = isHit ? 1 : 2;
             updateVisualDisplays();
             myTurn = true; 
-            statusBox.innerText = isHit ? "It's a HIT! Go again." : "Missed. Opponent's turn.";
+            statusBox.innerText = isHit ? "DIRECT HIT! Fire again." : "Splash. Missed target. Opponent's turn.";
         }
     </script>
 </body>
