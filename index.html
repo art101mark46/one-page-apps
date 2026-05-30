@@ -350,26 +350,40 @@
         }
 
         function rebuildTargetDropdown() {
-            const picker = document.getElementById('enemy-target-picker');
-            const currentSelection = picker.value;
-            picker.innerHTML = '';
-            
-            let elementsAdded = 0;
-            for (let pId in globalPlayers) {
-                if (pId === myId) continue; 
-                const opt = document.createElement('option');
-                opt.value = pId;
-                opt.innerText = globalPlayers[pId].name + (globalPlayers[pId].lost ? " (ELIMINATED)" : "");
-                picker.appendChild(opt);
-                elementsAdded++;
-            }
-            if (currentSelection && picker.querySelector(`option[value="${currentSelection}"]`)) {
-                picker.value = currentSelection;
-            }
-            if (elementsAdded > 0) {
-                document.getElementById('target-selector-container').classList.remove('hidden');
-            }
-        }
+    const picker = document.getElementById('enemy-target-picker');
+    const currentSelection = picker.value;
+    picker.innerHTML = '';
+    
+    let elementsAdded = 0;
+    const iAmSpectator = globalPlayers[myId] && globalPlayers[myId].lost;
+
+    for (let pId in globalPlayers) {
+        if (pId === myId) continue; 
+        
+        // CRITICAL UPDATE: If you are an active player, don't show eliminated targets.
+        // If you are a spectator, you get to see all players to monitor their maps.
+        if (!iAmSpectator && globalPlayers[pId].lost) continue;
+
+        const opt = document.createElement('option');
+        opt.value = pId;
+        opt.innerText = globalPlayers[pId].name + (globalPlayers[pId].lost ? " (ELIMINATED)" : "");
+        picker.appendChild(opt);
+        elementsAdded++;
+    }
+    
+    // Auto-fallback if your previously selected target was just removed
+    if (currentSelection && picker.querySelector(`option[value="${currentSelection}"]`)) {
+        picker.value = currentSelection;
+    } else if (picker.options.length > 0) {
+        picker.selectedIndex = 0;
+    }
+    
+    if (elementsAdded > 0) {
+        document.getElementById('target-selector-container').classList.remove('hidden');
+    } else {
+        document.getElementById('target-selector-container').classList.add('hidden');
+    }
+}
 
         document.getElementById('enemy-target-picker').addEventListener('change', renderSelectedOpponentGrid);
 
