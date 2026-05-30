@@ -13,7 +13,7 @@
         body { font-family: -apple-system, sans-serif; background: #121212; color: #fff; text-align: center; margin: 0; padding: 15px; }
         .hidden { display: none; }
         h1 { font-size: 1.5rem; margin-bottom: 5px; }
-        .status { background: #222; padding: 10px; border-radius: 8px; margin: 10px 0; font-weight: bold; }
+        .status { background: #222; padding: 10px; border-radius: 8px; margin: 10px 0; font-weight: bold; color: #00ffca; }
         .qr-area { background: #fff; padding: 10px; border-radius: 8px; max-width: 250px; margin: 15px auto; display: flex; justify-content: center; }
         #reader { max-width: 300px; margin: 15px auto; background: #222; border-radius: 8px; overflow: hidden; }
         .grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; max-width: 350px; aspect-ratio: 1; margin: 15px auto; }
@@ -21,15 +21,16 @@
         .cell.target { background: #ff4444; }
         .cell.hit { background: red; }
         .cell.miss { background: blue; }
-        button { background: #3498db; color: white; border: none; padding: 12px 24px; border-radius: 5px; cursor: pointer; font-size: 1rem; margin: 5px; }
+        button { background: #3498db; color: white; border: none; padding: 12px 24px; border-radius: 5px; cursor: pointer; font-size: 1rem; margin: 5px; font-weight: bold; }
+        button:active { background: #2980b9; }
     </style>
 </head>
 <body>
 
     <h1>WebRTC Battleships</h1>
-    <div id="status-box" class="status">Initialising System...</div>
+    <div id="status-box" class="status">Initializing...</div>
 
-    <div id="connection-flow">
+    <div id="connection-flow" class="hidden">
         <button id="btn-host">Host Game</button>
         <button id="btn-join">Join Game</button>
         
@@ -65,16 +66,19 @@
         let yourFleetLocations = Array(boardSize * boardSize).fill(0);
 
         function initPeer() {
+            // Instantiates connecting loop using defaults to standard PeerJS infrastructure
             peer = new Peer();
 
             peer.on('open', (id) => {
                 statusBox.innerText = "System Ready. Choose Role.";
+                document.getElementById('connection-flow').classList.remove('hidden');
                 initHostFlow(id);
                 initJoinFlow();
             });
 
             peer.on('error', (err) => {
-                statusBox.innerText = `Network Error: ${err.type}`;
+                statusBox.style.color = "#ff4444";
+                statusBox.innerText = `PeerJS Cloud Error: ${err.type}`;
                 console.error(err);
             });
         }
@@ -85,7 +89,7 @@
                 myRole = 'host';
                 document.getElementById('host-ui').classList.remove('hidden');
                 document.getElementById('join-ui').classList.add('hidden');
-                statusBox.innerText = "Waiting for Player 2 to join...";
+                statusBox.innerText = "Waiting for Player 2 to scan...";
                 
                 document.getElementById("qrcode").innerHTML = "";
                 new QRCode(document.getElementById("qrcode"), {
@@ -106,22 +110,23 @@
                 document.getElementById('host-ui').classList.add('hidden');
                 statusBox.innerText = "Starting Camera Engine...";
 
-                // Instantiating the new camera tool
+                // Instantiating the unified html5Qrcode API
                 html5QrcodeScanner = new Html5Qrcode("reader");
                 
                 html5QrcodeScanner.start(
-                    { facingMode: "environment" }, // Forces back camera cleanly
+                    { facingMode: "environment" }, 
                     { fps: 10, qrbox: { width: 250, height: 250 } },
                     (decodedText) => {
-                        // Success Callback: Token Read!
+                        // Success Callback: Token Intercepted!
                         html5QrcodeScanner.stop().then(() => {
                             document.getElementById('join-ui').classList.add('hidden');
                             connectToHost(decodedText);
-                        });
+                        }).catch(err => console.error("Failed to stop scanner cleanly", err));
                     },
-                    (errorMessage) => { /* Soft ignore focus logs */ }
+                    (errorMessage) => { /* Ignore standard video frame focus warnings */ }
                 ).catch(err => {
-                    statusBox.innerText = "Camera failed. Verify HTTPS or permissions.";
+                    statusBox.style.color = "#ff4444";
+                    statusBox.innerText = "Camera failed. Check HTTPS context or site permissions.";
                     console.error(err);
                 });
             });
@@ -157,6 +162,7 @@
                 turnDisplay.innerText = "Opponent's Turn";
             }
 
+            // Put 5 mock ship coordinates down for initial configuration verification
             for (let i = 0; i < 5; i++) {
                 yourFleetLocations[Math.floor(Math.random() * 100)] = 1;
             }
@@ -210,7 +216,32 @@
             turnDisplay.innerText = "Opponent's Turn";
         }
 
-        window.addEventListener('load', initPeer);
+        // Diagnostic Initialization Snippet
+        window.addEventListener('load', () => {
+            statusBox.innerText = "Connecting to PeerJS Cloud...";
+            try {
+                if (typeof Peer === 'undefined') {
+                    statusBox.style.color = "#ff4444";
+                    statusBox.innerText = "Error: peerjs.min.js failed to load. Check file name formatting.";
+                    return;
+                }
+                if (typeof QRCode === 'undefined') {
+                    statusBox.style.color = "#ff4444";
+                    statusBox.innerText = "Error: qrcode.min.js failed to load. Check file name formatting.";
+                    return;
+                }
+                if (typeof Html5Qrcode === 'undefined') {
+                    statusBox.style.color = "#ff4444";
+                    statusBox.innerText = "Error: html5-qrcode.min.js failed to load. Check file name formatting.";
+                    return;
+                }
+                initPeer();
+            } catch (e) {
+                statusBox.style.color = "#ff4444";
+                statusBox.innerText = `Crash during file verification: ${e.message}`;
+                console.error(e);
+            }
+        });
     </script>
 </body>
 </html>
