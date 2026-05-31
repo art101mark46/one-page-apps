@@ -120,6 +120,11 @@
         .btn-color-pause { background-color: #ffc107; color: #333; flex-basis: 65%; } .btn-color-pause:hover { background-color: #e0a800; }
         .btn-stop-small { background-color: #6c757d; color: white; flex-basis: 35%; }
 
+        /* Shared Menu / Row Layout Rules */
+        .btn-menu-row { display: flex; gap: 10px; margin-top: 10px; }
+        .btn-menu-row button { margin-top: 0; font-size: 15px; padding: 12px; background-color: #6c757d; }
+        .btn-menu-row button:hover { background-color: #5a6268; }
+
         #timer-screen { display: none; }
         .status-label { font-size: 24px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 5px; }
         .timer-display { font-size: 80px; font-weight: bold; color: #333; line-height: 1; margin: 10px 0; }
@@ -154,6 +159,12 @@
                 <textarea id="exerciseNames" placeholder="Pushups, Situps, Squats..."></textarea>
             </div>
             <button class="btn-block btn-primary" onclick="setupReadyScreen()">Start Workout</button>
+            
+            <div class="btn-menu-row">
+                <button class="btn-block" onclick="triggerCSVLoad()">Load Programme</button>
+                <button class="btn-block" onclick="saveProgrammeCSV()">Save Programme</button>
+            </div>
+            <input type="file" id="csv-file-input" accept=".csv" style="display:none;" onchange="handleCSVLoad(this)">
         </div>
 
         <div id="timer-screen">
@@ -215,6 +226,113 @@
         // Load settings immediately
         loadSettings();
 
+        // --- CSV PROGRAMME EXPORT / IMPORT SYSTEM ---
+        function saveProgrammeCSV() {
+            const numIntervals = document.getElementById('numIntervals').value;
+            const workDuration = document.getElementById('workDuration').value;
+            const restDuration = document.getElementById('restDuration').value;
+            const exerciseNames = document.getElementById('exerciseNames').value;
+            
+            // Standard CSV cell formatting to handle double quotes safely
+            const escapedExercises = '"' + exerciseNames.replace(/"/g, '""') + '"';
+            const csvContent = "numIntervals,workDuration,restDuration,exerciseNames\n" 
+                             + `${numIntervals},${workDuration},${restDuration},${escapedExercises}`;
+            
+            try {
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.setAttribute("href", url);
+                link.setAttribute("download", "workout_programme.csv");
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } catch (e) {
+                alert("Could not export file on this device.");
+            }
+        }
+
+        function triggerCSVLoad() {
+            document.getElementById('csv-file-input').click();
+        }
+
+        function handleCSVLoad(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                parseCSVAndPopulate(e.target.result);
+                input.value = ''; // Flush variable target
+            };
+            reader.readAsText(file);
+        }
+
+        function parseCSVAndPopulate(text) {
+            const lines = [];
+            let row = [];
+            let inQuotes = false;
+            let currentField = '';
+
+            for (let i = 0; i < text.length; i++) {
+                const char = text[i];
+                const nextChar = text[i+1];
+
+                if (inQuotes) {
+                    if (char === '"') {
+                        if (nextChar === '"') {
+                            currentField += '"';
+                            i++; 
+                        } else {
+                            inQuotes = false;
+                        }
+                    } else {
+                        currentField += char;
+                    }
+                } else {
+                    if (char === '"') {
+                        inQuotes = true;
+                    } else if (char === ',') {
+                        row.push(currentField);
+                        currentField = '';
+                    } else if (char === '\n' || char === '\r') {
+                        if (char === '\r' && nextChar === '\n') i++; 
+                        row.push(currentField);
+                        lines.push(row);
+                        row = [];
+                        currentField = '';
+                    } else {
+                        currentField += char;
+                    }
+                }
+            }
+            if (currentField || row.length > 0) {
+                row.push(currentField);
+                lines.push(row);
+            }
+
+            if (lines.length < 2) {
+                alert("Invalid or incomplete profile structure.");
+                return;
+            }
+
+            const headers = lines[0].map(h => h.trim());
+            const data = lines[1];
+
+            const numIdx = headers.indexOf('numIntervals');
+            const workIdx = headers.indexOf('workDuration');
+            const restIdx = headers.indexOf('restDuration');
+            const exIdx = headers.indexOf('exerciseNames');
+
+            if (numIdx !== -1 && data[numIdx]) document.getElementById('numIntervals').value = data[numIdx];
+            if (workIdx !== -1 && data[workIdx]) document.getElementById('workDuration').value = data[workIdx];
+            if (restIdx !== -1 && data[restIdx]) document.getElementById('restDuration').value = data[restIdx];
+            if (exIdx !== -1 && data[exIdx] !== undefined) document.getElementById('exerciseNames').value = data[exIdx];
+
+            saveSettings(); 
+        }
+
         // --- WAKE LOCK (KEEP SCREEN ON) ---
         let wakeLock = null;
         async function requestWakeLock() {
@@ -267,7 +385,7 @@
                     osc.frequency.value = 600; gain.gain.value = 0.3; osc.type = 'triangle';
                     osc.start(); osc.stop(audioCtx.currentTime + 0.1); return; 
                 }
-                else { // Finish sound
+                else { 
                     osc.frequency.value = 500; gain.gain.value = vol; osc.type = 'square';
                     osc.start(); osc.stop(audioCtx.currentTime + 1.0); return; 
                 }
@@ -362,8 +480,8 @@
 
         function setupReadyScreen() {
             safeInitAudio(); 
-            requestWakeLock(); // Prevent sleep
-            saveSettings(); // Save user inputs
+            requestWakeLock(); 
+            saveSettings(); 
 
             totalIntervals = parseInt(document.getElementById('numIntervals').value) || 5;
             workTime = parseInt(document.getElementById('workDuration').value) || 30;
@@ -467,8 +585,6 @@
 
         function switchPhase() {
             document.body.classList.remove('pulsing');
-
-            // Update Progress Bar
             let progressPct = (currentInterval / totalIntervals) * 100;
 
             if (isWorking) {
@@ -483,7 +599,6 @@
                 playBeep('rest');
                 updateStack(true); 
                 updateTimeDisplay();
-                // Show half-progress for rest
                 document.getElementById('progress-fill').style.width = `${progressPct - (50/totalIntervals)}%`;
             } else {
                 isWorking = true;
@@ -509,7 +624,7 @@
 
         function finishSet() {
             clearInterval(timerInterval);
-            releaseWakeLock(); // Let phone sleep again
+            releaseWakeLock(); 
             document.body.classList.remove('pulsing');
             setsCompleted++;
             document.getElementById('total-sets-count').innerText = setsCompleted;
@@ -532,7 +647,7 @@
 
         function resetToMenu() {
             clearInterval(timerInterval);
-            releaseWakeLock(); // Let phone sleep
+            releaseWakeLock(); 
             document.body.classList.remove('pulsing');
             document.getElementById('timer-screen').style.display = 'none';
             document.getElementById('setup-screen').style.display = 'block';
