@@ -259,11 +259,11 @@
             
             if(rem <= 5 && rem > 0) {
                 appEl.classList.add('timer-warn');
-                playTone(880, 0.1); // High pitched warning beep (880Hz, 0.1s long)
+                playTone(1024, 0.3); // High pitched warning beep (880Hz, 0.1s long)
             }
             if(rem <= 0) { 
                 appEl.classList.remove('timer-warn'); 
-                playTone(330, 0.35); // Lower pitched, twice as long switch buzzer (330Hz, 0.35s long)
+                playTone(800, 0.8); // Lower pitched, twice as long switch buzzer (330Hz, 0.35s long)
                 switchPlayer(); 
             } 
         }, 1000);
