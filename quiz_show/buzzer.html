@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Buzzer Studio Pro</title>
+    <style>
+        body, html { 
+            margin: 0; padding: 0; height: 100%; width: 100%; 
+            overflow: hidden; background: #000; font-family: sans-serif;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        /* Setup Menu */
+        #setup {
+            position: fixed; inset: 0; background: #1a1a1a; color: white;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 200; padding: 20px; text-align: center; overflow-y: auto;
+        }
+        .row { margin: 10px 0; width: 100%; max-width: 300px; text-align: left; }
+        select, button { width: 100%; padding: 15px; margin-top: 5px; border-radius: 8px; border: none; font-size: 1rem; cursor: pointer; }
+        #load-btn { background: #3498db; color: white; }
+        #start-btn { background: #27ae60; color: white; font-weight: bold; display: none; }
+        
+        .mode-toggle { display: flex; gap: 10px; margin-top: 5px; }
+        .mode-btn { background: #444; color: white; flex: 1; padding: 10px; border-radius: 5px; border: 2px solid transparent; }
+        .mode-btn.active { border-color: #3498db; background: #2c3e50; }
+
+        /* Background Wrapper */
+        #bg-wrapper {
+            display: none;
+            flex-direction: column;
+            position: absolute;
+            z-index: 1;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .plate { 
+            width: 100%; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            transition: opacity 0.2s;
+        }
+          .plate { 
+                touch-action: manipulation; 
+        }
+
+        #top-plate { background-color: #ff0000; }
+        #bottom-plate { background-color: #008000; }
+
+        .label {
+            color: white; font-size: 3rem; font-weight: bold;
+            text-shadow: 2px 2px 6px rgba(0,0,0,0.6);
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            pointer-events: none;
+            user-select: none;
+            text-align: center;
+        }
+
+        /* Quit Button Styles */
+        #quit-btn {
+            position: fixed;
+            background: #222;
+            border: 3px solid white;
+            border-radius: 50%;
+            color: white;
+            font-weight: bold;
+            display: none;
+            align-items: center; justify-content: center;
+            cursor: pointer;
+            z-index: 150;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.8);
+            -webkit-tap-highlight-color: transparent;
+            transition: all 0.3s ease;
+        }
+
+        #quit-btn.center-mode {
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 75px; height: 75px;
+            font-size: 0.85rem;
+        }
+
+        #quit-btn.corner-mode {
+            top: 20px; right: 20px;
+            width: 50px; height: 50px;
+            font-size: 0.7rem;
+            opacity: 0.6;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="setup">
+        <h1>Buzzer Studio</h1>
+        
+        <div class="row">
+            <label>Players on this device:</label>
+            <div class="mode-toggle">
+                <button class="mode-btn active" id="btn-mode1" onclick="setMode(1)">1 Player</button>
+                <button class="mode-btn" id="btn-mode2" onclick="setMode(2)">2 Players</button>
+            </div>
+        </div>
+
+        <div class="row">
+            <button id="load-btn" onclick="document.getElementById('file-input').click()">📁 1. Load Sound Folder</button>
+            <input type="file" id="file-input" webkitdirectory directory multiple style="display:none">
+        </div>
+
+        <div class="row" id="row-p1">
+            <label id="label-p1">Buzzer Sound:</label>
+            <select id="sel-top" onchange="validateSelection('top')"></select>
+        </div>
+
+        <div class="row" id="row-p2" style="display:none;">
+            <label>Player 2 Sound:</label>
+            <select id="sel-bottom" onchange="validateSelection('bottom')"></select>
+        </div>
+
+        <button id="start-btn" onclick="startGame()">🚀 2. START GAME</button>
+    </div>
+
+    <div id="bg-wrapper">
+        <div id="top-plate" class="plate" onpointerdown="play('top')">
+            <div id="txt1" class="label">PLAYER 1</div>
+        </div>
+        <div id="bottom-plate" class="plate" onpointerdown="play('bottom')" style="display:none;">
+            <div id="txt2" class="label">PLAYER 2</div>
+        </div>
+    </div>
+
+    <div id="quit-btn" onclick="confirmQuit()">QUIT</div>
+
+    <script>
+        const audioLibrary = {};
+        let isLocked = false;
+        let playerCount = 1;
+        let lastTopValue = "";
+        let lastBottomValue = "";
+        
+        const bg = document.getElementById('bg-wrapper');
+        const quit = document.getElementById('quit-btn');
+        const txt1 = document.getElementById('txt1');
+        const txt2 = document.getElementById('txt2');
+        const p1Plate = document.getElementById('top-plate');
+        const p2Plate = document.getElementById('bottom-plate');
+        const tSel = document.getElementById('sel-top');
+        const bSel = document.getElementById('sel-bottom');
+
+        function setMode(num) {
+            playerCount = num;
+            document.getElementById('btn-mode1').classList.toggle('active', num === 1);
+            document.getElementById('btn-mode2').classList.toggle('active', num === 2);
+            document.getElementById('row-p2').style.display = (num === 2) ? 'block' : 'none';
+            document.getElementById('label-p1').innerText = (num === 2) ? "Player 1 (Red):" : "Buzzer Sound:";
+            quit.className = (num === 2) ? 'center-mode' : 'corner-mode';
+            if(num === 2) validateSelection('init');
+        }
+
+        // Prevents both players from having the same sound
+        function validateSelection(changedSide) {
+            if (playerCount !== 2 || tSel.options.length < 2) return;
+
+            if (tSel.value === bSel.value) {
+                if (changedSide === 'top') {
+                    // If Player 1 picks Player 2's sound, move Player 2 to Player 1's old sound
+                    bSel.value = lastTopValue;
+                } else {
+                    // If Player 2 picks Player 1's sound, move Player 1 to Player 2's old sound
+                    tSel.value = lastBottomValue;
+                }
+            }
+            lastTopValue = tSel.value;
+            lastBottomValue = bSel.value;
+        }
+
+        document.getElementById('file-input').addEventListener('change', (e) => {
+            tSel.innerHTML = ''; bSel.innerHTML = '';
+            for (let file of e.target.files) {
+                if (file.type.includes('audio') || file.name.endsWith('.mp3')) {
+                    const url = URL.createObjectURL(file);
+                    audioLibrary[file.name] = url;
+                    tSel.add(new Option(file.name, file.name));
+                    bSel.add(new Option(file.name, file.name));
+                }
+            }
+            if(Object.keys(audioLibrary).length > 0) {
+                document.getElementById('start-btn').style.display = 'block';
+                if(bSel.options.length > 1) bSel.selectedIndex = 1;
+                lastTopValue = tSel.value;
+                lastBottomValue = bSel.value;
+            }
+        });
+
+        function startGame() {
+            document.getElementById('setup').style.display = 'none';
+            bg.style.display = 'flex';
+            quit.style.display = 'flex';
+            p2Plate.style.display = (playerCount === 2) ? 'flex' : 'none';
+            quit.className = (playerCount === 2) ? 'center-mode' : 'corner-mode';
+            updateRotation();
+        }
+
+        function confirmQuit() {
+            if(confirm("Exit to menu?")) location.reload();
+        }
+
+        function play(side) {
+            if (isLocked) return;
+            const selectId = side === 'top' ? 'sel-top' : 'sel-bottom';
+            const fileName = document.getElementById(selectId).value;
+
+            if (audioLibrary[fileName]) {
+                isLocked = true;
+                const a = new Audio(audioLibrary[fileName]);
+                a.currentTime = 0;
+                a.play().catch(e => {});
+                const plate = document.getElementById(side + '-plate');
+                plate.style.opacity = '0.4';
+                setTimeout(() => {
+                    isLocked = false;
+                    plate.style.opacity = '1';
+                }, 1000);
+            }
+        }
+
+        function updateRotation() {
+            if (bg.style.display === 'none') return;
+            const angle = window.orientation || 0;
+            const isLandscape = Math.abs(angle) === 90;
+            const viewW = window.innerWidth;
+            const viewH = window.innerHeight;
+            const activeHeight = isLandscape ? viewW : viewH;
+
+            if (playerCount === 2) {
+                p1Plate.style.height = (activeHeight / 2) + 'px';
+                p2Plate.style.height = (activeHeight / 2) + 'px';
+            } else {
+                p1Plate.style.height = activeHeight + 'px';
+            }
+            
+            const wrapSize = Math.max(viewW, viewH) * 2;
+            bg.style.width = wrapSize + 'px';
+            bg.style.height = wrapSize + 'px';
+            bg.style.transform = `rotate(${-angle}deg)`;
+            txt1.style.transform = `rotate(${angle}deg)`;
+            txt2.style.transform = `rotate(${angle}deg)`;
+        }
+
+        window.addEventListener('orientationchange', () => setTimeout(updateRotation, 250));
+        window.addEventListener('resize', updateRotation);
+        setMode(1);
+    </script>
+</body>
+</html>

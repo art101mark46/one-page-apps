@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Darts Pro: Performance Tracker</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #1a1a1a; color: white; display: flex; justify-content: center; padding: 10px; margin: 0; min-height: 100vh; box-sizing: border-box; transition: background 0.2s; }
+        .container { width: 100%; max-width: 500px; background: #2d2d2d; padding: 12px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); align-self: flex-start; }
+        
+        @keyframes pulse-red { 0% { background-color: #1a1a1a; } 50% { background-color: #c0392b; } 100% { background-color: #1a1a1a; } }
+        .miss-pulse { animation: pulse-red 0.4s ease-out; }
+
+        .setup-screen, .game-screen { display: none; }
+        .active { display: block; }
+        
+        .flex-row { display: flex; gap: 8px; margin-bottom: 8px; }
+        .flex-row > * { flex: 1; margin: 0 !important; }
+        
+        .scoreboard { display: flex; justify-content: space-between; margin-bottom: 8px; background: #444; padding: 10px; border-radius: 8px; }
+        .player-box { text-align: center; width: 48%; border-bottom: 4px solid transparent; border-radius: 4px; }
+        .player-box.current { border-bottom: 4px solid #2ecc71; background: rgba(46, 204, 113, 0.1); }
+        .score { font-size: 2.8rem; font-weight: bold; margin: 0; line-height: 1; }
+        .sets-count { font-size: 0.75rem; color: #2ecc71; font-weight: bold; }
+        
+        .history { font-size: 0.85rem; color: #00ff00; min-height: 1.2em; font-weight: bold; margin: 4px 0; }
+        .checkout-tip { font-size: 0.8rem; color: #ffcc00; background: rgba(255, 204, 0, 0.1); padding: 6px; border-radius: 4px; min-height: 1.2em; border: 1px solid rgba(255, 204, 0, 0.2); font-weight: bold; }
+
+        .dart-counter { display: flex; justify-content: center; gap: 12px; margin: 8px 0; }
+        .dart-icon { font-size: 1.4rem; opacity: 0.15; }
+        .dart-icon.active { opacity: 1; color: #2ecc71; }
+
+        .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; margin-top: 8px; }
+        button { padding: 12px 2px; font-size: 1rem; cursor: pointer; border: none; border-radius: 4px; background: #555; color: white; font-weight: bold; -webkit-tap-highlight-color: transparent; }
+        button:active { filter: brightness(1.3); }
+        button:disabled { opacity: 0.2; }
+        
+        .btn-num { background: #3498db; }
+        .btn-mod { background: #e67e22; }
+        .btn-bull { background: #c0392b; grid-column: span 2; }
+        .btn-undo { background: #9b59b6; grid-column: span 2; }
+        
+        .stats-table { width: 100%; margin-top: 12px; border-collapse: collapse; background: #222; border-radius: 6px; overflow: hidden; font-size: 0.75rem; }
+        .stats-table th { background: #111; color: #888; padding: 4px; }
+        .stats-table td { padding: 6px; text-align: center; border-top: 1px solid #333; }
+        .avg-highlight { color: #2ecc71; font-weight: bold; }
+
+        input, select { width: 100%; padding: 10px; border-radius: 4px; background: #3d3d3d; color: white; border: 1px solid #444; box-sizing: border-box; }
+        .status-bar { text-align: center; margin-top: 8px; font-size: 0.8rem; font-weight: bold; color: #2ecc71; text-transform: uppercase; }
+    </style>
+</head>
+<body id="mainBody">
+
+<div class="container">
+    <div id="setup" class="setup-screen active">
+        <h2 style="color: #2ecc71; text-align: center; margin-bottom: 15px;">DARTS PRO</h2>
+        <label style="color:#aaa; font-size:0.75rem;">PLAYER NAMES</label>
+        <div class="flex-row">
+            <input type="text" id="p1Input" value="P1">
+            <input type="text" id="p2Input" value="P2">
+        </div>
+        <label style="color:#aaa; font-size:0.75rem;">FORMAT</label>
+        <div class="flex-row">
+            <select id="gameType">
+                <option value="301">301</option>
+                <option value="501" selected>501</option>
+            </select>
+            <select id="bestOf">
+                <option value="1">1 Leg</option>
+                <option value="3">Best of 3</option>
+                <option value="5">Best of 5</option>
+                <option value="7">Best of 7</option>
+            </select>
+        </div>
+        <div style="margin: 10px 0; display: flex; align-items: center; gap: 8px; font-size: 0.85rem;">
+            <input type="checkbox" id="doubleOut" checked style="width: 18px; height: 18px;"> 
+            <label for="doubleOut">Double Out Required</label>
+        </div>
+        <button onclick="startGame()" style="width:100%; background: #27ae60; padding: 14px; font-size: 1.1rem; color:white; border:none; border-radius:4px;">START MATCH</button>
+    </div>
+
+    <div id="game" class="game-screen">
+        <div class="scoreboard">
+            <div id="box0" class="player-box">
+                <div id="legs0" class="sets-count">Legs: 0</div>
+                <div id="name0" style="color:#aaa; font-size:0.7rem;">P1</div>
+                <div id="score0" class="score">501</div>
+                <div id="hist0" class="history"></div>
+                <div id="tip0" class="checkout-tip"></div>
+            </div>
+            <div id="box1" class="player-box">
+                <div id="legs1" class="sets-count">Legs: 0</div>
+                <div id="name1" style="color:#aaa; font-size:0.7rem;">P2</div>
+                <div id="score1" class="score">501</div>
+                <div id="hist1" class="history"></div>
+                <div id="tip1" class="checkout-tip"></div>
+            </div>
+        </div>
+
+        <div class="dart-counter">
+            <span class="dart-icon" id="dart1">🎯</span>
+            <span class="dart-icon" id="dart2">🎯</span>
+            <span class="dart-icon" id="dart3">🎯</span>
+        </div>
+
+        <div id="controls">
+            <div class="grid" id="numberGrid"></div>
+            <div class="grid">
+                <button class="btn-mod ctrl-btn" onclick="applyScore(1, 'S')">S</button>
+                <button class="btn-mod ctrl-btn" onclick="applyScore(2, 'D')">D</button>
+                <button class="btn-mod ctrl-btn" onclick="applyScore(3, 'T')">T</button>
+                <button class="btn-bull ctrl-btn" onclick="directScore(25, '25', 'S')">25</button>
+                <button class="btn-bull ctrl-btn" onclick="directScore(50, 'BULL', 'D')">BULL</button>
+                <button style="background:#7f8c8d" class="ctrl-btn" onclick="triggerMiss()">Miss</button>
+                <button class="btn-undo" onclick="undoLastDart()">UNDO</button>
+            </div>
+        </div>
+
+        <table class="stats-table">
+            <thead>
+                <tr><th id="statP1">P1</th><th>MATCH STATS</th><th id="statP2">P2</th></tr>
+            </thead>
+            <tbody>
+                <tr><td id="p0_avg" class="avg-highlight">0.0</td><td>3-DART AVG</td><td id="p1_avg" class="avg-highlight">0.0</td></tr>
+                <tr><td id="p0_L1">-</td><td>Latest Turn</td><td id="p1_L1">-</td></tr>
+                <tr><td id="p0_L2">-</td><td>Prev Turn</td><td id="p1_L2">-</td></tr>
+                <tr><td id="p0_L3">-</td><td>Prev Turn</td><td id="p1_L3">-</td></tr>
+            </tbody>
+        </table>
+
+        <div class="status-bar" id="status">P1'S THROW (0 DARTS)</div>
+    </div>
+</div>
+
+<script>
+    let players = [{score:501, legs:0, totalScored:0, turnTotal: 0, currentTurn:[], history:[], dartsThrown:0}, {score:501, legs:0, totalScored:0, turnTotal: 0, currentTurn:[], history:[], dartsThrown:0}];
+    let currentPlayer = 0, selectedNumber = null, gameStartScore = 501, legsToWin = 1, doubleOutRule = true, undoStack = [], inputLocked = false;
+
+    const checkoutTable = { 170:"T20 T20 BULL",167:"T20 T19 BULL",121:"T20 T11 D14",100:"T20 D20",61:"T11 D14", 51:"S11 D20", 41:"S9 D16" };
+
+    function lockInput(status) {
+        inputLocked = status;
+        document.querySelectorAll('.ctrl-btn, .btn-num').forEach(b => b.disabled = status);
+    }
+
+    function getCheckoutSuggestion(score) {
+        if (checkoutTable[score]) return checkoutTable[score];
+        if (score <= 40 && score % 2 === 0) return "D" + (score / 2);
+        if (score <= 40 && score % 2 !== 0) return "S1 D" + ((score - 1) / 2);
+        if (score > 40 && score < 60) return "S" + (score - 40) + " D20";
+        return score > 170 ? "Aim High" : "Aim T20";
+    }
+
+    function startGame() {
+        players[0].name = document.getElementById('p1Input').value;
+        players[1].name = document.getElementById('p2Input').value;
+        gameStartScore = parseInt(document.getElementById('gameType').value);
+        doubleOutRule = document.getElementById('doubleOut').checked;
+        legsToWin = Math.ceil(parseInt(document.getElementById('bestOf').value) / 2);
+        players.forEach(p => { resetPlayerData(p); p.legs = 0; });
+        document.getElementById('name0').innerText = players[0].name;
+        document.getElementById('name1').innerText = players[1].name;
+        document.getElementById('statP1').innerText = players[0].name;
+        document.getElementById('statP2').innerText = players[1].name;
+        document.getElementById('setup').style.display = 'none';
+        document.getElementById('game').style.display = 'block';
+        createNumberGrid(); updateDisplay();
+    }
+
+    function resetPlayerData(p) {
+        p.score = gameStartScore; p.totalScored = 0; p.turnTotal = 0; p.currentTurn = []; p.history = []; p.dartsThrown = 0;
+    }
+
+    function createNumberGrid() {
+        const grid = document.getElementById('numberGrid'); grid.innerHTML = '';
+        for (let i = 1; i <= 20; i++) {
+            let btn = document.createElement('button'); btn.className = 'btn-num'; btn.innerText = i;
+            btn.onclick = () => { if(inputLocked) return; selectedNumber = i; document.querySelectorAll('.btn-num').forEach(b => b.style.background = '#3498db'); btn.style.background = '#2ecc71'; };
+            grid.appendChild(btn);
+        }
+    }
+
+    function processTurn(pts, label, type) {
+        if(inputLocked) return;
+        let p = players[currentPlayer];
+        undoStack.push(JSON.parse(JSON.stringify({players, currentPlayer})));
+        
+        let newScore = p.score - pts;
+        p.dartsThrown++;
+
+        if (newScore < 0 || (doubleOutRule && (newScore === 1 || (newScore === 0 && type !== 'D')))) {
+            lockInput(true); p.currentTurn.push("BUST"); p.turnTotal = 0;
+            updateDisplay(); 
+            setTimeout(() => { finishTurn(); lockInput(false); }, 1000); 
+            return;
+        }
+        
+        p.score = newScore; 
+        p.totalScored += pts;
+        p.turnTotal += pts;
+        p.currentTurn.push(label);
+        
+        if (p.score === 0) {
+            lockInput(true); updateDisplay();
+            setTimeout(() => {
+                if (p.legs + 1 === legsToWin) { alert(p.name + " WINS THE MATCH!"); location.reload(); }
+                else { p.legs++; players.forEach(pl => resetPlayerData(pl)); currentPlayer = (p.legs + players[1-currentPlayer].legs) % 2; updateDisplay(); lockInput(false); }
+            }, 500);
+            return;
+        }
+
+        if (p.currentTurn.length >= 3) {
+            lockInput(true); updateDisplay(); 
+            setTimeout(() => { finishTurn(); lockInput(false); }, 700); 
+        } else { updateDisplay(); }
+    }
+
+    function finishTurn() {
+        let p = players[currentPlayer];
+        p.history.unshift(p.turnTotal);
+        if (p.history.length > 3) p.history.pop();
+        p.turnTotal = 0; p.currentTurn = [];
+        currentPlayer = (currentPlayer + 1) % 2;
+        updateDisplay();
+    }
+
+    function triggerMiss() {
+        const body = document.getElementById('mainBody');
+        body.classList.remove('miss-pulse'); void body.offsetWidth; body.classList.add('miss-pulse');
+        processTurn(0, 'M', 'S');
+    }
+
+    function updateDisplay() {
+        players.forEach((p, i) => {
+            const avg = p.dartsThrown > 0 ? ((p.totalScored / p.dartsThrown) * 3).toFixed(1) : "0.0";
+            document.getElementById(`score${i}`).innerText = p.score;
+            document.getElementById(`legs${i}`).innerText = `Legs: ${p.legs}`;
+            document.getElementById(`hist${i}`).innerText = p.currentTurn.join(' • ');
+            document.getElementById(`box${i}`).classList.toggle('current', currentPlayer === i);
+            document.getElementById(`tip${i}`).innerText = getCheckoutSuggestion(p.score);
+            document.getElementById(`p${i}_avg`).innerText = avg;
+            for(let j=1; j<=3; j++) document.getElementById(`p${i}_L${j}`).innerText = p.history[j-1] !== undefined ? p.history[j-1] : "-";
+        });
+        const dartCount = players[currentPlayer].currentTurn.length;
+        for(let i=1; i<=3; i++) document.getElementById(`dart${i}`).classList.toggle('active', i <= dartCount);
+        document.getElementById('status').innerText = `${players[currentPlayer].name}'S THROW (${players[currentPlayer].dartsThrown} DARTS)`;
+    }
+
+    function applyScore(m, prfx) { if (!selectedNumber) return; processTurn(selectedNumber * m, prfx + selectedNumber, prfx); selectedNumber = null; document.querySelectorAll('.btn-num').forEach(b => b.style.background = '#3498db'); }
+    function directScore(pts, lbl, t) { processTurn(pts, lbl, t); }
+    function undoLastDart() { if (undoStack.length > 0) { let s = undoStack.pop(); players = s.players; currentPlayer = s.currentPlayer; lockInput(false); updateDisplay(); } }
+</script>
+</body>
+</html>

@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mounjaro Master Stock Pile & Taper Calculator</title>
+    <style>
+        :root {
+            --primary: #007aff;
+            --primary-hover: #0056b3;
+            --secondary: #34c759;
+            --secondary-hover: #28a745;
+            --danger: #ff3b30;
+            --bg-body: #f4f4f9;
+            --bg-card: #ffffff;
+            --text-main: #333333;
+            --border-color: #e5e5ea;
+        }
+
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            padding: 12px; 
+            max-width: 1000px; 
+            margin: auto; 
+            background: var(--bg-body); 
+            color: var(--text-main); 
+            line-height: 1.4; 
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Responsive Grid System */
+        .grid { 
+            display: grid; 
+            grid-template-columns: 1fr; 
+            gap: 16px; 
+        }
+
+        @media (min-width: 768px) { 
+            body { padding: 20px; }
+            .grid { grid-template-columns: 1.1fr 0.9fr; gap: 20px; } 
+        }
+
+        /* Layout Cards */
+        .card { 
+            background: var(--bg-card); 
+            padding: 16px; 
+            border-radius: 12px; 
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05); 
+            margin-bottom: 16px; 
+            box-sizing: border-box; 
+        }
+        
+        @media (min-width: 768px) {
+            .card { padding: 24px; margin-bottom: 20px; }
+        }
+
+        h2, h3 { 
+            margin-top: 0; 
+            margin-bottom: 12px;
+            color: #111; 
+            border-bottom: 2px solid var(--bg-body); 
+            padding-bottom: 8px; 
+            font-size: 1.2rem;
+        }
+
+        label { 
+            font-weight: 600; 
+            font-size: 0.85rem; 
+            display: block; 
+            margin-top: 10px; 
+            color: #555;
+        }
+
+        /* Form Controls optimized for desktop hover & mobile touch targets */
+        input, select, button { 
+            width: 100%; 
+            padding: 12px; 
+            margin: 4px 0 10px 0; 
+            border-radius: 8px; 
+            border: 1px solid #ccc; 
+            box-sizing: border-box; 
+            font-size: 1rem; 
+        }
+        
+        select {
+            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='%23666' d='M0 0l5 5 5-5z'/></svg>");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            background-size: 10px 6px;
+            padding-right: 30px;
+        }
+
+        button { 
+            background: var(--primary); 
+            color: white; 
+            font-weight: bold; 
+            border: none; 
+            cursor: pointer; 
+            margin-top: 8px; 
+            transition: background 0.15s ease-in-out; 
+        }
+        
+        button:hover, button:active { background: var(--primary-hover); }
+        .btn-secondary { background: var(--secondary); margin-top: 4px; }
+        .btn-secondary:hover, .btn-secondary:active { background: var(--secondary-hover); }
+
+        /* Responsive Visibility Switches */
+        .desktop-only { display: none; }
+        .mobile-only { display: block; }
+
+        @media (min-width: 768px) {
+            .desktop-only { display: table; width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+            .mobile-only { display: none; }
+        }
+
+        /* Desktop Table Styling */
+        th, td { 
+            border-bottom: 1px solid var(--border-color); 
+            padding: 12px 10px; 
+            text-align: left; 
+            vertical-align: middle; 
+        }
+        th { background-color: #f8f9fa; font-weight: 600; color: #444; }
+        
+        /* Mobile Stacked Card View Styling */
+        .mobile-row-card {
+            background: #f8f9fa;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 14px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            transition: background-color 0.15s;
+        }
+        .mobile-row-card:last-child { margin-bottom: 0; }
+        .mobile-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+            margin-bottom: 8px;
+            border-bottom: 1px dashed var(--border-color);
+            padding-bottom: 6px;
+        }
+
+        /* Shared States & Classes */
+        .taper-row, .mobile-row-card.taper-style { background-color: #fffde6; }
+        
+        .roadmap-row:hover { background-color: #f0f4f9; }
+        
+        .taken-row, .mobile-row-card.taken-style { background-color: #fafafa !important; color: #bbb !important; opacity: 0.5; text-decoration: line-through; }
+        .taken-row b, .taken-row span, .taken-row td, .mobile-row-card.taken-style * { color: #bbb !important; }
+        
+        .error { 
+            background-color: #fce8e6; 
+            color: #a51d24; 
+            padding: 12px; 
+            border-radius: 8px; 
+            border: 1px solid #f5c2c1; 
+            margin-top: 12px; 
+            font-weight: 500; 
+            display: none; 
+            font-size: 0.9rem;
+        }
+        
+        .badge-expired { 
+            background-color: var(--danger); 
+            color: white; 
+            padding: 2px 6px; 
+            border-radius: 4px; 
+            font-size: 0.72rem; 
+            font-weight: bold; 
+            display: inline-block; 
+            line-height: 1.1;
+            text-decoration: none !important;
+        }
+
+        .checkbox-container { 
+            display: flex; 
+            align-items: center; 
+            gap: 10px; 
+            margin: 12px 0; 
+            font-weight: 600; 
+            font-size: 0.9rem; 
+            color: var(--primary); 
+        }
+        .checkbox-container input { width: 20px; height: 20px; margin: 0; cursor: pointer; }
+
+        .delete-btn { 
+            background: none; 
+            border: none; 
+            color: var(--danger); 
+            cursor: pointer; 
+            font-weight: bold; 
+            padding: 6px 0; 
+            width: auto; 
+            margin: 0; 
+            font-size: 0.85rem; 
+        }
+        
+        .small-text { color: #666; font-size: 0.8rem; margin-top: -6px; margin-bottom: 10px; }
+        
+        .chip-container { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+        .chip { 
+            background: #e5e5ea; 
+            padding: 8px 14px; 
+            border-radius: 20px; 
+            font-size: 0.82rem; 
+            font-weight: 600; 
+            cursor: pointer; 
+            user-select: none; 
+            color: #333;
+        }
+        
+        .inline-check { width: 18px; height: 18px; margin: 0; cursor: pointer; vertical-align: middle; }
+        .table-input { margin: 0; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.9rem; width: 100%; font-weight: 600; box-sizing: border-box; }
+    </style>
+</head>
+<body>
+
+<div class="grid">
+    <div>
+        <div class="card">
+            <h3>📦 Pen Inventory Stock Pile</h3>
+            
+            <label>Pen Nickname / Label</label>
+            <input type="text" id="penNickname" placeholder="e.g. Box 1 - Pen A, Top Shelf">
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div>
+                    <label>Pen Size</label>
+                    <select id="penSize">
+                        <option value="15mg">15 mg Pen</option>
+                        <option value="12.5mg">12.5 mg Pen</option>
+                        <option value="10mg">10 mg Pen</option>
+                        <option value="7.5mg">7.5 mg Pen</option>
+                        <option value="5mg">5 mg Pen</option>
+                        <option value="2.5mg">2.5 mg Pen</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Quantity to Add</label>
+                    <input type="number" id="penQty" value="1" min="1">
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 10px;">
+                <div>
+                    <label>Expiry Date</label>
+                    <input type="date" id="penExpiry">
+                </div>
+                <div>
+                    <label>Pen Price (£)</label>
+                    <input type="number" id="penPrice" placeholder="e.g. 149" min="0" step="0.01">
+                </div>
+            </div>
+
+            <button onclick="addPen()">Add Pen(s) to Fridge</button>
+            
+            <div id="inventoryTableContainer"></div>
+        </div>
+
+        <div class="card">
+            <h3>💡 Custom Longevity Calculator</h3>
+            <p class="small-text">Calculates what dosage strength your pens yield, how long the total stockpile lasts, and the exact projection end date:</p>
+            
+            <label>Target Injection Clicks per Week</label>
+            <input type="number" id="insightClicks" value="60" min="1" oninput="updateLongevityInsights()">
+            
+            <div class="chip-container">
+                <span class="chip" onclick="setInsightClicks(15)">15 clks</span>
+                <span class="chip" onclick="setInsightClicks(30)">30 clks</span>
+                <span class="chip" onclick="setInsightClicks(45)">45 clks</span>
+                <span class="chip" onclick="setInsightClicks(60)">60 clks (Standard Full)</span>
+            </div>
+            
+            <div id="insightsContainer"></div>
+        </div>
+    </div>
+
+    <div>
+        <div class="card">
+            <h3>🗓️ Timeline & Taper Parameters</h3>
+            
+            <label>Start Date</label>
+            <input type="date" id="startDate" onchange="triggerRecalc()">
+            
+            <label>End Date</label>
+            <input type="date" id="endDate" onchange="triggerRecalc()">
+
+            <label>Injection Frequency (Days)</label>
+            <input type="number" id="injectionFrequency" value="7" min="1" oninput="triggerRecalc()">
+            
+            <div class="checkbox-container">
+                <input type="checkbox" id="linkInventory" onchange="toggleLinkInventory()">
+                <label for="linkInventory" style="margin:0; cursor:pointer;">🔗 Auto-link total clicks to Stock Pile</label>
+            </div>
+
+            <label>Total Clicks Available</label>
+            <input type="number" id="totalClicks" placeholder="e.g. 240" oninput="saveInputs()">
+            
+            <label>Taper Start Date (Optional)</label>
+            <input type="date" id="taperDate" onchange="triggerRecalc()">
+            
+            <label>Target Final Dose Clicks</label>
+            <input type="number" id="targetLastClicks" value="5" min="0" oninput="triggerRecalc()">
+            
+            <button onclick="calculateSchedule()">Generate Master Schedule</button>
+            <button id="exportBtn" class="btn-secondary" style="display:none;" onclick="exportToCSV()">💾 Export Schedule to CSV</button>
+            
+            <div id="error-msg" class="error"></div>
+        </div>
+    </div>
+</div>
+
+<div class="card" style="max-width: 100%;">
+    <h3>📊 Generated Roadmap</h3>
+    <p class="small-text" style="margin-top: -5px;">💡 Tap anywhere on any row or mobile card to mark that dose as taken or pending:</p>
+    <div id="results"></div>
+</div>
+
+<script>
+let inventory = [];
+let currentSchedule = [];
+let takenDoses = {}; 
+
+window.onload = function() {
+    const savedInv = localStorage.getItem('mounjaro_inventory_v6');
+    if (savedInv) {
+        inventory = JSON.parse(savedInv);
+    }
+
+    const savedTaken = localStorage.getItem('mounjaro_taken_doses_v6');
+    if (savedTaken) {
+        takenDoses = JSON.parse(savedTaken);
+    }
+
+    renderInventory();
+
+    const savedData = localStorage.getItem('mounjaro_scheduler_data_v6');
+    if (savedData) {
+        const data = JSON.parse(savedData);
+        if (document.getElementById('startDate')) document.getElementById('startDate').value = data.startDate || '';
+        if (document.getElementById('endDate')) document.getElementById('endDate').value = data.endDate || '';
+        if (document.getElementById('injectionFrequency')) document.getElementById('injectionFrequency').value = data.injectionFrequency || '7';
+        if (document.getElementById('totalClicks')) document.getElementById('totalClicks').value = data.totalClicks || '';
+        if (document.getElementById('taperDate')) document.getElementById('taperDate').value = data.taperDate || '';
+        if (document.getElementById('targetLastClicks')) document.getElementById('targetLastClicks').value = data.targetLastClicks || '5';
+        if (document.getElementById('linkInventory')) document.getElementById('linkInventory').checked = data.linkInventory || false;
+        if (data.insightClicks && document.getElementById('insightClicks')) {
+            document.getElementById('insightClicks').value = data.insightClicks;
+        }
+    }
+    
+    updateLongevityInsights();
+    toggleLinkInventory();
+    
+    const sDate = document.getElementById('startDate') ? document.getElementById('startDate').value : '';
+    const eDate = document.getElementById('endDate') ? document.getElementById('endDate').value : '';
+    if (sDate && eDate) {
+        calculateSchedule();
+    }
+};
+
+function saveInputs() {
+    const data = {
+        startDate: document.getElementById('startDate').value,
+        endDate: document.getElementById('endDate').value,
+        injectionFrequency: document.getElementById('injectionFrequency').value,
+        totalClicks: document.getElementById('totalClicks').value,
+        taperDate: document.getElementById('taperDate').value,
+        targetLastClicks: document.getElementById('targetLastClicks').value,
+        linkInventory: document.getElementById('linkInventory').checked,
+        insightClicks: document.getElementById('insightClicks').value
+    };
+    localStorage.setItem('mounjaro_scheduler_data_v6', JSON.stringify(data));
+}
+
+function triggerRecalc() {
+    saveInputs();
+    const sDate = document.getElementById('startDate').value;
+    const eDate = document.getElementById('endDate').value;
+    if (sDate && eDate) {
+        calculateSchedule();
+    }
+}
+
+function setInsightClicks(val) {
+    document.getElementById('insightClicks').value = val;
+    saveInputs();
+    updateLongevityInsights();
+}
+
+function addPen() {
+    const size = document.getElementById('penSize').value;
+    const qty = parseInt(document.getElementById('penQty').value) || 1;
+    const expiry = document.getElementById('penExpiry').value;
+    const price = parseFloat(document.getElementById('penPrice').value) || 0;
+    const nicknameInput = document.getElementById('penNickname').value.trim();
+    
+    for(let i = 0; i < qty; i++) {
+        let finalNick = nicknameInput || `${size} Pen`;
+        if (qty > 1) {
+            finalNick += ` (${i + 1})`;
+        }
+        
+        inventory.push({
+            id: 'pen_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now(),
+            size: size,
+            expiry: expiry,
+            price: price,
+            goldenDose: false,
+            nickname: finalNick
+        });
+    }
+    
+    localStorage.setItem('mounjaro_inventory_v6', JSON.stringify(inventory));
+    
+    renderInventory();
+    updateLongevityInsights();
+    toggleLinkInventory();
+    
+    const sDate = document.getElementById('startDate').value;
+    const eDate = document.getElementById('endDate').value;
+    if(sDate && eDate) {
+        calculateSchedule();
+    }
+    
+    document.getElementById('penQty').value = "1";
+    document.getElementById('penExpiry').value = "";
+    document.getElementById('penNickname').value = "";
+    document.getElementById('penPrice').value = "";
+}
+
+function renamePen(id, newName) {
+    const pen = inventory.find(p => p.id === id);
+    if (pen) {
+        pen.nickname = newName.trim() || `${pen.size} Pen`;
+        localStorage.setItem('mounjaro_inventory_v6', JSON.stringify(inventory));
+        updateLongevityInsights();
+        const sDate = document.getElementById('startDate').value;
+        const eDate = document.getElementById('endDate').value;
+        if(sDate && eDate) {
+            calculateSchedule();
+        }
+    }
+}
+
+function updatePenPriceInTable(id, val) {
+    const pen = inventory.find(p => p.id === id);
+    if (pen) {
+        pen.price = parseFloat(val) || 0;
+        localStorage.setItem('mounjaro_inventory_v6', JSON.stringify(inventory));
+        renderInventory();
+        updateLongevityInsights();
+        const sDate = document.getElementById('startDate').value;
+        const eDate = document.getElementById('endDate').value;
+        if(sDate && eDate) {
+            calculateSchedule();
+        }
+    }
+}
+
+function toggleGoldenDose(id) {
+    const pen = inventory.find(p => p.id === id);
+    if(pen) {
+        pen.goldenDose = !pen.goldenDose;
+        localStorage.setItem('mounjaro_inventory_v6', JSON.stringify(inventory));
+        renderInventory();
+        updateLongevityInsights();
+        toggleLinkInventory();
+        const sDate = document.getElementById('startDate').value;
+        const eDate = document.getElementById('endDate').value;
+        if(sDate && eDate) {
+            calculateSchedule();
+        }
+    }
+}
+
+function deleteInventoryItem(id) {
+    inventory = inventory.filter(p => p.id !== id);
+    localStorage.setItem('mounjaro_inventory_v6', JSON.stringify(inventory));
+    renderInventory();
+    updateLongevityInsights();
+    toggleLinkInventory();
+    const sDate = document.getElementById('startDate').value;
+    const eDate = document.getElementById('endDate').value;
+    if(sDate && eDate) {
+        calculateSchedule();
+    }
+}
+
+function renderInventory() {
+    inventory.sort((a, b) => {
+        if (!a.expiry) return 1;
+        if (!b.expiry) return -1;
+        return new Date(a.expiry) - new Date(b.expiry);
+    });
+    
+    // Desktop View Table
+    let html = `<table class="desktop-only"><thead><tr><th>Pen Nickname (Tap to Edit)</th><th>Strength</th><th>Expiry</th><th>Price</th><th>Extra Dose (+60clks)</th><th>Total Vol</th><th>Action</th></tr></thead><tbody>`;
+    // Mobile View Cards Container
+    let mobileHtml = `<div class="mobile-only">`;
+    
+    let totalClicks = 0;
+    let totalCost = 0;
+    
+    inventory.forEach((item) => {
+        let finalClicks = item.goldenDose ? 300 : 240;
+        totalClicks += finalClicks;
+        totalCost += (item.price || 0);
+        let dateStr = item.expiry ? new Date(item.expiry).toLocaleDateString('en-GB', {day:'numeric', month:'short', year:'numeric'}) : 'None Set';
+        let checkedStr = item.goldenDose ? 'checked' : '';
+        
+        // Build Desktop Rows
+        html += `<tr>
+            <td style="width:22%;"><input type="text" class="table-input" value="${item.nickname}" onchange="renamePen('${item.id}', this.value)"></td>
+            <td>Mounjaro ${item.size}</td>
+            <td style="white-space: nowrap;">${dateStr}</td>
+            <td style="width:12%;"><input type="number" class="table-input" value="${item.price || ''}" placeholder="0.00" step="0.01" onchange="updatePenPriceInTable('${item.id}', this.value)"></td>
+            <td>
+                <label style="margin:0; display:flex; align-items:center; gap:6px; cursor:pointer;">
+                    <input type="checkbox" class="inline-check" ${checkedStr} onchange="toggleGoldenDose('${item.id}')">
+                    <span style="font-size:0.8rem; font-weight:600; color:#34c759;">Extra</span>
+                </label>
+            </td>
+            <td><b>${finalClicks} clks</b></td>
+            <td><button class="delete-btn" onclick="deleteInventoryItem('${item.id}')">Delete</button></td>
+        </tr>`;
+
+        // Build Mobile Fluid Cards
+        mobileHtml += `<div class="mobile-row-card" style="background:#ffffff; border: 1px solid var(--border-color)" onclick="event.stopPropagation();">
+            <div style="margin-bottom: 8px;">
+                <label style="margin:0 0 4px 0;">Nickname / Label</label>
+                <input type="text" class="table-input" value="${item.nickname}" onchange="renamePen('${item.id}', this.value)">
+            </div>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; font-size:0.85rem; margin-bottom:8px;">
+                <div><b>Strength:</b> ${item.size}</div>
+                <div><b>Expiry:</b> ${dateStr}</div>
+            </div>
+            <div style="margin-bottom: 8px;">
+                <label style="margin:0 0 4px 0;">Pen Price (£)</label>
+                <input type="number" class="table-input" value="${item.price || ''}" placeholder="0.00" step="0.01" onchange="updatePenPriceInTable('${item.id}', this.value)">
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; background:#f8f9fa; padding:8px; border-radius:6px;">
+                <label style="margin:0; display:flex; align-items:center; gap:6px; cursor:pointer;">
+                    <input type="checkbox" class="inline-check" ${checkedStr} onchange="toggleGoldenDose('${item.id}')">
+                    <span style="font-size:0.8rem; font-weight:600; color:#34c759;">Syringe Extra (+60)</span>
+                </label>
+                <div><b>Value:</b> ${finalClicks} clks</div>
+            </div>
+            <div style="text-align:right; margin-top:6px;">
+                <button class="delete-btn" onclick="deleteInventoryItem('${item.id}')">❌ Remove Pen</button>
+            </div>
+        </div>`;
+    });
+    
+    if (inventory.length === 0) {
+        html += `<tr><td colspan="7" style="text-align:center; color:#888; padding:20px;">Fridge is empty.</td></tr>`;
+        mobileHtml += `<p style="text-align:center; color:#888; padding:10px; font-style:italic;">Fridge is empty.</p>`;
+    } else {
+        html += `<tr style="background:#f8f9fa; font-weight:bold;"><td colspan="3">Total Pile Capacity</td><td>£${totalCost.toFixed(2)}</td><td></td><td>${totalClicks} clks</td><td></td></tr>`;
+        mobileHtml += `<div style="background:#007aff; color:white; padding:12px; border-radius:8px; text-align:center; font-weight:bold; margin-top:10px; display:flex; justify-content:space-between;"><span>💰 Value: £${totalCost.toFixed(2)}</span><span>📦 Vol: ${totalClicks} clks</span></div>`;
+    }
+    
+    html += `</tbody></table>`;
+    mobileHtml += `</div>`;
+    
+    document.getElementById('inventoryTableContainer').innerHTML = html + mobileHtml;
+}
+
+function updateLongevityInsights() {
+    saveInputs();
+    const targetClicks = parseInt(document.getElementById('insightClicks').value) || 0;
+    const startInput = document.getElementById('startDate').value;
+    
+    if (inventory.length === 0) {
+        document.getElementById('insightsContainer').innerHTML = "<p style='color:#888; font-style:italic; text-align:center; padding:10px;'>Log stock above to see custom click tracking insights.</p>";
+        return;
+    }
+    
+    if (targetClicks <= 0) {
+        document.getElementById('insightsContainer').innerHTML = "<p style='color:#a51d24; font-weight:500;'>Please enter clicks above zero.</p>";
+        return;
+    }
+
+    let totalAvailableClicks = 0;
+    inventory.forEach(item => { 
+        totalAvailableClicks += item.goldenDose ? 300 : 240; 
+    });
+    
+    let weeksDosesCount = totalAvailableClicks / targetClicks;
+    let weeksDisplay = weeksDosesCount.toFixed(1);
+
+    let endDateHtml = "";
+    if (startInput) {
+        let baseStartDate = new Date(startInput);
+        let totalDaysOffset = Math.floor(weeksDosesCount) * 7; 
+        let calculatedEndDate = new Date(baseStartDate.getTime() + (totalDaysOffset * 24 * 60 * 60 * 1000));
+        let formattedEndDate = calculatedEndDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+        endDateHtml = `<br>🏁 <b>Projected End Date:</b> Stock runs dry on or near <b>${formattedEndDate}</b>.`;
+    } else {
+        endDateHtml = `<br>ℹ️ <i>Set a Timeline "Start Date" to project exact calendar end date.</i>`;
+    }
+
+    let uniquePenSizes = [...new Set(inventory.map(item => item.size))];
+    
+    let html = `<div style="margin-top:10px; background:#f8f9fa; padding:12px; border-radius:8px; border-left:4px solid var(--primary); font-size:0.9rem;">`;
+    html += `🎯 <b>Total Lifespan:</b> Yields exactly <b>${weeksDisplay} injections</b> at <b>${targetClicks} clicks per week</b>.`;
+    html += endDateHtml;
+    html += `</div>`;
+    
+    html += `<table style="width:100%; margin-top:10px; border-collapse:collapse; font-size:0.9rem;"><thead><tr><th style="padding:8px; border-bottom:1px solid var(--border-color);">Pen Size in Fridge</th><th style="padding:8px; border-bottom:1px solid var(--border-color);">Dosage Strength Received</th></tr></thead><tbody>`;
+    uniquePenSizes.forEach(size => {
+        let sizeNum = parseFloat(size);
+        let calculatedMg = (targetClicks * (sizeNum / 60)).toFixed(2);
+        html += `<tr><td style="padding:8px; border-bottom:1px solid var(--border-color);">Mounjaro <b>${size} Pen</b></td><td style="padding:8px; border-bottom:1px solid var(--border-color);"><b style="color:var(--primary);">${calculatedMg} mg</b></td></tr>`;
+    });
+    html += `</tbody></table>`;
+    
+    document.getElementById('insightsContainer').innerHTML = html;
+}
+
+function toggleLinkInventory() {
+    const linkCheckbox = document.getElementById('linkInventory');
+    const totalClicksInput = document.getElementById('totalClicks');
+    
+    if (linkCheckbox && totalClicksInput) {
+        if (linkCheckbox.checked) {
+            let totalClicks = 0;
+            inventory.forEach(item => { 
+                totalClicks += item.goldenDose ? 300 : 240; 
+            });
+            totalClicksInput.value = totalClicks;
+            totalClicksInput.readOnly = true;
+            totalClicksInput.style.backgroundColor = "#e5e5ea";
+        } else {
+            totalClicksInput.readOnly = false;
+            totalClicksInput.style.backgroundColor = "";
+        }
+    }
+    saveInputs();
+}
+
+function toggleDoseTaken(index) {
+    const desktopRow = document.getElementById(`row_dose_${index}`);
+    const mobileCard = document.getElementById(`mobile_card_dose_${index}`);
+    
+    if (!takenDoses[index]) {
+        takenDoses[index] = true;
+        if (desktopRow) desktopRow.classList.add('taken-row');
+        if (mobileCard) mobileCard.classList.add('taken-style');
+    } else {
+        takenDoses[index] = false;
+        if (desktopRow) desktopRow.classList.remove('taken-row');
+        if (mobileCard) mobileCard.classList.remove('taken-style');
+    }
+    localStorage.setItem('mounjaro_taken_doses_v6', JSON.stringify(takenDoses));
+}
+
+function calculateSchedule() {
+    const errorDiv = document.getElementById('error-msg');
+    const exportBtn = document.getElementById('exportBtn');
+    errorDiv.style.display = "none";
+    document.getElementById('results').innerHTML = "";
+    exportBtn.style.display = "none";
+    currentSchedule = [];
+    
+    const startInput = document.getElementById('startDate').value;
+    const endInput = document.getElementById('endDate').value;
+    if (!startInput || !endInput) return;
+    
+    const start = new Date(startInput);
+    const end = new Date(endInput);
+    const frequency = parseInt(document.getElementById('injectionFrequency').value) || 7;
+    const taperInput = document.getElementById('taperDate').value;
+    const taper = taperInput ? new Date(taperInput) : null;
+    let totalClicks = parseInt(document.getElementById('totalClicks').value);
+    const targetLastClicks = parseInt(document.getElementById('targetLastClicks').value) || 0;
+    
+    if (!totalClicks || !frequency || frequency <= 0) return;
+    if (end <= start) { showError("Error: End date must be after the start date."); return; }
+
+    let dates = [];
+    let currentLoopDate = new Date(start);
+    while (currentLoopDate <= end) {
+        dates.push(new Date(currentLoopDate));
+        currentLoopDate.setDate(currentLoopDate.getDate() + frequency);
+    }
+    if (dates.length === 0) return;
+
+    let taperStartIndex = taper ? dates.findIndex(d => d >= taper) : -1;
+
+    if (taperStartIndex === -1 || taperStartIndex === dates.length) {
+        let avg = Math.floor(totalClicks / dates.length);
+        let remainder = totalClicks % dates.length;
+        currentSchedule = dates.map((d, index) => ({
+            date: d, clicks: avg + (index < remainder ? 1 : 0), isTaper: false
+        }));
+    } else {
+        let taperCount = dates.length - taperStartIndex;
+        let preTaperCount = taperStartIndex;
+        
+        if (preTaperCount === 0) {
+            let doses = distributeTaper(totalClicks, taperCount, targetLastClicks);
+            currentSchedule = dates.map((d, i) => ({ date: d, clicks: doses[i], isTaper: true }));
+        } else {
+            let foundValidProfile = false;
+            let bestPreTaperDose = Math.ceil(totalClicks / dates.length); 
+            let finalPreTaperDoses = [];
+            let finalTaperDoses = [];
+
+            for (let steadyDose = bestPreTaperDose * 2; steadyDose >= targetLastClicks; steadyDose--) {
+                let currentPreTaperTotal = steadyDose * preTaperCount;
+                let clicksLeftForTaper = totalClicks - currentPreTaperTotal;
+                
+                if (clicksLeftForTaper >= taperCount * targetLastClicks) {
+                    let simulatedTaper = generateSmoothTaper(steadyDose, targetLastClicks, taperCount, clicksLeftForTaper);
+                    if (simulatedTaper !== null) {
+                        finalPreTaperDoses = new Array(preTaperCount).fill(steadyDose);
+                        finalTaperDoses = simulatedTaper.doses;
+                        let excess = simulatedTaper.remaining;
+                        let idx = 0;
+                        while (excess > 0) {
+                            finalPreTaperDoses[idx % preTaperCount] += 1;
+                            excess--; idx++;
+                        }
+                        foundValidProfile = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!foundValidProfile) {
+                showError("Trajectory Conflict: Could not distribute clicks into a clean taper profile. Adjust dates or frequency.");
+                return;
+            }
+
+            for (let i = 0; i < dates.length; i++) {
+                if (i < taperStartIndex) {
+                    currentSchedule.push({ date: dates[i], clicks: finalPreTaperDoses[i], isTaper: false });
+                } else {
+                    currentSchedule.push({ date: dates[i], clicks: finalTaperDoses[i - taperStartIndex], isTaper: true });
+                }
+            }
+        }
+    }
+
+    let activePens = [];
+    inventory.forEach((item) => {
+        let initialVol = item.goldenDose ? 300 : 240;
+        activePens.push({
+            size: item.size,
+            sizeNum: parseFloat(item.size),
+            expiry: item.expiry ? new Date(item.expiry) : null,
+            price: item.price || 0,
+            costPerClick: (item.price || 0) / initialVol,
+            clicksLeft: initialVol,
+            nickname: item.nickname
+        });
+    });
+    activePens.sort((a, b) => {
+        if (!a.expiry) return 1;
+        if (!b.expiry) return -1;
+        return a.expiry - b.expiry;
+    });
+
+    currentSchedule.forEach(item => {
+        let clicksNeeded = item.clicks;
+        let penAllocations = [];
+        let totalMgForDose = 0;
+        let combinedDoseCost = 0;
+        
+        if (activePens.length === 0 && inventory.length > 0) {
+            item.penInfo = "⚠️ Stock Empty!";
+            item.mg = 0;
+            item.cost = 0;
+            return;
+        } else if (inventory.length === 0) {
+            item.penInfo = "Generic Setup";
+            item.mg = clicksNeeded * (15 / 60); 
+            item.cost = 0;
+            return;
+        }
+
+        while (clicksNeeded > 0 && activePens.length > 0) {
+            let currentPen = activePens[0];
+            let clicksFromThisPen = Math.min(clicksNeeded, currentPen.clicksLeft);
+            
+            clicksNeeded -= clicksFromThisPen;
+            currentPen.clicksLeft -= clicksFromThisPen;
+            totalMgForDose += clicksFromThisPen * (currentPen.sizeNum / 60);
+            combinedDoseCost += clicksFromThisPen * currentPen.costPerClick;
+            
+            let expBadge = "";
+            if (currentPen.expiry && item.date > currentPen.expiry) {
+                expBadge = " <span class='badge-expired'>⚠️ EXP</span>";
+            }
+            
+            penAllocations.push(`• <b>${currentPen.nickname}</b>: ${clicksFromThisPen} clks${expBadge}`);
+            
+            if (currentPen.clicksLeft === 0) activePens.shift();
+        }
+
+        if (clicksNeeded > 0) {
+            penAllocations.push(`<span class='badge-expired'>⚠️ Short ${clicksNeeded} clks</span>`);
+        }
+
+        item.penInfo = penAllocations.join("<br>");
+        item.mg = totalMgForDose;
+        item.cost = combinedDoseCost;
+    });
+
+    renderTable(currentSchedule);
+    exportBtn.style.display = "block";
+}
+
+function generateSmoothTaper(startCeiling, target, count, allowedClicks) {
+    let doses = new Array(count).fill(0);
+    let totalDropGap = startCeiling - target;
+    let stepSize = count > 1 ? totalDropGap / (count - 1) : 0;
+    let sum = 0;
+    for (let i = 0; i < count; i++) {
+        doses[i] = Math.round(startCeiling - (stepSize * i));
+        sum += doses[i];
+    }
+    if (sum <= allowedClicks) return { doses: doses, remaining: allowedClicks - sum };
+    return null;
+}
+
+function distributeTaper(total, count, target) {
+    let doses = new Array(count).fill(target);
+    let extra = total - (count * target);
+    let idx = 0;
+    while (extra > 0) { doses[idx % count] += 1; extra--; idx++; }
+    return doses.sort((a,b) => b-a);
+}
+
+function showError(msg) {
+    const errorDiv = document.getElementById('error-msg');
+    errorDiv.innerText = msg;
+    errorDiv.style.display = "block";
+}
+
+function renderTable(schedule) {
+    // Generate Table for Desktop
+    let html = `<table class="desktop-only"><thead><tr><th>Dose</th><th>Date</th><th>Volume</th><th>Strength</th><th>Cost / Dose</th><th>Pen Allocation</th></tr></thead><tbody>`;
+    
+    // Generate Cards for Mobile Stack View
+    let mobileHtml = `<div class="mobile-only">`;
+    
+    let verifiedTotal = 0;
+    let runningTotalCost = 0;
+    
+    schedule.forEach((item, index) => {
+        verifiedTotal += item.clicks;
+        runningTotalCost += item.cost;
+        let isTaken = takenDoses[index] === true;
+        
+        let rowClass = 'roadmap-row';
+        let cardClass = 'mobile-row-card';
+        if (item.isTaper) { rowClass += ' taper-row'; cardClass += ' taper-style'; }
+        if (isTaken) { rowClass += ' taken-row'; cardClass += ' taken-style'; }
+        
+        let costDisplay = item.cost > 0 ? `£${item.cost.toFixed(2)}` : '£0.00';
+        
+        // Build Desktop Table Markup
+        html += `<tr id="row_dose_${index}" class="${rowClass}" onclick="toggleDoseTaken(${index})">
+            <td>#${index + 1}</td>
+            <td style="white-space: nowrap;">${item.date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</td>
+            <td><b>${item.clicks} clks</b></td>
+            <td><b style="color:var(--primary);">${item.mg.toFixed(1)} mg</b></td>
+            <td><b style="color:var(--secondary);">${costDisplay}</b></td>
+            <td style="font-size: 0.85rem; color: #444;">${item.penInfo}</td>
+        </tr>`;
+
+        // Build Mobile Card Markup
+        mobileHtml += `<div id="mobile_card_dose_${index}" class="${cardClass}" onclick="toggleDoseTaken(${index})">
+            <div class="mobile-card-header">
+                <div>Dose #${index + 1}</div>
+                <div style="color: #666;">${item.date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; margin-bottom: 6px; font-size: 0.95rem;">
+                <div>Volume: <b>${item.clicks} clks</b></div>
+                <div>Strength: <b style="color:var(--primary);">${item.mg.toFixed(1)} mg</b></div>
+            </div>
+            <div style="margin-bottom: 8px; font-size: 0.95rem;">
+                Cost / Dose: <b style="color:var(--secondary);">${costDisplay}</b>
+            </div>
+            <div style="font-size: 0.85rem; background: rgba(0,0,0,0.02); padding: 8px; border-radius: 6px;">
+                <div style="font-weight: 600; margin-bottom: 2px; font-size: 0.75rem; color: #777;">PEN ALLOCATION DETAILS:</div>
+                <div>${item.penInfo}</div>
+            </div>
+        </div>`;
+    });
+    
+    html += `<tr style="background:#f8f9fa; font-weight:bold;"><td colspan="2">Total Allocated:</td><td>${verifiedTotal} clicks</td><td></td><td>£${runningTotalCost.toFixed(2)}</td><td></td></tr></tbody></table>`;
+    
+    mobileHtml += `<div style="background:#f8f9fa; border: 1px solid var(--border-color); padding: 14px; border-radius: 8px; font-weight: bold; margin-top: 10px; display:flex; justify-content:space-between; font-size:0.95rem;"><span>📊 Vol: ${verifiedTotal} clicks</span><span style="color:var(--secondary);">💰 Total: £${runningTotalCost.toFixed(2)}</span></div></div>`;
+    
+    document.getElementById('results').innerHTML = html + mobileHtml;
+}
+
+function exportToCSV() {
+    if (currentSchedule.length === 0) return;
+    let csvContent = "data:text/csv;charset=utf-8,";
+    csvContent += "Dose Number,Injection Date,Clicks Count,Dose Value (mg),Cost Per Dose,Pen Allocations,Schedule Profile,Status\r\n";
+
+    currentSchedule.forEach((item, index) => {
+        let formattedDate = item.date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        let profileType = item.isTaper ? "Tapering Step" : "Initial Plateau";
+        let status = takenDoses[index] === true ? "TAKEN" : "PENDING";
+        let cleanPenInfo = item.penInfo ? item.penInfo.replace(/<br>/g, " | ").replace(/<\/?[^>]+(>|$)/g, "") : "N/A";
+        if (cleanPenInfo.includes(",")) cleanPenInfo = `"${cleanPenInfo}"`;
+        csvContent += `${index + 1},${formattedDate},${item.clicks},${item.mg.toFixed(2)},£${item.cost.toFixed(2)},${cleanPenInfo},${profileType},${status}\r\n`;
+    });
+
+    let totalAllocated = currentSchedule.reduce((acc, item) => acc + item.clicks, 0);
+    let totalCostVal = currentSchedule.reduce((acc, item) => acc + item.cost, 0);
+    csvContent += `,,,\r\n`;
+    csvContent += `Total Allocated Across Box,,${totalAllocated},,£${totalCostVal.toFixed(2)},,,\r\n`;
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `mounjaro_cost_schedule_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+</script>
+</body>
+</html>
