@@ -19,7 +19,7 @@
             margin: 10px auto; 
             font-weight: bold; 
             color: #00ffca; 
-            max-width: 400px; 
+            max-width: 450px; 
             box-sizing: border-box; 
             border: 1px solid #333;
             font-size: 1.05rem;
@@ -32,27 +32,68 @@
         .mode-badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; margin-bottom: 10px; }
         .mode-online { background: #2ecc71; color: #fff; }
 
-        .controls { display: flex; justify-content: space-between; max-width: 400px; margin: 8px auto; gap: 8px; }
+        .controls { display: flex; justify-content: space-between; max-width: 450px; margin: 8px auto; gap: 8px; }
         .sub-btn { background: #7f8c8d; padding: 12px; font-size: 0.9rem; flex: 1; border-radius: 4px; border: none; color: white; font-weight: bold; cursor: pointer; text-transform: uppercase; }
 
+        /* Real-time Score Panel Stakes Widget */
+        .live-scoreboard {
+            background: #161616;
+            border: 1px solid #333;
+            border-radius: 6px;
+            max-width: 450px;
+            margin: 10px auto;
+            padding: 10px;
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .player-score-card {
+            background: #222;
+            padding: 6px 12px;
+            border-radius: 4px;
+            border-left: 3px solid #555;
+            font-size: 0.9rem;
+            min-width: 80px;
+        }
+        .player-score-card.active-turn {
+            border-left-color: #00ffca;
+            background: #1b2826;
+        }
+        .player-score-card .p-name { font-weight: bold; color: #eee; }
+        .player-score-card .p-pts { color: #f1c40f; font-weight: bold; font-size: 1rem; margin-top: 2px; }
+
         .grid-container { display: flex; flex-direction: column; align-items: center; gap: 15px; margin-top: 10px; width: 100%; }
-        .board-wrapper { width: 100%; max-width: 400px; }
+        .board-wrapper { width: 100%; max-width: 450px; }
         .board-title { font-size: 0.95rem; color: #aaa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; font-weight: bold; }
         
-        /* Minesweeper Fixed 10x10 Layout Grid */
-        .grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; width: 100%; aspect-ratio: 1; margin: 0 auto; box-sizing: border-box; background: #151515; padding: 4px; border-radius: 6px; }
+        .grid { 
+            display: grid; 
+            gap: 2px; 
+            width: 100%; 
+            aspect-ratio: 1; 
+            margin: 0 auto; 
+            box-sizing: border-box; 
+            background: #151515; 
+            padding: 4px; 
+            border-radius: 6px; 
+        }
         
-        .cell { background: #262626; aspect-ratio: 1; border-radius: 3px; border: 1px solid #111; position: relative; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.2rem; user-select: none; }
+        .cell { background: #262626; aspect-ratio: 1; border-radius: 2px; border: 1px solid #111; position: relative; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1rem; user-select: none; }
         .cell.revealed { background: #ecf0f1; border: 1px solid #bdc3c7; color: #2c3e50; }
         .cell.mine { background: #e74c3c !important; border: 1px solid #c0392b; }
         .cell.flagged { background: #f1c40f; border: 1px solid #d4ac0d; }
         
-        /* Cell number label text colorings */
+        /* Cell color mappings */
         .cell[data-count="1"] { color: #2980b9; }
         .cell[data-count="2"] { color: #27ae60; }
         .cell[data-count="3"] { color: #e74c3c; }
         .cell[data-count="4"] { color: #8e44ad; }
         .cell[data-count="5"] { color: #d35400; }
+
+        .grid-small .cell { font-size: 1.2rem; }
+        .grid-medium .cell { font-size: 0.95rem; }
+        .grid-large .cell { font-size: 0.75rem; border-radius: 1px; }
 
         .stats-table { width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 15px; background: #111; border-radius: 6px; overflow: hidden; font-size: 0.85rem; }
         .stats-table th { background: #2c3e50; color: #fff; padding: 8px; font-weight: bold; text-align: left; }
@@ -67,7 +108,7 @@
 </head>
 <body>
 
-    <h1>Minesweeper Pro: Multi-Ops Edition V3</h1>
+    <h1>Minesweeper Pro: Multi-Ops Edition</h1>
     <div id="status-box" class="status">Initializing Tactical Network Layer...</div>
 
     <div id="game-modal" class="modal-overlay hidden">
@@ -90,9 +131,9 @@
             <div style="text-align: left;">
                 <label for="player-limit-input">Max Player Allocation Limit</label>
                 <select id="player-limit-input">
-                    <option value="2">2 Players Max</option>
-                    <option value="3">3 Players Max</option>
-                    <option value="4">4 Players Max</option>
+                    <option value="2">2 Players Max (9x9 Field)</option>
+                    <option value="3">3 Players Max (12x12 Field)</option>
+                    <option value="4">4 Players Max (15x15 Field)</option>
                 </select>
             </div>
 
@@ -107,6 +148,8 @@
     </div>
 
     <div id="game-screen" class="hidden">
+        <div id="live-stakes-board" class="live-scoreboard"></div>
+
         <div class="controls" id="gameplay-controls-panel">
             <button class="sub-btn" id="btn-mode" style="background:#8e44ad;">Mode: DIGGING</button>
             <button class="sub-btn" id="btn-pass" style="background: #e67e22;">Pass Turn</button>
@@ -139,15 +182,12 @@
         let maxPlayersAllowed = 2;
         let matchIsActive = false;
 
-        // Scoring metrics tracked across sweeps
-        let statCellsCleared = 0;
-        let statFlagsPlaced = 0;
-
-        // Core Minefield Matrix Constants
-        const GRID_SIZE = 100; // 10x10 Matrix Array
-        const MINE_COUNT = 15;
-        let minefieldBlueprint = []; // Shared layout data maps: { isMine: bool, isRevealed: bool, isFlagged: bool, count: int }
-        let currentToolMode = "DIG"; // Alternative Option: "FLAG"
+        // Dynamic Board Dimensions Context Scale Properties
+        let gridSideDimension = 10; 
+        let totalGridCellsCount = 100;
+        let allocatedMinesCount = 15;
+        let minefieldBlueprint = []; 
+        let currentToolMode = "DIG"; 
 
         // --- DIALOG MODAL LAYOUT HANDLERS ---
         function showModal(title, htmlContent) {
@@ -182,10 +222,26 @@
             const roomCode = document.getElementById('room-input').value.trim();
             if (!roomCode) return alert("An operations channel code is required.");
             
+            applyScaleDimensionsParameters(maxPlayersAllowed);
+
             myChannel = 'msweep_v1_room_' + roomCode;
             pubnub = new PubNub({ publishKey: 'demo', subscribeKey: 'demo', userId: myId });
             setupPubNubChannelSubscription();
         });
+
+        function applyScaleDimensionsParameters(limit) {
+            if (limit === 2) {
+                gridSideDimension = 9;
+                allocatedMinesCount = 10;
+            } else if (limit === 3) {
+                gridSideDimension = 12;
+                allocatedMinesCount = 22;
+            } else {
+                gridSideDimension = 15;
+                allocatedMinesCount = 40;
+            }
+            totalGridCellsCount = gridSideDimension * gridSideDimension;
+        }
 
         function setupPubNubChannelSubscription() {
             globalPlayers[myId] = { name: myName, ready: false, score: 0 };
@@ -195,7 +251,6 @@
             });
             pubnub.subscribe({ channels: [myChannel] });
             
-            // Broadcast deployment identity to open operations nodes
             broadcastPayloadNetworkMessage({ type: 'sync-identity', name: globalPlayers[myId].name, limit: maxPlayersAllowed, sender: myId });
             
             document.getElementById('lobby-screen').classList.add('hidden');
@@ -203,13 +258,13 @@
             statusBox.innerText = "Awaiting deployment connections...";
             
             initMinefieldMemoryStructures();
-            renderBlankFieldGrid();
+            renderDynamicFieldGrid();
+            renderLiveStakesPanel();
         }
 
         // --- INBOUND SYSTEM NETWORK MESSAGE ROUTINES ---
         function handleInboundUnifiedMessage(data) {
             if (data.type === 'sync-identity') {
-                // Connection enforcement cap matching options configuration
                 if (Object.keys(globalPlayers).length >= data.limit || matchIsActive) {
                     if (data.sender === myId) {
                         handleRoomLockedKickback();
@@ -222,6 +277,10 @@
                     globalPlayers[data.sender] = { name: data.name, ready: false, score: 0 };
                 }
                 maxPlayersAllowed = data.limit;
+                applyScaleDimensionsParameters(maxPlayersAllowed);
+                
+                renderDynamicFieldGrid();
+
                 broadcastPayloadNetworkMessage({ type: 'ack-identity', name: globalPlayers[myId].name, sender: myId });
                 evaluateAutomaticOperationStart();
             }
@@ -237,13 +296,13 @@
                 evaluateAutomaticOperationStart();
             }
             else if (data.type === 'ghost-sync-payload') {
-                // Received direct operational map coordinates array from the host machine node
                 minefieldBlueprint = data.fieldMap;
                 activeTurnOrder = data.order;
                 currentTurnUserId = activeTurnOrder[0];
                 matchIsActive = true;
                 
                 updateVisualDisplays();
+                renderLiveStakesPanel();
                 updateTurnHeader();
             }
             else if (data.type === 'field-update-action') {
@@ -252,10 +311,12 @@
                 globalPlayers[data.actorId].score = data.actorUpdatedScore;
                 
                 updateVisualDisplays();
+                renderLiveStakesPanel();
                 updateTurnHeader();
             }
             else if (data.type === 'pass-turn-action') {
                 currentTurnUserId = data.nextUserId;
+                renderLiveStakesPanel();
                 updateTurnHeader();
             }
             else if (data.type === 'broadcast-global-match-over') {
@@ -277,7 +338,6 @@
             if (connectedIds.length === maxPlayersAllowed) {
                 let sortedIds = [...connectedIds].sort();
                 
-                // Host player node compiles structural seed to balance coordinates array layout
                 if (myId === sortedIds[0] && !matchIsActive) {
                     generateHostFieldBlueprint();
                     let shuffleTurnOrder = [...connectedIds].sort(() => Math.random() - 0.5);
@@ -291,24 +351,23 @@
                 }
             } else {
                 statusBox.innerText = `Waiting for players (${connectedIds.length}/${maxPlayersAllowed})...`;
+                renderLiveStakesPanel();
             }
         }
 
         function generateHostFieldBlueprint() {
             initMinefieldMemoryStructures();
             
-            // Randomly plant strategic points
             let planted = 0;
-            while (planted < MINE_COUNT) {
-                let randIndex = Math.floor(Math.random() * GRID_SIZE);
+            while (planted < allocatedMinesCount) {
+                let randIndex = Math.floor(Math.random() * totalGridCellsCount);
                 if (!minefieldBlueprint[randIndex].isMine) {
                     minefieldBlueprint[randIndex].isMine = true;
                     planted++;
                 }
             }
 
-            // Calculate adjacent numerical metrics parameters
-            for (let i = 0; i < GRID_SIZE; i++) {
+            for (let i = 0; i < totalGridCellsCount; i++) {
                 if (minefieldBlueprint[i].isMine) continue;
                 minefieldBlueprint[i].count = calculateNeighboringMinesCount(i);
             }
@@ -316,16 +375,16 @@
 
         function calculateNeighboringMinesCount(index) {
             let count = 0;
-            let row = Math.floor(index / 10);
-            let col = index % 10;
+            let row = Math.floor(index / gridSideDimension);
+            let col = index % gridSideDimension;
 
             for (let rOffset = -1; rOffset <= 1; rOffset++) {
                 for (let cOffset = -1; cOffset <= 1; cOffset++) {
                     let targetRow = row + rOffset;
                     let targetCol = col + cOffset;
                     
-                    if (targetRow >= 0 && targetRow < 10 && targetCol >= 0 && targetCol < 10) {
-                        let targetIdx = targetRow * 10 + targetCol;
+                    if (targetRow >= 0 && targetRow < gridSideDimension && targetCol >= 0 && targetCol < gridSideDimension) {
+                        let targetIdx = targetRow * gridSideDimension + targetCol;
                         if (minefieldBlueprint[targetIdx].isMine) count++;
                     }
                 }
@@ -335,19 +394,51 @@
 
         function initMinefieldMemoryStructures() {
             minefieldBlueprint = [];
-            for (let i = 0; i < GRID_SIZE; i++) {
+            for (let i = 0; i < totalGridCellsCount; i++) {
                 minefieldBlueprint.push({ isMine: false, isRevealed: false, isFlagged: false, count: 0 });
             }
-            statCellsCleared = 0;
-            statFlagsPlaced = 0;
             for (let p in globalPlayers) { globalPlayers[p].score = 0; }
         }
 
+        // --- LIVE SCORES ON THE GAME BOARD PANEL ---
+        function renderLiveStakesPanel() {
+            const stakesPanel = document.getElementById('live-stakes-board');
+            stakesPanel.innerHTML = '';
+            
+            Object.keys(globalPlayers).forEach(pId => {
+                const pData = globalPlayers[pId];
+                const card = document.createElement('div');
+                card.className = 'player-score-card';
+                if (matchIsActive && currentTurnUserId === pId) {
+                    card.classList.add('active-turn');
+                }
+                
+                const nameLabel = pId === myId ? `${pData.name} (You)` : pData.name;
+                card.innerHTML = `
+                    <div class="p-name">${nameLabel}</div>
+                    <div class="p-pts">🚩 ${pData.score}</div>
+                `;
+                stakesPanel.appendChild(card);
+            });
+        }
+
         // --- GRID RENDERING HANDLERS ---
-        function renderBlankFieldGrid() {
+        function renderDynamicFieldGrid() {
             const container = document.getElementById('minefield-board');
             container.innerHTML = '';
-            for (let i = 0; i < GRID_SIZE; i++) {
+            
+            container.style.gridTemplateColumns = `repeat(${gridSideDimension}, 1fr)`;
+            
+            container.className = 'grid';
+            if (gridSideDimension <= 9) {
+                container.classList.add('grid-small');
+            } else if (gridSideDimension <= 12) {
+                container.classList.add('grid-medium');
+            } else {
+                container.classList.add('grid-large');
+            }
+
+            for (let i = 0; i < totalGridCellsCount; i++) {
                 const cell = document.createElement('div');
                 cell.className = 'cell';
                 cell.setAttribute('data-index', i);
@@ -360,6 +451,7 @@
             const cells = document.querySelectorAll('#minefield-board .cell');
             cells.forEach((cell, i) => {
                 const data = minefieldBlueprint[i];
+                if (!data) return;
                 cell.className = 'cell';
                 cell.innerText = '';
                 cell.removeAttribute('data-count');
@@ -385,48 +477,63 @@
             if (!matchIsActive || currentTurnUserId !== myId) return;
             
             let cell = minefieldBlueprint[index];
-            if (cell.isRevealed) return; // Ignore already processed nodes
+            if (cell.isRevealed) return; 
 
             if (currentToolMode === "FLAG") {
                 cell.isFlagged = !cell.isFlagged;
-                if(cell.isFlagged) statFlagsPlaced++;
+                
+                // NEW STRATEGIC SCORING RULE: 
+                // Recalculate full player score based strictly on currently active accurate flags
+                recalculateMyAccurateFlagsScore();
+
                 advanceTurnSequenceState();
             } else {
-                // Digging Execution Process Mode
-                if (cell.isFlagged) return; // Prevent clicking safe grids accidentally
+                if (cell.isFlagged) return; 
                 
                 if (cell.isMine) {
-                    // Detonation path executed
                     cell.isRevealed = true;
-                    handleExplosionDefeatCondition();
+                    handleExplosionDefeatCondition(); // INSTANT LOSS TRIPPED
                 } else {
-                    // Safe sweep execution
                     executeCascadeReveal(index);
                     checkVictoryEnforcementStandard();
                 }
             }
         }
 
-        function executeCascadeReveal(index) {
-            let row = Math.floor(index / 10);
-            let col = index % 10;
+        function recalculateMyAccurateFlagsScore() {
+            let accurateCount = 0;
+            // Scans the map to see how many of the map's current flags are correctly targeting mines
+            for (let i = 0; i < totalGridCellsCount; i++) {
+                if (minefieldBlueprint[i].isFlagged && minefieldBlueprint[i].isMine) {
+                    accurateCount++;
+                }
+            }
+            globalPlayers[myId].score = accurateCount;
+        }
 
-            if (row < 0 || row >= 10 || col < 0 || col >= 10) return;
+        function executeCascadeReveal(index) {
+            let row = Math.floor(index / gridSideDimension);
+            let col = index % gridSideDimension;
+
+            if (row < 0 || row >= gridSideDimension || col < 0 || col >= gridSideDimension) return;
             let cell = minefieldBlueprint[index];
             if (cell.isRevealed || cell.isMine) return;
 
             cell.isRevealed = true;
-            cell.isFlagged = false; // Remove flag tracking overlay
-            statCellsCleared++;
-            globalPlayers[myId].score += 10; // Award progression units per node cleared
+            
+            // If an unrevealed flagged cell is opened by a cascade, remove the flag status
+            if (cell.isFlagged) {
+                cell.isFlagged = false;
+                recalculateMyAccurateFlagsScore();
+            }
 
             if (cell.count === 0) {
                 for (let rOffset = -1; rOffset <= 1; rOffset++) {
                     for (let cOffset = -1; cOffset <= 1; cOffset++) {
                         let targetRow = row + rOffset;
                         let targetCol = col + cOffset;
-                        if (targetRow >= 0 && targetRow < 10 && targetCol >= 0 && targetCol < 10) {
-                            executeCascadeReveal(targetRow * 10 + targetCol);
+                        if (targetRow >= 0 && targetRow < gridSideDimension && targetCol >= 0 && targetCol < gridSideDimension) {
+                            executeCascadeReveal(targetRow * gridSideDimension + targetCol);
                         }
                     }
                 }
@@ -450,7 +557,6 @@
         document.getElementById('btn-pass').addEventListener('click', () => {
             if (!matchIsActive || currentTurnUserId !== myId) return;
             
-            // Push luck option sequence loop passing direct execution token
             let nextIndex = (activeTurnOrder.indexOf(myId) + 1) % activeTurnOrder.length;
             let nextUserId = activeTurnOrder[nextIndex];
             
@@ -509,7 +615,7 @@
 
         function checkVictoryEnforcementStandard() {
             let winMatch = true;
-            for (let i = 0; i < GRID_SIZE; i++) {
+            for (let i = 0; i < totalGridCellsCount; i++) {
                 if (!minefieldBlueprint[i].isMine && !minefieldBlueprint[i].isRevealed) {
                     winMatch = false;
                     break;
@@ -528,7 +634,6 @@
                     sender: myId
                 });
             } else {
-                // No explosion and blocks remain: cycle turn safely
                 advanceTurnSequenceState();
             }
         }
@@ -538,7 +643,7 @@
                 return {
                     name: globalPlayers[pId].name,
                     score: globalPlayers[pId].score,
-                    isWinner: false
+                    isEliminated: (pId === currentTurnUserId && !matchIsActive && minefieldBlueprint.some(c => c.isMine && c.isRevealed))
                 };
             });
         }
@@ -551,23 +656,40 @@
             document.getElementById('gameplay-controls-panel').classList.add('hidden');
             document.getElementById('game-over-container').classList.remove('hidden');
 
-            // Force rendering visibility revealing location map arrays
             minefieldBlueprint.forEach(cell => { if(cell.isMine) cell.isRevealed = true; });
             updateVisualDisplays();
+            renderLiveStakesPanel();
 
             let title = outcome === 'VICTORY' ? "GRID SECURED" : "TACTICAL DETONATION";
-            let messageHtml = outcome === 'VICTORY' 
-                ? `<p style="color:#2ecc71; font-weight:bold;">Success! ${triggerName} cleared the last remaining safe cell.</p>`
-                : `<p style="color:#ff3838; font-weight:bold;">Boom! ${triggerName} triggered a live pressure contact point.</p>`;
+            let messageHtml = "";
 
-            // Display ranked score board
-            messageHtml += `<h4>Tactical Operations Metric Matrix:</h4>`;
-            messageHtml += `<table class="stats-table"><tr><th>Operator Node</th><th>Points Record</th></tr>`;
+            if (outcome === 'VICTORY') {
+                messageHtml = `<p style="color:#2ecc71; font-weight:bold;">Success! All safe terrain cleared.</p>`;
+            } else {
+                messageHtml = `<p style="color:#ff3838; font-weight:bold;">Boom! ${triggerName} triggered a mine and was instantly eliminated!</p>`;
+            }
+
+            messageHtml += `<h4>Tactical Flag Leaderboard (Accurate Flags Only):</h4>`;
+            messageHtml += `<table class="stats-table"><tr><th>Operator Node</th><th>Status</th><th>Accurate Flags</th></tr>`;
             
-            // Sort leaderboard ranking array descending
-            analyticsData.sort((a,b) => b.score - a.score);
+            // Find the person who hit the mine to clearly label them as disqualified/eliminated
+            analyticsData.forEach(p => {
+                if (p.name === triggerName && outcome === 'DEFEAT') {
+                    p.isEliminated = true;
+                }
+            });
+
+            // Sort by elimination status first, then by highest score
+            analyticsData.sort((a,b) => {
+                if (a.isEliminated && !b.isEliminated) return 1;
+                if (!a.isEliminated && a.isEliminated) return -1;
+                return b.score - a.score;
+            });
+
             analyticsData.forEach(r => {
-                messageHtml += `<tr><td>${r.name}</td><td>${r.score} PTS</td></tr>`;
+                let statusText = r.isEliminated ? `<span style="color:#ff3838;">💥 ELIMINATED</span>` : `<span style="color:#2ecc71;">SURVIVED</span>`;
+                let operationalScore = r.isEliminated ? "0" : r.score;
+                messageHtml += `<tr><td>${r.name}</td><td>${statusText}</td><td>🚩 ${operationalScore} / ${allocatedMinesCount}</td></tr>`;
             });
             messageHtml += "</table>";
 
