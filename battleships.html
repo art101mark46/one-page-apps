@@ -54,7 +54,6 @@
         .cell.revealed-ship { background: #d35400; border: 1px solid #e67e22; opacity: 0.85; } 
         .cell.spectator-ship { background: #1b5e20; border: 1px solid #2e7d32; opacity: 0.7; } 
         
-        /* Drag and Drop Placement Blueprints */
         .cell.preview-valid { background: #2ecc71 !important; border: 1px solid #27ae60 !important; opacity: 0.8; }
         .cell.preview-invalid { background: #e74c3c !important; border: 1px solid #c0392b !important; opacity: 0.8; }
         
@@ -76,7 +75,7 @@
 </head>
 <body>
 
-    <h1>Battleships Pro: Online Deployment - Battle Stats</h1>
+    <h1>Battleships Pro: Spectator mode</h1>
     <div id="status-box" class="status">Initializing Tactical Network Layer...</div>
 
     <div id="game-modal" class="modal-overlay hidden">
@@ -177,7 +176,7 @@
         let placementOrientation = "H"; 
         let yourFleetLocations = Array(100).fill(0); 
         let cellToShipMap = {}; 
-        let cellToShipNameMap = {}; // Tracks specific ship identities per coordinate for tracking hits
+        let cellToShipNameMap = {}; 
 
         // --- DIALOG MODAL LAYOUT HANDLERS ---
         function showModal(title, htmlContent) {
@@ -354,23 +353,52 @@
             let elementsAdded = 0;
             const iAmSpectator = globalPlayers[myId] && globalPlayers[myId].lost;
 
+            // Gather potential items, sort them alphabetically by profile name
+            let optionsPool = [];
             for (let pId in globalPlayers) {
-                if (pId === myId) continue; 
+                if (pId === myId) continue;
                 if (!iAmSpectator && globalPlayers[pId].lost) continue;
+                optionsPool.push({ id: pId, name: globalPlayers[pId].name, lost: globalPlayers[pId].lost });
+            }
+            
+            optionsPool.sort((a, b) => a.name.localeCompare(b.name));
 
+            optionsPool.forEach(item => {
                 const opt = document.createElement('option');
-                opt.value = pId;
-                opt.innerText = globalPlayers[pId].name + (globalPlayers[pId].lost ? " (ELIMINATED)" : "");
+                opt.value = item.id;
+                opt.innerText = item.name + (item.lost ? " (ELIMINATED)" : "");
                 picker.appendChild(opt);
                 elementsAdded++;
-            }
+            });
+
             if (currentSelection && picker.querySelector(`option[value="${currentSelection}"]`)) {
                 picker.value = currentSelection;
             } else if (picker.options.length > 0) {
                 picker.selectedIndex = 0;
             }
+            
             if (elementsAdded > 0) document.getElementById('target-selector-container').classList.remove('hidden');
             else document.getElementById('target-selector-container').classList.add('hidden');
+        }
+
+        function triggerAlphabeticalTargetSwitch() {
+            const picker = document.getElementById('enemy-target-picker');
+            const currentSelection = picker.value;
+
+            // Only switch targeting tracking if current target is non-existent or now dead
+            if (!currentSelection || (globalPlayers[currentSelection] && globalPlayers[currentSelection].lost)) {
+                let optionsPool = [];
+                for (let pId in globalPlayers) {
+                    if (pId === myId || globalPlayers[pId].lost) continue;
+                    optionsPool.push({ id: pId, name: globalPlayers[pId].name });
+                }
+                if (optionsPool.length > 0) {
+                    optionsPool.sort((a, b) => a.name.localeCompare(b.name));
+                    picker.value = optionsPool[0].id;
+                    renderSelectedOpponentGrid();
+                    updateTurnHeader();
+                }
+            }
         }
 
         document.getElementById('enemy-target-picker').addEventListener('change', renderSelectedOpponentGrid);
@@ -400,7 +428,7 @@
                 iamReady = true;
                 globalPlayers[myId].ready = true;
                 document.getElementById('deployment-dock').classList.add('hidden');
-                renderGrid('your-board', null, false); 
+                renderGrid('your-board', handleFleetDeploymentClick, false); 
                 
                 broadcastPayloadNetworkMessage({ type: 'player-ready', sender: myId });
                 statusBox.innerText = "Awaiting other players...";
@@ -522,7 +550,7 @@
             document.getElementById('board-divider').classList.remove('hidden');
             document.getElementById('spectator-action-container').classList.add('hidden');
             document.getElementById('game-over-container').classList.add('hidden');
-            rebuildTargetDropdown(); renderSelectedOpponentGrid(); updateTurnHeader(); updateVisualDisplays();
+            rebuildTargetDropdown(); renderGrid('your-board', handleFleetDeploymentClick, false); renderSelectedOpponentGrid(); updateTurnHeader(); updateVisualDisplays();
         }
 
         // --- PLAY CANVAS RENDERING ---
@@ -562,6 +590,47 @@
             }
         }
 
+        // --- SPECTATOR SHIP INSPECTION PIPELINE ---
+        function inspectTargetCoordinateAsSpectator(targetPlayerId, coord) {
+            const profile = globalPlayers[targetPlayerId];
+            if (!profile) return;
+            
+            // Resolve ship identification name matching the coordinates inside the profile mapping layer
+            const targetShipName = profile.shipNamesMap ? profile.shipNamesMap[coord] : null;
+            if (!targetShipName) {
+                showModal("SCAN INTELLIGENCE", `<p><strong>Location:</strong> [${Math.floor(coord/10)}, ${coord%10}]<br>No ship was placed at this coordinate by <strong>${profile.name}</strong>.</p>`);
+                return;
+            }
+
+            // Cross reference structural history inside logs to extract hits specifically targeting this ship on this player
+            let hitCount = 0;
+            let attackersMap = {};
+
+            globalCombatStrikeLog.forEach(log => {
+                if (log.target === targetPlayerId && log.vessel === targetShipName && log.hit) {
+                    hitCount++;
+                    const attackerName = globalPlayers[log.attacker] ? globalPlayers[log.attacker].name : "Unknown Attacker";
+                    attackersMap[attackerName] = (attackersMap[attackerName] || 0) + 1;
+                }
+            });
+
+            let breakdownHTML = `<h4>Vessel Inspection: ${targetShipName}</h4>`;
+            breakdownHTML += `<p><strong>Fleet Commander:</strong> ${profile.name}</p>`;
+            breakdownHTML += `<p><strong>Total Hits Sustained:</strong> ${hitCount}</p>`;
+
+            if (hitCount > 0) {
+                breakdownHTML += `<p style='margin-bottom:4px; font-weight:bold; color:#f1c40f;'>STRIKE ORIGIN BREAKDOWN:</p><ul style='text-align:left; margin:0 auto; max-width:260px; padding-left:20px; color:#ccc;'>`;
+                for (let attacker in attackersMap) {
+                    breakdownHTML += `<li><strong>${attacker}:</strong> ${attackersMap[attacker]} hit(s)</li>`;
+                }
+                breakdownHTML += `</ul>`;
+            } else {
+                breakdownHTML += `<p style='color:#2ecc71;'>Vessel has not sustained any visual structural damage.</p>`;
+            }
+
+            showModal("TACTICAL SCANNER", breakdownHTML);
+        }
+
         // --- ARTILLERY INTERACTIVE COMMAND LAYERS ---
         function updateVisualDisplays() {
             renderSelectedOpponentGrid();
@@ -597,7 +666,12 @@
             const targetId = document.getElementById('enemy-target-picker').value;
             if (!targetId) return;
 
-            if (globalPlayers[myId].lost) return;
+            // Redirect input structure if user has been scuttled into spectator mode
+            if (globalPlayers[myId].lost) {
+                inspectTargetCoordinateAsSpectator(targetId, coord);
+                return;
+            }
+            
             if (!matchIsActive || currentTurnUserId !== myId) return;
             if (globalPlayers[targetId].lost || globalPlayers[targetId].boardHits[coord] !== 0) return; 
             
@@ -631,15 +705,31 @@
                 globalPlayers[myId].lost = true; statusBox.innerText = "YOUR FLEET WAS ANNIHILATED!";
                 broadcastPayloadNetworkMessage({ type: 'endgame-reveal', fleetLocations: yourFleetLocations, sender: myId });
                 document.getElementById('spectator-action-container').classList.remove('hidden');
+                
+                // Set up your display to allow localized vessel inspection clicks on your own board
+                renderGrid('your-board', (c) => inspectTargetCoordinateAsSpectator(myId, c), false);
+                updateVisualDisplays();
             }
         }
 
         function handleShotFeedback(attackerId, targetId, coord, isHit, sunkShipName, targetLostHandshake) {
             if (globalPlayers[targetId]) {
                 globalPlayers[targetId].boardHits[coord] = isHit ? 1 : 2;
-                if (targetLostHandshake) globalPlayers[targetId].lost = true;
+                if (targetLostHandshake) {
+                    globalPlayers[targetId].lost = true;
+                }
             }
-            updateVisualDisplays();
+            
+            // Rebuild dropdown values to flag elements as eliminated
+            rebuildTargetDropdown();
+            
+            // If target was eliminated, automatically swing selectors alphabetically to next live player
+            if (targetLostHandshake) {
+                triggerAlphabeticalTargetSwitch();
+            } else {
+                updateVisualDisplays();
+            }
+
             if (attackerId === myId) {
                 if (isHit) statHitsLanded++;
                 if (!targetLostHandshake && sunkShipName) showModal("VEHICLE SUNK", `<p>You completely scuttled ${globalPlayers[targetId].name}'s ${sunkShipName}!</p>`);
