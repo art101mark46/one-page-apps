@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My App Dashboard</title>
+    <title>Art's One Page Apps</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
@@ -17,6 +17,13 @@
             --accent-gradient-1: linear-gradient(135deg, #3b82f6, #8b5cf6);
             --accent-gradient-2: linear-gradient(135deg, #ec4899, #8b5cf6);
             --accent-gradient-3: linear-gradient(135deg, #10b981, #3b82f6);
+            --accent-gradient-4: linear-gradient(135deg, #f59e0b, #e11d48); /* Sunset Fire (Orange to Rose) */
+            --accent-gradient-5: linear-gradient(135deg, #06b6d4, #3b82f6); /* Electric Ice (Cyan to Blue) */
+            --accent-gradient-6: linear-gradient(135deg, #a855f7, #ec4899); /* Cosmic Orchid (Purple to Pink) */
+            --accent-gradient-7: linear-gradient(135deg, #10b981, #f59e0b); /* Aurora (Emerald to Amber) */
+            --accent-gradient-8: linear-gradient(135deg, #6366f1, #06b6d4); /* Cyberpunk (Indigo to Cyan) */
+            --accent-gradient-9: linear-gradient(135deg, #ff416c, #ff4b2b); /* Neon Coral (Hot Pink to Bright Red) */
+            
         }
 
         * {
@@ -92,6 +99,12 @@
         .card:nth-child(3n+1) .card-visual { background: var(--accent-gradient-1); }
         .card:nth-child(3n+2) .card-visual { background: var(--accent-gradient-2); }
         .card:nth-child(3n+3) .card-visual { background: var(--accent-gradient-3); }
+        .card:nth-child(9n+4) .card-visual { background: var(--accent-gradient-4); }
+        .card:nth-child(9n+5) .card-visual { background: var(--accent-gradient-5); }
+        .card:nth-child(9n+6) .card-visual { background: var(--accent-gradient-6); }
+        .card:nth-child(9n+7) .card-visual { background: var(--accent-gradient-7); }
+        .card:nth-child(9n+8) .card-visual { background: var(--accent-gradient-8); }
+        .card:nth-child(9n+9) .card-visual { background: var(--accent-gradient-9); }
 
         /* Graphic/Icon Placeholder inside the card */
         .card-icon {
@@ -151,8 +164,8 @@
 <body>
 
     <header>
-        <h1>App Collection</h1>
-        <p>A suite of lightweight, single-page web applications.</p>
+        <h1>Art's One Page Apps</h1>
+        <p>A suite of lightweight, single-page web applications, all vibe coded in Google Gemini for fun.</p>
     </header>
 
     <main class="grid">
