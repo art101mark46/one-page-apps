@@ -148,6 +148,41 @@
     let players = [], frameWins = [], totalPoints = [], lives = [];
     let mode = 'standard', currentIdx = 0, turnScore = 0, pots = {red: 0, yellow: 0};
     let assigns = [null, null], timerInt, stateStack = [];
+    
+    // Audio Context variable
+    let audioCtx = null;
+
+    function initAudio() {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+    }
+
+    function playTone(frequency, duration) {
+        try {
+            initAudio();
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+            
+            // Linear fade out to prevent clicks/popping sounds
+            gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+            
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            osc.start();
+            osc.stop(audioCtx.currentTime + duration);
+        } catch (e) {
+            console.log("Audio error: ", e);
+        }
+    }
 
     function toggleKillerUI() {
         const isKiller = document.getElementById('game-mode-sel').value === 'killer';
@@ -165,6 +200,7 @@
     }
 
     function initMatch() {
+        initAudio(); // Initialize audio on user interaction
         mode = document.getElementById('game-mode-sel').value;
         
         if (mode === 'killer') {
@@ -220,8 +256,16 @@
         timerInt = setInterval(() => { 
             rem--; 
             document.getElementById('turn-timer').innerText = rem; 
-            if(rem <= 5 && rem > 0) appEl.classList.add('timer-warn');
-            if(rem <= 0) { appEl.classList.remove('timer-warn'); switchPlayer(); } 
+            
+            if(rem <= 5 && rem > 0) {
+                appEl.classList.add('timer-warn');
+                playTone(880, 0.1); // High pitched warning beep (880Hz, 0.1s long)
+            }
+            if(rem <= 0) { 
+                appEl.classList.remove('timer-warn'); 
+                playTone(330, 0.35); // Lower pitched, twice as long switch buzzer (330Hz, 0.35s long)
+                switchPlayer(); 
+            } 
         }, 1000);
     }
 
