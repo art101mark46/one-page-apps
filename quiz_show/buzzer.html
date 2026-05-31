@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Buzzer Studio Pro - 8 Player Edition</title>
+    <title>Buzzer Studio Pro</title>
     <style>
         body, html { 
             margin: 0; padding: 0; height: 100%; width: 100%; 
@@ -28,85 +28,95 @@
         #load-btn { background: #3498db; color: white; }
         #start-btn { background: #27ae60; color: white; font-weight: bold; display: none; }
         
-        /* Grid for 8 Player Configs */
+        /* Layout Grid for Player Assignments */
         .player-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 15px;
-            width: 100%;
-            max-width: 500px;
-            margin: 15px 0;
+            gap: 12px; width: 100%; max-width: 500px; margin: 15px 0;
         }
         .player-card {
-            background: #2b2b2b;
-            padding: 12px;
-            border-radius: 8px;
-            border-left: 5px solid #555;
+            background: #2b2b2b; padding: 12px; border-radius: 8px;
+            border-left: 5px solid #555; display: none;
         }
 
-        /* Spectator / Display Screen */
+        /* Mode 1 & 2: Split Screen Touch Layout */
+        #bg-wrapper {
+            display: none; flex-direction: column; position: absolute; z-index: 1;
+            align-items: center; justify-content: center;
+        }
+        .plate { width: 100%; display: flex; align-items: center; justify-content: center; transition: opacity 0.2s; touch-action: manipulation; }
+        #top-plate { background-color: #ff0000; }
+        #bottom-plate { background-color: #008000; }
+
+        /* Mode 3+: Spectator / Keyboard Layout */
         #stage {
-            display: none;
-            position: fixed; inset: 0;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 1;
-            transition: background-color 0.2s;
-            background-color: #111;
+            display: none; position: fixed; inset: 0; flex-direction: column;
+            align-items: center; justify-content: center; z-index: 1;
+            transition: background-color 0.1s; background-color: #111;
         }
 
-        .display-txt {
-            color: white; font-size: 5rem; font-weight: bold;
-            text-shadow: 2px 2px 10px rgba(0,0,0,0.8);
-            text-align: center;
-            user-select: none;
-            padding: 20px;
+        .label, .display-txt {
+            color: white; font-size: 3rem; font-weight: bold;
+            text-shadow: 2px 2px 6px rgba(0,0,0,0.6);
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            pointer-events: none; user-select: none; text-align: center;
         }
-        .sub-txt {
-            color: #888; font-size: 1.5rem; margin-top: 20px;
-        }
+        .display-txt { font-size: 5rem; text-shadow: 2px 2px 10px rgba(0,0,0,0.8); }
 
         /* Quit Button Styles */
         #quit-btn {
-            position: fixed;
-            bottom: 30px; right: 30px;
-            background: #222;
-            border: 3px solid white;
-            border-radius: 50%;
-            color: white;
-            font-weight: bold;
-            display: none;
-            align-items: center; justify-content: center;
-            cursor: pointer;
-            z-index: 150;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.8);
-            -webkit-tap-highlight-color: transparent;
-            width: 60px; height: 60px; font-size: 0.8rem;
+            position: fixed; background: #222; border: 3px solid white; border-radius: 50%;
+            color: white; font-weight: bold; display: none; align-items: center; justify-content: center;
+            cursor: pointer; z-index: 150; box-shadow: 0 4px 15px rgba(0,0,0,0.8);
+            -webkit-tap-highlight-color: transparent; transition: all 0.3s ease;
         }
+        #quit-btn.center-mode { top: 50%; left: 50%; transform: translate(-50%, -50%); width: 75px; height: 75px; font-size: 0.85rem; }
+        #quit-btn.corner-mode { top: 20px; right: 20px; width: 50px; height: 50px; font-size: 0.7rem; opacity: 0.6; }
+        #quit-btn.spec-mode { bottom: 30px; right: 30px; width: 60px; height: 60px; font-size: 0.8rem; }
     </style>
 </head>
 <body>
 
     <div id="setup">
-        <h1>Buzzer Studio (8-Player Keyboard Edition)</h1>
+        <h1>Buzzer Studio</h1>
         
+        <div class="row">
+            <label>Select Number of Players:</label>
+            <select id="player-count-select" onchange="updatePlayerCount()">
+                <option value="1">1 Player (Touch)</option>
+                <option value="2" selected>2 Players (Touch Split-Screen)</option>
+                <option value="3">3 Players (Keyboard Box)</option>
+                <option value="4">4 Players (Keyboard Box)</option>
+                <option value="5">5 Players (Keyboard Box)</option>
+                <option value="6">6 Players (Keyboard Box)</option>
+                <option value="7">7 Players (Keyboard Box)</option>
+                <option value="8">8 Players (Keyboard Box)</option>
+            </select>
+        </div>
+
         <div class="row">
             <button id="load-btn" onclick="document.getElementById('file-input').click()">📁 1. Load Sounds</button>
             <input type="file" id="file-input" accept="audio/*" multiple style="display:none">
         </div>
 
-        <div class="player-grid" id="config-grid">
-            </div>
+        <div class="player-grid" id="config-grid"></div>
 
         <div class="row">
             <button id="start-btn" onclick="startGame()">🚀 2. START GAME</button>
         </div>
     </div>
 
+    <div id="bg-wrapper">
+        <div id="top-plate" class="plate" onpointerdown="playTouch('top')">
+            <div id="txt1" class="label">PLAYER 1</div>
+        </div>
+        <div id="bottom-plate" class="plate" onpointerdown="playTouch('bottom')">
+            <div id="txt2" class="label">PLAYER 2</div>
+        </div>
+    </div>
+
     <div id="stage">
-        <div id="main-display" class="display-txt">READY TO BUZZ</div>
-        <div id="sub-display" class="sub-txt">Press any assigned key to lock in</div>
+        <div id="main-display" class="display-txt">READY</div>
     </div>
 
     <div id="quit-btn" onclick="confirmQuit()">QUIT</div>
@@ -114,43 +124,67 @@
     <script>
         const audioLibrary = {};
         let isLocked = false;
-        const totalPlayers = 8;
+        let playerCount = 2;
+        let lockoutTimer = null;
         
-        // Default unique key mappings for 8 players
         const defaultKeys = ['1', '2', '3', '4', '5', '6', '7', '8'];
-        const playerColors = [
-            '#e74c3c', '#3498db', '#2ecc71', '#f1c40f', 
-            '#9b59b6', '#e67e22', '#1abc9c', '#e84393'
-        ];
+        const playerColors = ['#e74c3c', '#008000', '#3498db', '#f1c40f', '#9b59b6', '#e67e22', '#1abc9c', '#e84393'];
+        const defaultNames = ['PLAYER 1', 'PLAYER 2', 'PLAYER 3', 'PLAYER 4', 'PLAYER 5', 'PLAYER 6', 'PLAYER 7', 'PLAYER 8'];
 
+        const bg = document.getElementById('bg-wrapper');
         const stage = document.getElementById('stage');
         const quit = document.getElementById('quit-btn');
+        const txt1 = document.getElementById('txt1');
+        const txt2 = document.getElementById('txt2');
+        const p1Plate = document.getElementById('top-plate');
+        const p2Plate = document.getElementById('bottom-plate');
         const mainDisplay = document.getElementById('main-display');
-        const subDisplay = document.getElementById('sub-display');
 
-        // Dynamically build the configuration UI for 8 players
+        // Build the 8-player structural grid behind the scenes
         const configGrid = document.getElementById('config-grid');
-        for (let i = 1; i <= totalPlayers; i++) {
+        for (let i = 1; i <= 8; i++) {
             const card = document.createElement('div');
             card.className = 'player-card';
+            card.id = `p-card-${i}`;
             card.style.borderLeftColor = playerColors[i-1];
             card.innerHTML = `
-                <strong style="color: ${playerColors[i-1]}">Player ${i}</strong>
+                <strong style="color: ${playerColors[i-1]}">Player ${i} Config</strong>
                 <div style="margin-top: 5px;">
-                    <label style="font-size:0.8rem; color:#aaa;">Trigger Key:</label>
+                    <label style="font-size:0.75rem; color:#aaa;">Name:</label>
+                    <input type="text" id="name-p${i}" value="${defaultNames[i-1]}">
+                </div>
+                <div style="margin-top: 5px;" class="key-assign-row">
+                    <label style="font-size:0.75rem; color:#aaa;">Trigger Key:</label>
                     <input type="text" id="key-p${i}" max-length="1" value="${defaultKeys[i-1]}" onfocus="captureNextKey(this)">
                 </div>
                 <div style="margin-top: 5px;">
-                    <label style="font-size:0.8rem; color:#aaa;">Sound:</label>
+                    <label style="font-size:0.75rem; color:#aaa;">Sound:</label>
                     <select id="sel-p${i}"></select>
                 </div>
             `;
             configGrid.appendChild(card);
         }
 
-        // Helper to easily bind key configuration by listening to a keystroke
+        function updatePlayerCount() {
+            playerCount = parseInt(document.getElementById('player-count-select').value);
+            
+            // Show/hide relevant settings cards based on selection count
+            for (let i = 1; i <= 8; i++) {
+                const card = document.getElementById(`p-card-${i}`);
+                const keyRow = card.querySelector('.key-assign-row');
+                
+                if (i <= playerCount) {
+                    card.style.display = 'block';
+                    // Hide individual key inputs if using mobile touch modes
+                    keyRow.style.display = (playerCount <= 2) ? 'none' : 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            }
+        }
+
         function captureNextKey(inputElement) {
-            inputElement.value = "Press any key...";
+            inputElement.value = "...";
             const listenForSingleKey = (e) => {
                 e.preventDefault();
                 inputElement.value = e.key.toUpperCase();
@@ -160,32 +194,23 @@
             window.addEventListener('keydown', listenForSingleKey);
         }
 
-        // Process uploaded audio files
         document.getElementById('file-input').addEventListener('change', (e) => {
-            // Clear existing options
-            for (let i = 1; i <= totalPlayers; i++) {
-                document.getElementById(`sel-p${i}`).innerHTML = '';
-            }
+            for (let i = 1; i <= 8; i++) document.getElementById(`sel-p${i}`).innerHTML = '';
 
             for (let file of e.target.files) {
                 if (file.type.includes('audio') || file.name.endsWith('.mp3')) {
                     const url = URL.createObjectURL(file);
                     audioLibrary[file.name] = url;
-                    
-                    // Add sound file to all 8 dropdowns
-                    for (let i = 1; i <= totalPlayers; i++) {
+                    for (let i = 1; i <= 8; i++) {
                         document.getElementById(`sel-p${i}`).add(new Option(file.name, file.name));
                     }
                 }
             }
 
             if (Object.keys(audioLibrary).length > 0) {
-                // Stagger default selections so players don't all have the exact same sound if multiple loaded
-                for (let i = 1; i <= totalPlayers; i++) {
+                for (let i = 1; i <= 8; i++) {
                     const select = document.getElementById(`sel-p${i}`);
-                    if (select.options.length > (i - 1)) {
-                        select.selectedIndex = i - 1;
-                    }
+                    if (select.options.length > (i - 1)) select.selectedIndex = i - 1;
                 }
                 document.getElementById('start-btn').style.display = 'block';
             }
@@ -193,67 +218,124 @@
 
         function startGame() {
             document.getElementById('setup').style.display = 'none';
-            stage.style.display = 'flex';
             quit.style.display = 'flex';
-            resetStage();
-            
-            // Start listening for keyboard game triggers
-            window.addEventListener('keydown', handleGameKeyPress);
+
+            // Apply manual naming tags to variables
+            txt1.innerText = document.getElementById('name-p1').value;
+            txt2.innerText = document.getElementById('name-p2').value;
+
+            if (playerCount <= 2) {
+                // RUN ORIGINAL MOBILE TOUCH ENVIRONMENT
+                bg.style.display = 'flex';
+                p2Plate.style.display = (playerCount === 2) ? 'flex' : 'none';
+                quit.className = (playerCount === 2) ? 'center-mode' : 'corner-mode';
+                updateRotation();
+                window.addEventListener('orientationchange', () => setTimeout(updateRotation, 250));
+                window.addEventListener('resize', updateRotation);
+            } else {
+                // RUN EXTERNAL HARDWARE SPECTATOR ENVIRONMENT
+                stage.style.display = 'flex';
+                quit.className = 'spec-mode';
+                resetSpectatorStage();
+                window.addEventListener('keydown', handleHardwareKeyPress);
+            }
         }
 
         function confirmQuit() {
-            if(confirm("Exit to menu?")) {
-                location.reload();
+            if(confirm("Exit to menu?")) location.reload();
+        }
+
+        /* --- MODE 1 & 2 TOUCH MECHANICS --- */
+        function playTouch(side) {
+            if (isLocked) return;
+            
+            const playerNum = side === 'top' ? 1 : 2;
+            const fileName = document.getElementById(`sel-p${playerNum}`).value;
+
+            if (audioLibrary[fileName]) {
+                isLocked = true;
+                const a = new Audio(audioLibrary[fileName]);
+                a.currentTime = 0;
+                a.play().catch(e => {});
+                
+                const plate = document.getElementById(side + '-plate');
+                plate.style.opacity = '0.4';
+                
+                // Automatic 2-second cooldown auto-reset
+                setTimeout(() => {
+                    isLocked = false;
+                    plate.style.opacity = '1';
+                }, 2000);
             }
         }
 
-        function resetStage() {
+        function updateRotation() {
+            if (bg.style.display === 'none') return;
+            const angle = window.orientation || 0;
+            const isLandscape = Math.abs(angle) === 90;
+            const viewW = window.innerWidth; const viewH = window.innerHeight;
+            const activeHeight = isLandscape ? viewW : viewH;
+
+            if (playerCount === 2) {
+                p1Plate.style.height = (activeHeight / 2) + 'px';
+                p2Plate.style.height = (activeHeight / 2) + 'px';
+            } else {
+                p1Plate.style.height = activeHeight + 'px';
+            }
+            
+            const wrapSize = Math.max(viewW, viewH) * 2;
+            bg.style.width = wrapSize + 'px'; bg.style.height = wrapSize + 'px';
+            bg.style.transform = `rotate(${-angle}deg)`;
+            txt1.style.transform = `rotate(${angle}deg)`;
+            txt2.style.transform = `rotate(${angle}deg)`;
+        }
+
+        /* --- MODE 3+ SPECTATOR MECHANICS --- */
+        function resetSpectatorStage() {
             isLocked = false;
             stage.style.backgroundColor = '#111';
-            mainDisplay.innerText = "READY TO BUZZ";
-            subDisplay.innerText = "Waiting for players...";
+            mainDisplay.innerText = "READY";
         }
 
-        // Central logic handling game inputs
-        function handleGameKeyPress(e) {
-            // If locked out, ignore inputs unless it's a reset action by the host/MC
-            if (isLocked) {
-                if (e.key === 'Escape' || e.key === ' ') { 
-                    resetStage(); 
-                }
-                return;
-            }
+        function handleHardwareKeyPress(e) {
+            if (isLocked) return; // Completely drop and ignore any subsequent physical clicks
 
             const pressedKey = e.key.toUpperCase();
 
-            // Check if the pressed key matches any registered player keys
-            for (let i = 1; i <= totalPlayers; i++) {
+            for (let i = 1; i <= playerCount; i++) {
                 const targetKey = document.getElementById(`key-p${i}`).value.toUpperCase();
-                
                 if (pressedKey === targetKey) {
-                    triggerBuzzer(i);
+                    triggerHardwareBuzzer(i);
                     break;
                 }
             }
         }
 
-        function triggerBuzzer(playerNum) {
+        function triggerHardwareBuzzer(playerNum) {
             isLocked = true;
             
-            // Visual indicators for who won the lockout
             const color = playerColors[playerNum - 1];
+            const name = document.getElementById(`name-p${playerNum}`).value;
+            
             stage.style.backgroundColor = color;
-            mainDisplay.innerText = `PLAYER ${playerNum}`;
-            subDisplay.innerText = "LOCKED OUT! (Press Spacebar or ESC to Reset)";
+            mainDisplay.innerText = name;
 
-            // Audio lookup & execution
             const fileName = document.getElementById(`sel-p${playerNum}`).value;
             if (audioLibrary[fileName]) {
                 const audio = new Audio(audioLibrary[fileName]);
                 audio.currentTime = 0;
-                audio.play().catch(err => console.log("Playback blocked or interrupted: ", err));
+                audio.play().catch(e => {});
             }
+
+            // Lockout lasts exactly 2 seconds before automatically clearing back to ready screen
+            clearTimeout(lockoutTimer);
+            lockoutTimer = setTimeout(() => {
+                resetSpectatorStage();
+            }, 2000);
         }
+
+        // Run default view setup parameters on boot
+        updatePlayerCount();
     </script>
 </body>
 </html>
