@@ -75,7 +75,7 @@
 </head>
 <body>
 
-    <h1>Battleships Pro: Spectator mode</h1>
+    <h1>Battleships Pro: Hidden Misses</h1>
     <div id="status-box" class="status">Initializing Tactical Network Layer...</div>
 
     <div id="game-modal" class="modal-overlay hidden">
@@ -353,7 +353,6 @@
             let elementsAdded = 0;
             const iAmSpectator = globalPlayers[myId] && globalPlayers[myId].lost;
 
-            // Gather potential items, sort them alphabetically by profile name
             let optionsPool = [];
             for (let pId in globalPlayers) {
                 if (pId === myId) continue;
@@ -385,7 +384,6 @@
             const picker = document.getElementById('enemy-target-picker');
             const currentSelection = picker.value;
 
-            // Only switch targeting tracking if current target is non-existent or now dead
             if (!currentSelection || (globalPlayers[currentSelection] && globalPlayers[currentSelection].lost)) {
                 let optionsPool = [];
                 for (let pId in globalPlayers) {
@@ -553,7 +551,7 @@
             rebuildTargetDropdown(); renderGrid('your-board', handleFleetDeploymentClick, false); renderSelectedOpponentGrid(); updateTurnHeader(); updateVisualDisplays();
         }
 
-        // --- PLAY CANVAS RENDERING ---
+        // --- PLAY CANVAS RENDERING WITH PRIVATE FOG OF WAR ---
         function renderSelectedOpponentGrid() {
             const targetId = document.getElementById('enemy-target-picker').value;
             if (!targetId) return;
@@ -564,14 +562,27 @@
             const iAmSpectator = globalPlayers[myId] && globalPlayers[myId].lost;
 
             oppCells.forEach((cell, i) => {
-                if (targetProfile.boardHits[i] === 1) cell.className = 'cell hit';
-                else if (targetProfile.boardHits[i] === 2) cell.className = 'cell miss';
-                else if (iAmSpectator && targetProfile.initialFleet && targetProfile.initialFleet[i] === 1) cell.className = 'cell spectator-ship';
+                const markerValue = targetProfile.boardHits[i];
+
+                if (markerValue === 1) {
+                    // Hits are perfectly public to all observers
+                    cell.className = 'cell hit';
+                } 
+                else if (markerValue === 2) {
+                    // Fog of War: Misses are only visible to the specific attacker or inside the full post-game analysis matrix
+                    const didIFireThisMiss = globalCombatStrikeLog.some(log => log.attacker === myId && log.target === targetId && log.coord === i && !log.hit);
+                    if (didIFireThisMiss) {
+                        cell.className = 'cell miss';
+                    }
+                }
+                else if (iAmSpectator && targetProfile.initialFleet && targetProfile.initialFleet[i] === 1) {
+                    cell.className = 'cell spectator-ship';
+                }
                 
-                if (iAmSpectator && targetProfile.initialFleet && targetProfile.initialFleet[i] === 1 && targetProfile.boardHits[i] === 1) {
+                if (iAmSpectator && targetProfile.initialFleet && targetProfile.initialFleet[i] === 1 && markerValue === 1) {
                     cell.className = 'cell spectator-ship hit';
                 }
-                if (targetProfile.finalFleetMap && targetProfile.finalFleetMap[i] === 1 && targetProfile.boardHits[i] === 0) {
+                if (targetProfile.finalFleetMap && targetProfile.finalFleetMap[i] === 1 && markerValue === 0) {
                     cell.className = 'cell revealed-ship';
                 }
             });
@@ -595,14 +606,12 @@
             const profile = globalPlayers[targetPlayerId];
             if (!profile) return;
             
-            // Resolve ship identification name matching the coordinates inside the profile mapping layer
             const targetShipName = profile.shipNamesMap ? profile.shipNamesMap[coord] : null;
             if (!targetShipName) {
                 showModal("SCAN INTELLIGENCE", `<p><strong>Location:</strong> [${Math.floor(coord/10)}, ${coord%10}]<br>No ship was placed at this coordinate by <strong>${profile.name}</strong>.</p>`);
                 return;
             }
 
-            // Cross reference structural history inside logs to extract hits specifically targeting this ship on this player
             let hitCount = 0;
             let attackersMap = {};
 
@@ -636,6 +645,8 @@
             renderSelectedOpponentGrid();
             document.querySelectorAll('#your-board .cell').forEach((cell, i) => {
                 if (!cell) return; cell.className = 'cell';
+                
+                // On your own board, you always see your own ships, hits sustained, and incoming misses
                 if (yourFleetLocations[i] === 1) cell.className = 'cell ship';
                 if (yourFleetLocations[i] === 2) cell.className = 'cell miss'; 
                 if (yourFleetLocations[i] === 3) cell.className = 'cell hit';  
@@ -666,7 +677,6 @@
             const targetId = document.getElementById('enemy-target-picker').value;
             if (!targetId) return;
 
-            // Redirect input structure if user has been scuttled into spectator mode
             if (globalPlayers[myId].lost) {
                 inspectTargetCoordinateAsSpectator(targetId, coord);
                 return;
@@ -706,7 +716,6 @@
                 broadcastPayloadNetworkMessage({ type: 'endgame-reveal', fleetLocations: yourFleetLocations, sender: myId });
                 document.getElementById('spectator-action-container').classList.remove('hidden');
                 
-                // Set up your display to allow localized vessel inspection clicks on your own board
                 renderGrid('your-board', (c) => inspectTargetCoordinateAsSpectator(myId, c), false);
                 updateVisualDisplays();
             }
@@ -720,10 +729,8 @@
                 }
             }
             
-            // Rebuild dropdown values to flag elements as eliminated
             rebuildTargetDropdown();
             
-            // If target was eliminated, automatically swing selectors alphabetically to next live player
             if (targetLostHandshake) {
                 triggerAlphabeticalTargetSwitch();
             } else {
