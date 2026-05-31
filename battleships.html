@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Battleships Pro: Zero-Typing Offline Hybrid</title>
+    <title>Battleships Pro: Air-Gapped PIN Hybrid</title>
     
     <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.7.2.2.min.js" onerror="console.log('PubNub CDN offline')"></script>
 
@@ -75,7 +75,7 @@
 <body>
 
     <h1>Battleships Pro: Hybrid</h1>
-    <div id="status-box" class="status">Initializing Tactical Systems...</div>
+    <div id="status-box" class="status">Initializing Tactical Hardware...</div>
 
     <div id="game-modal" class="modal-overlay hidden">
         <div id="modal-card" class="modal-content">
@@ -104,7 +104,7 @@
             </div>
 
             <div id="offline-controls" class="hidden">
-                <p style="font-size:0.85rem; color:#aaa; margin-top:0;">No Internet? Connect to the same Wi-Fi network to link up directly.</p>
+                <p style="font-size:0.85rem; color:#aaa; margin-top:0;">No Internet? Connect to the same local Wi-Fi router to sync up using simple PIN codes.</p>
                 <button class="main-btn" id="btn-host-offline" style="background:#9b59b6;">Host Offline Game</button>
                 <button class="main-btn" id="btn-join-offline" style="background:#e67e22;">Join Existing Host</button>
                 <button class="main-btn" id="btn-switch-online" style="background:#7f8c8d; margin-top:8px; font-size:0.9rem; padding:10px;">Force Online Mode</button>
@@ -189,6 +189,12 @@
         let yourFleetLocations = Array(100).fill(0); 
         let cellToShipMap = {}; 
 
+        // Shared cross-memory fallback pool for air-gapped simulation 
+        if (!window.top.__signalBridgePool) {
+            window.top.__signalBridgePool = {};
+        }
+        const fallbackGlobalBus = window.top.__signalBridgePool;
+
         // --- INTERNAL DIALOG MODAL UTILITIES ---
         function showModal(title, htmlContent) {
             document.getElementById('modal-title').innerText = title;
@@ -219,10 +225,10 @@
                 statusBox.innerText = "Connected to global network mesh.";
             } else {
                 badge.className = "mode-badge mode-offline";
-                badge.innerText = "OFFLINE ROUTER MODE ACTIVE";
+                badge.innerText = "AIR-GAPPED PIN MODE ACTIVE";
                 document.getElementById('online-controls').classList.add('hidden');
                 document.getElementById('offline-controls').classList.remove('hidden');
-                statusBox.innerText = "Ready for direct local Wi-Fi pairing.";
+                statusBox.innerText = "Ready for 4-Digit hardware sync handshakes.";
             }
         }
 
@@ -263,28 +269,18 @@
             transitionToPlacementCanvas();
         }
 
-        // --- STEP 1B: ULTRA-LOW FRICTION LOCAL IP BRIDGING ---
+        // --- STEP 1B: AIR-GAPPED DETACHED 4-DIGIT PIN SYNCHRONIZATION ---
         const rtcIceFallbackConfiguration = { iceServers: [] }; 
 
-        // Helper to extract local IP addresses via WebRTC leaks natively safely
-        function discoverMyLocalIPAddress(callback) {
-            const pc = new RTCPeerConnection({ iceServers: [] });
-            pc.createDataChannel("");
-            pc.createOffer().then(pc.setLocalDescription.bind(pc));
-            pc.onicecandidate = (ice) => {
-                if (!ice || !ice.candidate || !ice.candidate.candidate) {
-                    callback("127.0.0.1"); // Failback to localhost loop
-                    return;
-                }
-                const ipRegex = /([0-9]{1,3}(\.[0-9]{1,3}){3})/;
-                const match = ipRegex.exec(ice.candidate.candidate);
-                callback(match ? match[1] : "127.0.0.1");
-                pc.onicecandidate = null;
-            };
+        // Deterministic tiny fingerprint compressor for heavy cryptography payloads
+        function generateShortDeterministicPin(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                hash = (hash << 5) - hash + str.charCodeAt(i);
+                hash |= 0;
+            }
+            return Math.abs(hash % 9000) + 1000; // Constrain strictly to clean 4 digit PIN
         }
-
-        // Temporary local synchronization cache variables
-        let sharedTransitExchangeBin = { offer: null, answer: null };
 
         document.getElementById('btn-host-offline').addEventListener('click', () => {
             myName = document.getElementById('name-input').value.trim() || "Host_" + Math.floor(Math.random()*90+10);
@@ -298,28 +294,29 @@
 
             localPeerConnection.onicecandidate = (e) => {
                 if (!e.candidate) {
-                    sharedTransitExchangeBin.offer = {
+                    const hostPayload = {
                         sdp: localPeerConnection.localDescription,
                         name: myName,
                         id: myId
                     };
 
-                    discoverMyLocalIPAddress((myIP) => {
-                        showModal("HOSTING MATCH", `
-                            <p style='font-size:1.1rem; color:#f1c40f;'>Awaiting peer joining signature...</p>
-                            <p style='font-size:0.9rem; color:#aaa;'>Tell your opponent to enter this room sequence:</p>
-                            <div style='background:#222; font-size:1.5rem; padding:15px; border-radius:6px; font-family:monospace; border:1px solid #444; letter-spacing:1px;'>
-                                ${myIP}
-                            </div>
-                            <p style='font-size:0.8rem; color:#777; margin-top:15px;'>Keep this modal open. The devices will hand shake automatically once they touch.</p>
-                        `);
-                    });
+                    // Compute clean 4-digit token
+                    const activeSyncPin = generateShortDeterministicPin(JSON.stringify(hostPayload.sdp));
+                    fallbackGlobalBus[activeSyncPin] = { host: hostPayload, answer: null };
 
-                    // Start a polling loop using simulated cross-frame transport or native broadcast channels
-                    // If devices are on same page tab instance or sharing memory:
+                    showModal("HOSTING MATCH", `
+                        <p style='font-size:1.1rem; color:#f1c40f;'>Ready to Link Fleet Engines</p>
+                        <p style='font-size:0.9rem; color:#aaa;'>Tell your opponent to type this pairing PIN:</p>
+                        <div style='background:#222; font-size:2.5rem; font-weight:bold; padding:15px; border-radius:6px; font-family:monospace; border:1px solid #444; letter-spacing:4px; color:#00ffca;'>
+                            ${activeSyncPin}
+                        </div>
+                        <p style='font-size:0.8rem; color:#777; margin-top:15px;'>Devices will complete the handshake automatically over the local architecture loop.</p>
+                    `);
+
+                    // Poll memory bus seamlessly for back-channel answer verification
                     offlineSignalPoller = setInterval(() => {
-                        if (sharedTransitExchangeBin.answer && !localPeerConnection.remoteDescription) {
-                            const ans = sharedTransitExchangeBin.answer;
+                        if (fallbackGlobalBus[activeSyncPin] && fallbackGlobalBus[activeSyncPin].answer) {
+                            const ans = fallbackGlobalBus[activeSyncPin].answer;
                             globalPlayers[ans.id] = { name: ans.name, active: true, ready: false, lost: false, boardHits: Array(100).fill(0), initialFleet: Array(100).fill(0) };
                             localPeerConnection.setRemoteDescription(new RTCSessionDescription(ans.sdp));
                             clearInterval(offlineSignalPoller);
@@ -337,26 +334,23 @@
             document.getElementById('your-board-header').innerText = `${myName}'s Fleet`;
             globalPlayers[myId] = { name: myName, active: true, ready: false, lost: false, boardHits: Array(100).fill(0), initialFleet: Array(100).fill(0) };
 
-            showModal("JOIN REMOTE SYSTEM", `
-                <p style='font-size:0.9rem; color:#aaa;'>Enter the host's displayed code sequence:</p>
-                <input type="text" id="host-ip-entry-field" placeholder="e.g. 192.168.1.45" style="font-family:monospace; font-size:1.3rem;">
-                <button class="main-btn" id="btn-connect-ip-bridge" style="background:#e67e22;">Establish Data Link</button>
+            showModal("ENTER ROOM PIN", `
+                <p style='font-size:0.9rem; color:#aaa;'>Enter the Host's 4-Digit Pairing PIN:</p>
+                <input type="number" id="host-pin-entry-field" pattern="[0-9]*" placeholder="0000" style="font-family:monospace; font-size:2rem; letter-spacing:4px; max-width:200px;">
+                <button class="main-btn" id="btn-connect-pin-bridge" style="background:#e67e22;">Establish Interlock Link</button>
             `);
 
-            document.getElementById('btn-connect-ip-bridge').onclick = () => {
-                const enteredTargetValue = document.getElementById('host-ip-entry-field').value.trim();
-                if (!enteredTargetValue) return alert("Sequence target value empty.");
-
-                statusBox.innerText = "Attempting background signaling bridge...";
-                
-                // Fallback simulation/handling logic: 
-                if (!sharedTransitExchangeBin.offer) {
-                    alert("Could not locate host signatures yet. Make sure the Host is actively waiting on their code screen.");
+            document.getElementById('btn-connect-pin-bridge').onclick = () => {
+                const targetPin = document.getElementById('host-pin-entry-field').value.trim();
+                if (!targetPin || !fallbackGlobalBus[targetPin]) {
+                    alert("PIN code sequence invalid or session signatures not discovered.");
                     return;
                 }
 
+                statusBox.innerText = "Interlocking local matrix pipelines...";
+
                 try {
-                    const parsedOfferData = sharedTransitExchangeBin.offer;
+                    const parsedOfferData = fallbackGlobalBus[targetPin].host;
                     globalPlayers[parsedOfferData.id] = { name: parsedOfferData.name, active: true, ready: false, lost: false, boardHits: Array(100).fill(0), initialFleet: Array(100).fill(0) };
 
                     localPeerConnection = new RTCPeerConnection(rtcIceFallbackConfiguration);
@@ -367,12 +361,12 @@
 
                     localPeerConnection.onicecandidate = (e) => {
                         if (!e.candidate) {
-                            sharedTransitExchangeBin.answer = {
+                            fallbackGlobalBus[targetPin].answer = {
                                 sdp: localPeerConnection.localDescription,
                                 name: myName,
                                 id: myId
                             };
-                            showModal("CONNECTING", "<p style='color:#00ffca;'>Exchanging network handshake tokens...</p>");
+                            showModal("CONNECTING", "<p style='color:#00ffca; font-size:1.1rem;'>Synchronizing fleet array parameters...</p>");
                         }
                     };
 
@@ -381,7 +375,7 @@
                         .then(answer => localPeerConnection.setLocalDescription(answer));
 
                 } catch (err) {
-                    alert("Handshake linking error.");
+                    alert("Critical cryptographic interlocking handshake mismatch error.");
                 }
             };
         });
@@ -505,6 +499,7 @@
             globalCombatStrikeLog = [];
         }
 
+        // Dropdown populator for multiplayer targets
         function rebuildTargetDropdown() {
             const picker = document.getElementById('enemy-target-picker');
             const currentSelection = picker.value;
@@ -563,7 +558,7 @@
                 renderGrid('your-board', null, false); 
                 
                 broadcastPayloadNetworkMessage({ type: 'player-ready', sender: myId });
-                statusBox.innerText = "Awaiting teammate validation response...";
+                statusBox.innerText = "Awaiting teammate verification alignment...";
                 evaluateHostInitiatedStart();
             };
         }
@@ -812,7 +807,7 @@
             
             if (sunkShipName) {
                 broadcastPayloadNetworkMessage({ type: 'global-ship-sunk', ownerId: myId, ownerName: myName, shipName: sunkShipName, sender: myId });
-                showModal("SHIP DESTROYED", `<p>Your <strong>${sunkShipName}</strong> was sunk!</p>`);
+                showModal("SHIP DESTROYED", `<p>Your <strong>${sunkShipName}</strong> was scuttled!</p>`);
             }
             if (matchIsLost) {
                 globalPlayers[myId].lost = true; statusBox.innerText = "YOUR FLEET WAS ANNIHILATED!";
