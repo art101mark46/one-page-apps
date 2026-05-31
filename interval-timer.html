@@ -14,7 +14,7 @@
             height: 100vh;
             margin: 0;
             transition: background-color 0.2s ease;
-            overflow: hidden; /* Prevent body scroll, handle in container */
+            overflow: hidden; 
         }
 
         @keyframes pulse-red {
@@ -34,15 +34,15 @@
             width: 90%;
             max-width: 340px;
             max-height: 90vh;
-            overflow-y: auto; /* Allow scrolling inside the card */
-            -webkit-overflow-scrolling: touch; /* Smooth scroll on iOS */
+            overflow-y: auto; 
+            -webkit-overflow-scrolling: touch; 
         }
 
-        /* Fullscreen Button */
-        .btn-fullscreen {
+        /* Top Corner Buttons */
+        .btn-icon {
             position: absolute;
-            top: 5px; right: 5px; 
-            width: 44px; height: 44px; /* Larger touch target */
+            top: 5px; 
+            width: 44px; height: 44px; 
             padding: 0; margin: 0;
             background: transparent; color: #ccc; 
             font-size: 24px; line-height: 44px;
@@ -50,7 +50,9 @@
             -webkit-tap-highlight-color: transparent;
             z-index: 100;
         }
-        .btn-fullscreen:hover { color: #333; }
+        .btn-icon:hover { color: #333; }
+        .btn-fullscreen { right: 5px; }
+        .btn-mute { left: 5px; font-size: 20px; }
 
         /* Stack Styles */
         .exercise-stack {
@@ -97,13 +99,17 @@
 
         .stats-bar { border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px; font-size: 14px; color: #666; font-weight: bold; display: flex; justify-content: space-between; margin-top: 15px;}
         .stats-highlight { color: #007BFF; }
+        
+        .progress-bar-bg { width: 100%; height: 6px; background: #eee; border-radius: 3px; margin: 15px 0 5px 0; overflow: hidden; }
+        .progress-bar-fill { height: 100%; background: #28a745; width: 0%; transition: width 0.5s ease; }
+
         .input-group { margin-bottom: 15px; text-align: left; }
         label { display: block; margin-bottom: 5px; font-weight: bold; color: #333; }
         input, textarea { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #ddd; border-radius: 5px; font-size: 16px; font-family: inherit; }
         textarea { resize: vertical; height: 80px; }
         .hint { font-size: 12px; color: #777; margin-top: 2px; display: block; }
 
-        button { border: none; padding: 12px 20px; font-size: 16px; border-radius: 5px; cursor: pointer; width: 100%; margin-top: 10px; transition: background 0.2s; color: white; -webkit-tap-highlight-color: transparent; }
+        button.btn-block { border: none; padding: 12px 20px; font-size: 16px; border-radius: 5px; cursor: pointer; width: 100%; margin-top: 10px; transition: background 0.2s; color: white; -webkit-tap-highlight-color: transparent; }
         .btn-primary { background-color: #007BFF; } .btn-primary:hover { background-color: #0056b3; }
         .btn-danger { background-color: #dc3545; margin-top: 15px; } .btn-danger:hover { background-color: #a71d2a; }
         .btn-success { background-color: #28a745; font-weight: bold; font-size: 18px; padding: 15px; } .btn-success:hover { background-color: #218838; }
@@ -112,7 +118,7 @@
         .btn-control-row button { margin-top: 0; height: 50px; }
         .btn-main-action { background-color: #28a745; color: white; font-weight: bold; flex-basis: 65%; } .btn-main-action:hover { background-color: #218838; }
         .btn-color-pause { background-color: #ffc107; color: #333; flex-basis: 65%; } .btn-color-pause:hover { background-color: #e0a800; }
-        .btn-stop-small { background-color: #6c757d; flex-basis: 35%; }
+        .btn-stop-small { background-color: #6c757d; color: white; flex-basis: 35%; }
 
         #timer-screen { display: none; }
         .status-label { font-size: 24px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 5px; }
@@ -125,12 +131,13 @@
 <body>
 
     <div class="container">
-        <button class="btn-fullscreen" onclick="safeToggleFullScreen()" title="Full Screen">⤢</button>
+        <button class="btn-icon btn-mute" id="btn-mute" onclick="toggleMute()" title="Mute Sound">🔊</button>
+        <button class="btn-icon btn-fullscreen" onclick="safeToggleFullScreen()" title="Full Screen">⤢</button>
 
         <div id="setup-screen">
             <h2>Setup Workout</h2>
             <div class="input-group">
-                <label>Number of Intervals per Set</label>
+                <label>Number of Intervals</label>
                 <input type="number" id="numIntervals" value="5" min="1">
             </div>
             <div class="input-group">
@@ -146,7 +153,7 @@
                 <span class="hint">Separate with commas or new lines.</span>
                 <textarea id="exerciseNames" placeholder="Pushups, Situps, Squats..."></textarea>
             </div>
-            <button class="btn-primary" onclick="setupReadyScreen()">Start Workout</button>
+            <button class="btn-block btn-primary" onclick="setupReadyScreen()">Start Workout</button>
         </div>
 
         <div id="timer-screen">
@@ -166,43 +173,85 @@
                 <div class="timer-area">
                     <div id="status-label" class="status-label">Get Ready</div>
                     <div id="time-display" class="timer-display">00</div>
+                    <div class="progress-bar-bg">
+                        <div id="progress-fill" class="progress-bar-fill"></div>
+                    </div>
                     <div id="sets-display" class="sets-display">Interval 1 / 5</div>
                 </div>
             </div>
             
             <div id="active-controls" class="btn-control-row">
-                <button id="main-btn" class="btn-main-action" onclick="handleMainButton()">Start</button>
-                <button class="btn-stop-small" onclick="resetToMenu()">Stop</button>
+                <button id="main-btn" class="btn-block btn-main-action" onclick="handleMainButton()">Start</button>
+                <button class="btn-block btn-stop-small" onclick="resetToMenu()">Stop</button>
             </div>
 
             <div id="completion-options">
-                <button class="btn-success" onclick="setupReadyScreen()">Start Next Set</button>
-                <button class="btn-danger" onclick="resetToMenu()">New Workout</button>
+                <button class="btn-block btn-success" onclick="setupReadyScreen()">Start Next Set</button>
+                <button class="btn-block btn-danger" onclick="resetToMenu()">New Workout</button>
             </div>
         </div>
     </div>
 
     <script>
-        // --- SAFE AUDIO SYSTEM ---
+        // --- SETTINGS PERSISTENCE ---
+        function saveSettings() {
+            try {
+                localStorage.setItem('numIntervals', document.getElementById('numIntervals').value);
+                localStorage.setItem('workDuration', document.getElementById('workDuration').value);
+                localStorage.setItem('restDuration', document.getElementById('restDuration').value);
+                localStorage.setItem('exerciseNames', document.getElementById('exerciseNames').value);
+            } catch(e) {}
+        }
+
+        function loadSettings() {
+            try {
+                if(localStorage.getItem('numIntervals')) document.getElementById('numIntervals').value = localStorage.getItem('numIntervals');
+                if(localStorage.getItem('workDuration')) document.getElementById('workDuration').value = localStorage.getItem('workDuration');
+                if(localStorage.getItem('restDuration')) document.getElementById('restDuration').value = localStorage.getItem('restDuration');
+                if(localStorage.getItem('exerciseNames')) document.getElementById('exerciseNames').value = localStorage.getItem('exerciseNames');
+            } catch(e) {}
+        }
+        
+        // Load settings immediately
+        loadSettings();
+
+        // --- WAKE LOCK (KEEP SCREEN ON) ---
+        let wakeLock = null;
+        async function requestWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                }
+            } catch (err) { console.log("Wake Lock error:", err); }
+        }
+        async function releaseWakeLock() {
+            if (wakeLock !== null) {
+                await wakeLock.release();
+                wakeLock = null;
+            }
+        }
+
+        // --- AUDIO SYSTEM & MUTE ---
         let audioCtx = null;
+        let isMuted = false;
+
+        function toggleMute() {
+            isMuted = !isMuted;
+            document.getElementById('btn-mute').innerText = isMuted ? "🔇" : "🔊";
+        }
 
         function safeInitAudio() {
             try {
                 if (!audioCtx) {
                     const AudioContext = window.AudioContext || window.webkitAudioContext;
-                    if (AudioContext) {
-                        audioCtx = new AudioContext();
-                    }
+                    if (AudioContext) audioCtx = new AudioContext();
                 }
-                if (audioCtx && audioCtx.state === 'suspended') {
-                    audioCtx.resume();
-                }
-            } catch (e) {
-                console.log("Audio init failed, continuing without sound.");
-            }
+                if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+            } catch (e) { console.log("Audio init failed"); }
         }
 
         function playBeep(type) {
+            if (isMuted) return;
             try {
                 if (!audioCtx) return;
                 
@@ -218,17 +267,14 @@
                     osc.frequency.value = 600; gain.gain.value = 0.3; osc.type = 'triangle';
                     osc.start(); osc.stop(audioCtx.currentTime + 0.1); return; 
                 }
-                else { 
+                else { // Finish sound
                     osc.frequency.value = 500; gain.gain.value = vol; osc.type = 'square';
                     osc.start(); osc.stop(audioCtx.currentTime + 1.0); return; 
                 }
                 osc.start(); osc.stop(audioCtx.currentTime + 0.5);
-            } catch (e) {
-                console.log("Audio play failed");
-            }
+            } catch (e) {}
         }
 
-        // --- SAFE FULLSCREEN TOGGLE ---
         function safeToggleFullScreen() {
             try {
                 const doc = window.document;
@@ -239,9 +285,7 @@
 
                 if (!isFullScreen) { if(requestFullScreen) requestFullScreen.call(docEl); } 
                 else { if(cancelFullScreen) cancelFullScreen.call(doc); }
-            } catch(e) {
-                console.log("Fullscreen not supported");
-            }
+            } catch(e) {}
         }
 
         // --- APP LOGIC ---
@@ -270,19 +314,11 @@
         }
 
         function updateStack(animate = true) {
-            // FIXED LOGIC: Calculate buffer based on future state
             let valBuffer;
-            
-            // Note: We calculate the item that will appear at the bottom *next* time.
-            // If currently working (showing Work), next is Rest. After Rest comes Work+1.
-            // If currently resting (showing Rest), next is Work+1. After Work+1 comes Rest.
-            
             if (isWorking) {
-                // Current: Work. Next: Rest. Buffer: Work+1
                 if (currentInterval >= totalIntervals) valBuffer = ""; 
                 else valBuffer = exercises[currentInterval]; 
             } else {
-                // Current: Rest. Next: Work+1. Buffer: Rest (or Finish)
                 if (currentInterval + 1 >= totalIntervals && isWorking) valBuffer = "Finish Set";
                 else valBuffer = "REST";
             }
@@ -300,20 +336,16 @@
                 return;
             }
 
-            // 1. Shift positions visually
             assignClass(slotOrder[0], 'pos-hidden-top'); 
             assignClass(slotOrder[1], 'pos-prev');       
             assignClass(slotOrder[2], 'pos-curr');       
             assignClass(slotOrder[3], 'pos-next');       
 
-            // 2. Recycle item
             const recycledItem = slotOrder.shift(); 
             slotOrder.push(recycledItem); 
 
-            // 3. Update Text of recycled item (which is now hidden at bottom)
             document.getElementById(recycledItem).innerText = valBuffer;
 
-            // 4. Snap back to bottom position instantly
             setTimeout(() => {
                 const el = document.getElementById(recycledItem);
                 el.classList.add('no-transition');
@@ -329,7 +361,9 @@
         }
 
         function setupReadyScreen() {
-            safeInitAudio(); // Try to init, but don't block if fail
+            safeInitAudio(); 
+            requestWakeLock(); // Prevent sleep
+            saveSettings(); // Save user inputs
 
             totalIntervals = parseInt(document.getElementById('numIntervals').value) || 5;
             workTime = parseInt(document.getElementById('workDuration').value) || 30;
@@ -340,6 +374,7 @@
             document.getElementById('timer-screen').style.display = 'block';
             document.getElementById('completion-options').style.display = 'none';
             document.getElementById('active-controls').style.display = 'flex';
+            document.getElementById('progress-fill').style.width = '0%';
 
             currentInterval = 1;
             isWorking = true;
@@ -433,6 +468,9 @@
         function switchPhase() {
             document.body.classList.remove('pulsing');
 
+            // Update Progress Bar
+            let progressPct = (currentInterval / totalIntervals) * 100;
+
             if (isWorking) {
                 if (currentInterval === totalIntervals) { finishSet(); return; }
                 isWorking = false;
@@ -445,6 +483,8 @@
                 playBeep('rest');
                 updateStack(true); 
                 updateTimeDisplay();
+                // Show half-progress for rest
+                document.getElementById('progress-fill').style.width = `${progressPct - (50/totalIntervals)}%`;
             } else {
                 isWorking = true;
                 currentInterval++;
@@ -454,4 +494,49 @@
                 statusLabel.innerText = "WORK";
                 statusLabel.className = "status-label work-mode";
                 
-                document.getElementById('sets-display').innerText = `Interva
+                document.getElementById('sets-display').innerText = `Interval ${currentInterval} / ${totalIntervals}`;
+                playBeep('work');
+                updateStack(true); 
+                updateTimeDisplay();
+                document.getElementById('progress-fill').style.width = `${(currentInterval-1)/totalIntervals * 100}%`;
+            }
+        }
+
+        function updateTimeDisplay() {
+            let displayTime = currentTime < 10 ? "0" + currentTime : currentTime;
+            document.getElementById('time-display').innerText = displayTime;
+        }
+
+        function finishSet() {
+            clearInterval(timerInterval);
+            releaseWakeLock(); // Let phone sleep again
+            document.body.classList.remove('pulsing');
+            setsCompleted++;
+            document.getElementById('total-sets-count').innerText = setsCompleted;
+            document.getElementById('progress-fill').style.width = `100%`;
+
+            const statusLabel = document.getElementById('status-label');
+            statusLabel.innerText = "SET COMPLETE!";
+            statusLabel.className = "status-label finished-mode";
+            
+            document.getElementById(slotOrder[1]).innerText = "-"; 
+            document.getElementById(slotOrder[2]).innerText = "Good Job!"; 
+            document.getElementById(slotOrder[3]).innerText = "-"; 
+
+            document.getElementById('time-display').innerText = "00";
+            document.getElementById('active-controls').style.display = 'none';
+            document.getElementById('completion-options').style.display = 'block';
+            
+            playBeep('finish');
+        }
+
+        function resetToMenu() {
+            clearInterval(timerInterval);
+            releaseWakeLock(); // Let phone sleep
+            document.body.classList.remove('pulsing');
+            document.getElementById('timer-screen').style.display = 'none';
+            document.getElementById('setup-screen').style.display = 'block';
+        }
+    </script>
+</body>
+</html>
