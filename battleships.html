@@ -3,11 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Battleships Pro: Hybrid Tactical Engine</title>
+    <title>Battleships Pro: Zero-Dependency Hybrid</title>
     
-    <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.7.2.2.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.7.2.2.min.js" onerror="console.log('PubNub CDN offline; ignoring fallback.')"></script>
 
     <style>
         body { font-family: -apple-system, sans-serif; background: #121212; color: #fff; text-align: center; margin: 0; padding: 10px; box-sizing: border-box; }
@@ -29,7 +27,8 @@
         
         .setup-card { background: #1a1a1a; padding: 25px; border-radius: 12px; max-width: 360px; margin: 20px auto; border: 1px solid #333; text-align: left; }
         .setup-card label { font-size: 0.9rem; color: #aaa; font-weight: bold; display: block; margin-top: 12px; text-transform: uppercase; }
-        input, select { background: #333; color: #fff; border: 1px solid #555; padding: 14px; border-radius: 6px; font-size: 1.1rem; width: 100%; text-align: center; margin: 6px 0 18px 0; box-sizing: border-box; }
+        input, select, textarea { background: #333; color: #fff; border: 1px solid #555; padding: 14px; border-radius: 6px; font-size: 1.1rem; width: 100%; text-align: center; margin: 6px 0 18px 0; box-sizing: border-box; }
+        textarea { font-family: monospace; font-size: 0.8rem; height: 100px; text-align: left; resize: none; }
         
         .mode-badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; margin-bottom: 10px; }
         .mode-online { background: #2ecc71; color: #fff; }
@@ -66,21 +65,19 @@
         .stats-table { width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 15px; background: #111; border-radius: 6px; overflow: hidden; font-size: 0.85rem; }
         .stats-table th { background: #2c3e50; color: #fff; padding: 8px; font-weight: bold; text-align: left; }
         .stats-table td { padding: 8px; border-bottom: 1px solid #222; text-align: left; color: #ccc; }
-        .stats-highlight { color: #f1c40f; font-weight: bold; }
 
         .main-btn { background: #3498db; color: white; border: none; padding: 16px; border-radius: 6px; cursor: pointer; font-size: 1.1rem; font-weight: bold; width: 100%; box-sizing: border-box; margin-top: 10px; }
         .main-btn:disabled { background: #333; color: #666; cursor: not-allowed; border: 1px dashed #444; }
 
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; box-sizing: border-box; }
         .modal-content { background: #1a1a1a; border: 2px solid #3498db; border-radius: 12px; max-width: 440px; width: 100%; padding: 22px; box-sizing: border-box; text-align: center; box-shadow: 0 0 20px rgba(52, 152, 219, 0.4); max-height: 90vh; overflow-y: auto; }
-        .qr-box { background: white; padding: 10px; display: inline-block; margin: 10px auto; border-radius: 8px; }
-        #scanner-video { width: 100%; max-width: 300px; border-radius: 8px; background: #000; transform: scaleX(-1); }
+        .token-box { background: #111; padding: 10px; border-radius: 6px; border: 1px solid #444; margin: 10px 0; }
     </style>
 </head>
 <body>
 
     <h1>Battleships Pro: Hybrid</h1>
-    <div id="status-box" class="status">Detecting Network Vector...</div>
+    <div id="status-box" class="status">Initializing System Hardware...</div>
 
     <div id="game-modal" class="modal-overlay hidden">
         <div id="modal-card" class="modal-content">
@@ -92,7 +89,7 @@
 
     <div id="lobby-screen" class="hidden">
         <div class="setup-card" style="text-align: center;">
-            <div id="net-badge" class="mode-badge mode-online">ONLINE MODE AVAILABLE</div>
+            <div id="net-badge" class="mode-badge mode-online">ONLINE MODE DETECTED</div>
             
             <div style="text-align: left;">
                 <label for="name-input">Your Calling Name</label>
@@ -109,9 +106,9 @@
             </div>
 
             <div id="offline-controls" class="hidden">
-                <p style="font-size:0.85rem; color:#aaa; margin-top:0;">No Internet? Connect to the ship's local Wi-Fi and sync screens using camera handshakes.</p>
+                <p style="font-size:0.85rem; color:#aaa; margin-top:0;">No Internet? Connect to the ship's local Wi-Fi and pass structural handshake codes below.</p>
                 <button class="main-btn" id="btn-host-offline" style="background:#9b59b6;">Host Offline Game</button>
-                <button class="main-btn" id="btn-join-offline" style="background:#e67e22;">Scan Offline Host</button>
+                <button class="main-btn" id="btn-join-offline" style="background:#e67e22;">Join Existing Host</button>
                 <button class="main-btn" id="btn-switch-online" style="background:#7f8c8d; margin-top:8px; font-size:0.9rem; padding:10px;">Force Online Mode</button>
             </div>
         </div>
@@ -177,7 +174,7 @@
         let matchIsActive = false;
         let isNetworkOnline = true;
 
-        // Offline WebRTC Specific Architecture Variables
+        // Offline WebRTC Data Core 
         let localPeerConnection = null;
         let localDataChannel = null;
 
@@ -193,10 +190,19 @@
         let yourFleetLocations = Array(100).fill(0); 
         let cellToShipMap = {}; 
 
+        // --- INTERNAL DIALOG MODAL UTILITIES ---
+        function showModal(title, htmlContent) {
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-body').innerHTML = htmlContent;
+            document.getElementById('game-modal').classList.remove('hidden');
+        }
+        function closeModal() {
+            document.getElementById('game-modal').classList.add('hidden');
+        }
+
         // --- NETWORK AUTO-DETECTION ENGINE ---
         window.addEventListener('load', () => {
             isNetworkOnline = navigator.onLine;
-            // Guard clause: check if the PubNub class compiled successfully
             if (typeof PubNub === 'undefined') isNetworkOnline = false;
             
             toggleNetworkModeUILayout(isNetworkOnline);
@@ -216,12 +222,12 @@
                 badge.innerText = "CRUISE SHIP MODE ACTIVE (OFFLINE)";
                 document.getElementById('online-controls').classList.add('hidden');
                 document.getElementById('offline-controls').classList.remove('hidden');
-                statusBox.innerText = "Offline. Ready for peer-to-peer camera linking.";
+                statusBox.innerText = "Offline. Ready for local peer-to-peer data syncing.";
             }
         }
 
-        document.getElementById('btn-switch-offline').addEventListener('click', () => toggleNetworkModeUILayout(false));
-        document.getElementById('btn-switch-online').addEventListener('click', () => toggleNetworkModeUILayout(true));
+        document.getElementById('btn-switch-offline').addEventListener('click', () => { isNetworkOnline = false; toggleNetworkModeUILayout(false); });
+        document.getElementById('btn-switch-online').addEventListener('click', () => { isNetworkOnline = navigator.onLine; toggleNetworkModeUILayout(isNetworkOnline); });
 
         // --- GLOBAL OUTBOUND TRANSMISSION LAYER ---
         function broadcastPayloadNetworkMessage(msg) {
@@ -257,8 +263,8 @@
             transitionToPlacementCanvas();
         }
 
-        // --- STEP 1B: AIR-GAPPED OFFLINE WEBRTC CAMERA LINKING HANDSHAKES ---
-        const rtcIceFallbackConfiguration = { iceServers: [] }; // 100% offline local IP operation loop
+        // --- STEP 1B: AIR-GAPPED OFFLINE WEBRTC HANDSHAKES (NO INTERNET FILES REQUIRED) ---
+        const rtcIceFallbackConfiguration = { iceServers: [] }; 
 
         document.getElementById('btn-host-offline').addEventListener('click', () => {
             myName = document.getElementById('name-input').value.trim() || "Host_" + Math.floor(Math.random()*90+10);
@@ -272,13 +278,32 @@
             configureDataChannelListeners();
 
             localPeerConnection.onicecandidate = (e) => {
-                if (!e.candidate) { // Handshake generation payload complete
+                if (!e.candidate) { 
                     const offerPayloadString = btoa(JSON.stringify({
                         sdp: localPeerConnection.localDescription,
                         name: myName,
                         id: myId
                     }));
-                    displayConnectionQRCodeOverlay("Scan to Connect", offerPayloadString, "Waiting for your peer to scan this screen with their camera to join...");
+                    
+                    showModal("1. HOST CODE", `
+                        <p style='font-size:0.85rem; color:#aaa;'>Share this generated token with your opponent:</p>
+                        <textarea readonly onclick="this.select()">${offerPayloadString}</textarea>
+                        <p style='font-size:0.8rem; color:#f1c40f;'>Once they process it, paste their response code below:</p>
+                        <input type="text" id="answer-input-field" placeholder="Paste peer code here...">
+                        <button class="main-btn" id="btn-submit-answer" style="background:#27ae60;">Verify Connection</button>
+                    `);
+
+                    document.getElementById('btn-submit-answer').onclick = () => {
+                        const val = document.getElementById('answer-input-field').value.trim();
+                        if (!val) return alert("Code block empty.");
+                        try {
+                            const parsedAnswerData = JSON.parse(atob(val));
+                            globalPlayers[parsedAnswerData.id] = { name: parsedAnswerData.name, active: true, ready: false, lost: false, boardHits: Array(100).fill(0), initialFleet: Array(100).fill(0) };
+                            localPeerConnection.setRemoteDescription(new RTCSessionDescription(parsedAnswerData.sdp));
+                        } catch(err) {
+                            alert("Failed handshake sequence processing. Verify code entry.");
+                        }
+                    };
                 }
             };
 
@@ -291,10 +316,17 @@
             document.getElementById('your-board-header').innerText = `${myName}'s Fleet`;
             globalPlayers[myId] = { name: myName, active: true, ready: false, lost: false, boardHits: Array(100).fill(0), initialFleet: Array(100).fill(0) };
 
-            activateCameraQRScannerOverlay((scannedRawTextString) => {
+            showModal("2. JOIN SYSTEM", `
+                <p style='font-size:0.85rem; color:#aaa;'>Paste the Host's code block below:</p>
+                <input type="text" id="offer-input-field" placeholder="Paste host token code...">
+                <button class="main-btn" id="btn-process-offer" style="background:#e67e22;">Process Handshake</button>
+            `);
+
+            document.getElementById('btn-process-offer').onclick = () => {
+                const val = document.getElementById('offer-input-field').value.trim();
+                if (!val) return alert("No input detected.");
                 try {
-                    const parsedOfferData = JSON.parse(atob(scannedRawTextString));
-                    
+                    const parsedOfferData = JSON.parse(atob(val));
                     globalPlayers[parsedOfferData.id] = { name: parsedOfferData.name, active: true, ready: false, lost: false, boardHits: Array(100).fill(0), initialFleet: Array(100).fill(0) };
 
                     localPeerConnection = new RTCPeerConnection(rtcIceFallbackConfiguration);
@@ -311,7 +343,11 @@
                                 name: myName,
                                 id: myId
                             }));
-                            displayConnectionQRCodeOverlay("Show to Host", answerPayloadString, "Hold this code up to the Host's camera to complete the handshake loop.");
+                            showModal("3. COMBAT RESPONSE CODE", `
+                                <p style='font-size:0.85rem; color:#aaa;'>Now send this output string back to the Host machine:</p>
+                                <textarea readonly onclick="this.select()">${answerPayloadString}</textarea>
+                                <p style='font-size:0.8rem; color:#2ecc71;'>Awaiting Host confirmation over local terminal router...</p>
+                            `);
                         }
                     };
 
@@ -320,100 +356,20 @@
                         .then(answer => localPeerConnection.setLocalDescription(answer));
 
                 } catch (err) {
-                    alert("Invalid tactical handshake token scan. Try again.");
-                    closeModal();
+                    alert("Handshake error. Re-verify source token code.");
                 }
-            });
+            };
         });
 
         function configureDataChannelListeners() {
             localDataChannel.onopen = () => {
                 closeModal();
-                // Send identity info directly through the WebRTC pipeline
                 broadcastPayloadNetworkMessage({ type: 'sync-identity', name: myName, sender: myId });
                 transitionToPlacementCanvas();
             };
             localDataChannel.onmessage = (e) => {
                 handleInboundUnifiedMessage(JSON.parse(e.data));
             };
-        }
-
-        // --- NATIVE MODAL CAMERA SCANNERS & GENERATORS ---
-        function displayConnectionQRCodeOverlay(title, rawPayloadText, directions) {
-            let qrSvgElement = "<p style='color:red;'>QR Generator Blocked</p>";
-            if (typeof qrcode !== 'undefined') {
-                const qrGeneratorInstance = qrcode(0, 'M');
-                qrGeneratorInstance.addData(rawPayloadText);
-                qrGeneratorInstance.make();
-                qrSvgElement = qrGeneratorInstance.createImgTag(6);
-            } else {
-                qrSvgElement = `<textarea style="width:100%; height:120px; font-size:10px; background:#222; color:#fff; border:1px solid #555;">${rawPayloadText}</textarea>`;
-            }
-
-            const modalHtmlContent = `
-                <p style="font-size:0.9rem; color:#aaa; margin-top:0;">${directions}</p>
-                <div class="qr-box">${qrSvgElement}</div>
-                ${!isNetworkOnline && localPeerConnection.signalingState === "have-local-offer" ? 
-                `<button class="main-btn" id="btn-scan-back" style="background:#27ae60;">Scan Back Peer Code</button>` : ''}
-            `;
-            showModal(title, modalHtmlContent, "victory-theme");
-
-            const scanBackBtn = document.getElementById('btn-scan-back');
-            if (scanBackBtn) {
-                scanBackBtn.onclick = () => {
-                    activateCameraQRScannerOverlay((scannedAnswerText) => {
-                        const parsedAnswerData = JSON.parse(atob(scannedAnswerText));
-                        globalPlayers[parsedAnswerData.id] = { name: parsedAnswerData.name, active: true, ready: false, lost: false, boardHits: Array(100).fill(0), initialFleet: Array(100).fill(0) };
-                        localPeerConnection.setRemoteDescription(new RTCSessionDescription(parsedAnswerData.sdp));
-                    });
-                };
-            }
-        }
-
-        function activateCameraQRScannerOverlay(successCallback) {
-            showModal("ACTIVATE VIEWFINDER", `
-                <p>Grant camera permissions to link devices locally:</p>
-                <video id=\"scanner-video\" autoplay playsinline></video>
-                <canvas id=\"scanner-canvas\" class=\"hidden\"></canvas>
-            `, "sunk-theme");
-
-            const video = document.getElementById('scanner-video');
-            let videoStreamTrackerRef = null;
-
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }).then(stream => {
-                videoStreamTrackerRef = stream;
-                video.srcObject = stream;
-                video.setAttribute("playsinline", true);
-                video.play();
-                requestAnimationFrame(tickScannerLoopFrame);
-            }).catch(() => {
-                alert("Camera access denied or missing. Reverting configuration.");
-                closeModal();
-            });
-
-            function tickScannerLoopFrame() {
-                if (video.readyState === video.HAVE_ENOUGH_DATA && typeof jsQR !== 'undefined') {
-                    const canvas = document.getElementById('scanner-canvas');
-                    if (!canvas) return; 
-                    const ctx = canvas.getContext('2d');
-                    canvas.height = video.videoHeight;
-                    canvas.width = video.videoWidth;
-                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                    const code = jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts: "dontInvert" });
-                    
-                    if (code) {
-                        videoStreamTrackerRef.getTracks().forEach(track => track.stop());
-                        successCallback(code.data);
-                        return;
-                    }
-                }
-                if (document.getElementById('scanner-video')) {
-                    requestAnimationFrame(tickScannerLoopFrame);
-                } else if (videoStreamTrackerRef) {
-                    videoStreamTrackerRef.getTracks().forEach(track => track.stop());
-                }
-            }
         }
 
         function transitionToPlacementCanvas() {
@@ -446,7 +402,7 @@
             else if (data.type === 'room-locked-rejection') {
                 if (data.targetUser === myId && !matchIsActive) {
                     if(pubnub) pubnub.unsubscribe({ channels: [myChannel] });
-                    showModal("CHANNEL LOCKED", "<p>This match is currently in progress. Access denied.</p>", "sunk-theme");
+                    showModal("CHANNEL LOCKED", "<p>This match is currently in progress.</p>");
                     statusBox.innerText = "Error: Room Locked.";
                     document.getElementById('lobby-screen').classList.remove('hidden');
                     document.getElementById('deployment-dock').classList.add('hidden');
@@ -486,7 +442,7 @@
                 if (data.ownerId !== myId) {
                     statusBox.style.color = "#ff3838";
                     statusBox.innerText = `ALERT: ${data.ownerName}'s ${data.shipName} was completely SUNK!`;
-                    showModal("VESSEL SCUTTLED", `<p>Tactical Feed Update:</p><p><strong>${data.ownerName}</strong> has lost their <strong>${data.shipName}</strong>!</p>`, "sunk-theme");
+                    showModal("VESSEL SCUTTLED", `<p><strong>${data.ownerName}</strong> has lost their <strong>${data.shipName}</strong>!</p>`);
                 }
             }
             else if (data.type === 'pass-turn') {
@@ -602,6 +558,7 @@
             updateVisualDisplays(); verifyDeploymentCompletion(); selectShipForPlacement(idx);
         }
 
+        // Space and Bounds checking rules
         function checkPlacementValidity(startCoord, size, orientation) {
             let coords = []; let row = Math.floor(startCoord / 10); let col = startCoord % 10;
             for (let i = 0; i < size; i++) {
@@ -808,7 +765,7 @@
             let feedbackHtml = `<p>Vessel: <strong>${deducedShipName}</strong> (${totalHits}/${shipCoordinatedGroup.length} Hits)</p><table class="stats-table">`;
             for (let att in damageDealersMap) feedbackHtml += `<tr><td>${globalPlayers[att]?globalPlayers[att].name:"Player"}</td><td>+${damageDealersMap[att]} Pts</td></tr>`;
             feedbackHtml += `</table>`;
-            showModal("TACTICAL INTEL OVERLAY", feedbackHtml, "victory-theme");
+            showModal("TACTICAL INTEL OVERLAY", feedbackHtml);
         }
 
         function handleIncomingShot(coord) {
@@ -831,7 +788,7 @@
             
             if (sunkShipName) {
                 broadcastPayloadNetworkMessage({ type: 'global-ship-sunk', ownerId: myId, ownerName: myName, shipName: sunkShipName, sender: myId });
-                showModal("SHIP DESTROYED", `<p>Your <strong>${sunkShipName}</strong> was sunk!</p>`, "sunk-theme");
+                showModal("SHIP DESTROYED", `<p>Your <strong>${sunkShipName}</strong> was sunk!</p>`);
             }
             if (matchIsLost) {
                 globalPlayers[myId].lost = true; statusBox.innerText = "YOUR FLEET WAS ANNIHILATED!";
@@ -848,7 +805,7 @@
             updateVisualDisplays();
             if (attackerId === myId) {
                 if (isHit) statHitsLanded++;
-                if (!targetLostHandshake && sunkShipName) showModal("VEHICLE SUNK", `<p>You sunk ${globalPlayers[targetId].name}'s ${sunkShipName}!</p>`, "victory-theme");
+                if (!targetLostHandshake && sunkShipName) showModal("VEHICLE SUNK", `<p>You sunk ${globalPlayers[targetId].name}'s ${sunkShipName}!</p>`);
                 checkVictoryConditions();
             }
             if (targetId === myId) passTurnToNextPlayer();
@@ -886,12 +843,12 @@
             analyticsData.forEach(r => {
                 html += `<tr ${r.status==="VICTORIOUS"?"style='color:#2ecc71; font-weight:bold;'":''}><td>${r.name}</td><td>${r.status}</td><td>${r.shotsFired}</td><td>${r.accuracy}%</td></tr>`;
             });
-            showModal(`VICTORY: ${winnerName.toUpperCase()}`, html + "</table>", "victory-theme");
+            showModal(`VICTORY: ${winnerName.toUpperCase()}`, html + "</table>");
         }
 
         document.getElementById('btn-spec-stats').addEventListener('click', () => {
             const acc = statShotsFired > 0 ? Math.round((statHitsLanded / statShotsFired) * 100) : 0;
-            showModal("TACTICAL LOGS", `<p>Artillery Launched: ${statShotsFired}</p><p>Accuracy: ${acc}%</p>`, "victory-theme");
+            showModal("TACTICAL LOGS", `<p>Artillery Launched: ${statShotsFired}</p><p>Accuracy: ${acc}%</p>`);
         });
 
         // --- STEP 6: BRANCHING SYSTEM CLEANUP & RESETS ---
@@ -924,1052 +881,6 @@
             document.getElementById('game-screen').classList.add('hidden');
             document.getElementById('lobby-screen').classList.remove('hidden');
             toggleNetworkModeUILayout(navigator.onLine);
-        });
-    </script>
-</body>
-</html><!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Battleships Pro: Tactical Warzone</title>
-    
-    <!-- Stable PubNub SDK Container -->
-    <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.7.2.2.min.js"></script>
-
-    <style>
-        body { font-family: -apple-system, sans-serif; background: #121212; color: #fff; text-align: center; margin: 0; padding: 10px; box-sizing: border-box; }
-        .hidden { display: none !important; }
-        h1 { font-size: 1.5rem; margin: 8px 0; color: #f1c40f; }
-        
-        .status { 
-            background: #222; 
-            padding: 14px; 
-            border-radius: 8px; 
-            margin: 10px auto; 
-            font-weight: bold; 
-            color: #00ffca; 
-            max-width: 400px; 
-            box-sizing: border-box; 
-            border: 1px solid #333;
-            font-size: 1.05rem;
-        }
-        
-        .setup-card { background: #1a1a1a; padding: 25px; border-radius: 12px; max-width: 360px; margin: 20px auto; border: 1px solid #333; text-align: left; }
-        .setup-card label { font-size: 0.9rem; color: #aaa; font-weight: bold; display: block; margin-top: 12px; text-transform: uppercase; }
-        input, select { background: #333; color: #fff; border: 1px solid #555; padding: 14px; border-radius: 6px; font-size: 1.1rem; width: 100%; text-align: center; margin: 6px 0 18px 0; box-sizing: border-box; }
-        select { text-align-last: center; cursor: pointer; }
-        
-        .dock { background: #1a1a1a; padding: 12px; border-radius: 8px; max-width: 400px; margin: 10px auto; text-align: left; box-sizing: border-box; border: 1px solid #333; }
-        .dock h4 { margin: 0 0 4px 0; text-align: center; font-size: 0.95rem; letter-spacing: 1px; color: #aaa; }
-        .dock p { margin: 0 0 10px 0; text-align: center; font-size: 0.8rem; color: #777; }
-        .ship-btn { background: #2c3e50; color: #fff; padding: 8px 12px; margin: 4px; border-radius: 4px; font-size: 0.85rem; border: 1px solid #455a64; display: inline-block; cursor: pointer; }
-        .ship-btn.selected { background: #e67e22; border-color: #d35400; }
-        .ship-btn.placed { background: #27ae60; border-color: #2196f3; opacity: 0.5; }
-        
-        .controls { display: flex; justify-content: space-between; max-width: 400px; margin: 8px auto; gap: 8px; }
-        .sub-btn { background: #7f8c8d; padding: 12px; font-size: 0.9rem; flex: 1; border-radius: 4px; border: none; color: white; font-weight: bold; cursor: pointer; }
-
-        .grid-container { display: flex; flex-direction: column; align-items: center; gap: 15px; margin-top: 10px; width: 100%; }
-        .board-wrapper { width: 100%; max-width: 400px; }
-        .board-title { font-size: 0.95rem; color: #aaa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; font-weight: bold; }
-        .grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; width: 100%; aspect-ratio: 1; margin: 0 auto; box-sizing: border-box; background: #151515; padding: 4px; border-radius: 6px; }
-        
-        .cell { background: #262626; aspect-ratio: 1; border-radius: 3px; border: 1px solid #111; position: relative; cursor: pointer; }
-        .cell.ship { background: #555; border: 1px solid #777; }
-        .cell.hit { background: #ff3838; }
-        .cell.miss { background: #3867ff; }
-        .cell.revealed-ship { background: #d35400; border: 1px solid #e67e22; opacity: 0.85; } 
-        .cell.spectator-ship { background: #1b5e20; border: 1px solid #2e7d32; opacity: 0.7; } 
-        .cell.spectator-ship.cell.hit { background: #ff3838; border-color: #e74c3c; }
-        
-        .cell.preview-valid { background: #9b59b6 !important; border: 1px solid #e040fb; opacity: 0.9; }
-        .cell.preview-invalid { background: #c0392b !important; border: 1px solid #ff0000; opacity: 0.6; }
-        
-        .cell.hit::after { content: '×'; color: #fff; font-size: 18px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-weight: bold; }
-        .cell.revealed-ship::after { content: '▰'; color: #fff; font-size: 12px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
-        .cell.spectator-ship::after { content: '▰'; color: #81c784; font-size: 10px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
-        
-        .stats-table { width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 15px; background: #111; border-radius: 6px; overflow: hidden; font-size: 0.85rem; }
-        .stats-table th { background: #2c3e50; color: #fff; padding: 8px; font-weight: bold; text-align: left; }
-        .stats-table td { padding: 8px; border-bottom: 1px solid #222; text-align: left; color: #ccc; }
-        .stats-highlight { color: #f1c40f; font-weight: bold; }
-
-        .main-btn { background: #3498db; color: white; border: none; padding: 16px; border-radius: 6px; cursor: pointer; font-size: 1.1rem; font-weight: bold; width: 100%; box-sizing: border-box; margin-top: 10px; }
-        .main-btn:disabled { background: #333; color: #666; cursor: not-allowed; border: 1px dashed #444; }
-
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; box-sizing: border-box; }
-        .modal-content { background: #1a1a1a; border: 2px solid #3498db; border-radius: 12px; max-width: 440px; width: 100%; padding: 22px; box-sizing: border-box; text-align: center; box-shadow: 0 0 20px rgba(52, 152, 219, 0.4); max-height: 90vh; overflow-y: auto; }
-        .modal-content.sunk-theme { border-color: #e74c3c; box-shadow: 0 0 20px rgba(231, 76, 60, 0.4); }
-        .modal-content.victory-theme { border-color: #2ecc71; box-shadow: 0 0 20px rgba(46, 204, 113, 0.4); }
-        .modal-content h3 { margin-top: 0; font-size: 1.4rem; color: #fff; }
-        .modal-content p { color: #ccc; line-height: 1.4; margin: 12px 0; }
-    </style>
-</head>
-<body>
-
-    <h1>Battleships Pro (Multiplayer) - Monster Kill</h1>
-    <div id="status-box" class="status">Initializing System...</div>
-
-    <!-- GLOBAL TACTICAL DIALOG MODAL -->
-    <div id="game-modal" class="modal-overlay hidden">
-        <div id="modal-card" class="modal-content">
-            <h3 id="modal-title">Alert</h3>
-            <div id="modal-body">Message contents...</div>
-            <button class="main-btn" style="margin-top:15px; padding:12px;" onclick="closeModal()">Acknowledge</button>
-        </div>
-    </div>
-
-    <!-- 1. ENTRY LOBBY MATCHMAKER -->
-    <div id="lobby-screen" class="hidden">
-        <div class="setup-card">
-            <h3 style="margin-top:0; text-align:center; color:#f1c40f;">Strategic Operations</h3>
-            
-            <label for="name-input">Your Calling Name</label>
-            <input type="text" id="name-input" placeholder="e.g. Captain_James" maxlength="12">
-            
-            <label for="room-input">Tactical Channel Code</label>
-            <input type="number" id="room-input" pattern="[0-9]*" placeholder="e.g. 9988">
-            
-            <button class="main-btn" id="btn-start">Verify Channel & Join Room</button>
-        </div>
-    </div>
-
-    <!-- 2. FLEET PLACEMENT ENGINE DOCK -->
-    <div id="deployment-dock" class="hidden">
-        <div class="dock">
-            <h4>FLEET MANAGEMENT DOCK</h4>
-            <p>Click a dock button to place, or tap a ship on your grid to reposition it.</p>
-            <div id="ship-buttons-container"></div>
-        </div>
-        <div class="controls">
-            <button class="sub-btn" id="btn-dir" style="background:#8e44ad;">Direction: HORIZONTAL</button>
-            <button class="sub-btn" id="btn-auto" style="background: #27ae60;">Auto Place</button>
-        </div>
-        <div style="max-width: 400px; margin: 10px auto;">
-            <button class="main-btn" id="btn-commence" disabled>Await Deployment Completion</button>
-        </div>
-    </div>
-
-    <!-- 3. REAL-TIME GAMEPLAY MAP INSTANCE -->
-    <div id="game-screen" class="hidden">
-        <!-- Target Selection Panel -->
-        <div style="width: 100%; max-width: 400px; margin: 0 auto 5px auto;" id="target-selector-container" class="hidden">
-            <label style="font-size: 0.8rem; font-weight: bold; color: #aaa; display: block; text-align: left; margin-bottom: 4px; text-transform: uppercase;">Select System Target:</label>
-            <select id="enemy-target-picker"></select>
-        </div>
-
-        <div class="grid-container">
-            <!-- Upper Grid: Target Attack Board -->
-            <div class="board-wrapper hidden" id="opponent-container">
-                <div class="board-title" id="attack-header">Select Target Above</div>
-                <div id="opponent-board" class="grid"></div>
-            </div>
-            
-            <hr id="board-divider" class="hidden" style="width: 100%; max-width: 400px; border: 0; border-top: 1px solid #222; margin: 5px 0;">
-            
-            <!-- Lower Grid: Home Fleet Board -->
-            <div class="board-wrapper hidden" id="your-container">
-                <div class="board-title" id="your-board-header">Your Fleet Map</div>
-                <div id="your-board" class="grid"></div>
-            </div>
-
-            <!-- In-Game Intermediary Spectator Panel (Locks Exit Options) -->
-            <div class="board-wrapper hidden" id="spectator-action-container">
-                <button class="main-btn" style="background: #34495e; margin-bottom: 8px;" id="btn-spec-stats">Review Combat Metrics</button>
-            </div>
-
-            <!-- Branching Post-Match Option Matrix -->
-            <div class="board-wrapper hidden" id="game-over-container">
-                <div style="background:#1a1a1a; padding:15px; border-radius:8px; border:1px solid #333; margin-bottom:10px;">
-                    <h4 style="margin:0 0 10px 0; color:#f1c40f;">MATCH COMPLETED</h4>
-                    <button class="main-btn" style="background: #2ecc71; margin-bottom: 10px; margin-top:0;" id="btn-play-again">Play Again (Same Room)</button>
-                    <button class="main-btn" style="background: #e67e22; margin-top:0;" id="btn-exit-lobby">Exit to Main Lobby</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        const statusBox = document.getElementById('status-box');
-        let pubnub, myChannel, myName;
-        let myId = "user_" + Math.random().toString(36).substring(2, 7);
-        
-        let globalPlayers = {}; 
-        let activeTurnOrder = []; 
-        let currentTurnUserId = null;
-        let iamReady = false;
-        let matchIsActive = false;
-
-        // Metrics Ledger
-        let statShotsFired = 0;
-        let statHitsLanded = 0;
-        let statIncomingShotsByPlayer = {}; 
-        
-        // Dynamic Room-Wide Combat Log Tracker for Spectator Analytics
-        let globalCombatStrikeLog = [];
-
-        const shipTypesArr = [
-            { name: "Aircraft Carrier", size: 5 },
-            { name: "Battleship", size: 4 },
-            { name: "Cruiser", size: 3 },
-            { name: "Submarine", size: 3 },
-            { name: "Destroyer", size: 2 }
-        ];
-        let shipTypes = [];
-
-        let currentSelectedShipIndex = null;
-        let placementOrientation = "H"; 
-
-        let yourFleetLocations = Array(100).fill(0); 
-        let cellToShipMap = {}; 
-
-        pubnub = new PubNub({ publishKey: 'demo', subscribeKey: 'demo', userId: myId });
-        
-        window.addEventListener('load', () => {
-            statusBox.innerText = "System Ready.";
-            document.getElementById('lobby-screen').classList.remove('hidden');
-        });
-
-        function showModal(title, bodyHtml, themeStyle) {
-            document.getElementById('modal-title').innerText = title;
-            document.getElementById('modal-body').innerHTML = bodyHtml;
-            document.getElementById('modal-card').className = "modal-content " + (themeStyle || "");
-            document.getElementById('game-modal').classList.remove('hidden');
-        }
-
-        document.getElementById('game-modal').addEventListener('click', (e) => {
-            if (e.target.id === 'game-modal') closeModal();
-        });
-        function closeModal() { document.getElementById('game-modal').classList.add('hidden'); }
-
-        // --- STEP 1: MESH NETWORKING REGISTRY ---
-        document.getElementById('btn-start').addEventListener('click', () => {
-            myName = document.getElementById('name-input').value.trim() || "User_" + Math.floor(Math.random()*90+10);
-            const roomCode = document.getElementById('room-input').value.trim();
-            if (!roomCode) return alert("A channel code is required.");
-            
-            myChannel = 'bbship_v6_room_' + roomCode;
-            setupChannelSubscription();
-        });
-
-        function setupChannelSubscription() {
-            document.getElementById('your-board-header').innerText = `${myName}'s Fleet`;
-            globalPlayers[myId] = { name: myName, active: true, ready: false, lost: false, boardHits: Array(100).fill(0), initialFleet: Array(100).fill(0) };
-
-            pubnub.addListener({
-                message: function(event) {
-                    const data = event.message;
-                    
-                    if (data.type === 'sync-identity') {
-                        if (matchIsActive) {
-                            pubnub.publish({ channel: myChannel, message: { type: 'room-locked-rejection', targetUser: data.sender } });
-                            return;
-                        }
-                        if (!globalPlayers[data.sender]) {
-                            globalPlayers[data.sender] = { name: data.name, active: true, ready: false, lost: false, boardHits: Array(100).fill(0), initialFleet: Array(100).fill(0) };
-                            rebuildTargetDropdown();
-                        }
-                        if (data.sender !== myId) {
-                            pubnub.publish({ channel: myChannel, message: { type: 'ack-identity', name: myName, sender: myId } });
-                        }
-                    }
-                    else if (data.type === 'room-locked-rejection') {
-                        if (data.targetUser === myId && !matchIsActive) {
-                            pubnub.unsubscribe({ channels: [myChannel] });
-                            showModal("CHANNEL LOCKED", "<p>This strategic encounter is currently in progress. Access denied to protect sync metrics.</p>", "sunk-theme");
-                            statusBox.innerText = "Error: Room Locked.";
-                            document.getElementById('lobby-screen').classList.remove('hidden');
-                            document.getElementById('deployment-dock').classList.add('hidden');
-                            document.getElementById('game-screen').classList.add('hidden');
-                        }
-                    }
-                    else if (data.type === 'ack-identity') {
-                        if (!matchIsActive && !globalPlayers[data.sender]) {
-                            globalPlayers[data.sender] = { name: data.name, active: true, ready: false, lost: false, boardHits: Array(100).fill(0), initialFleet: Array(100).fill(0) };
-                            rebuildTargetDropdown();
-                        }
-                    }
-                    else if (data.type === 'player-ready') {
-                        if (globalPlayers[data.sender]) globalPlayers[data.sender].ready = true;
-                        evaluateHostInitiatedStart();
-                    }
-                    else if (data.type === 'start-match') {
-                        executeGlobalMatchActivation(data.order);
-                        pubnub.publish({ channel: myChannel, message: { type: 'ghost-sync-payload', mapBlueprint: yourFleetLocations, sender: myId } });
-                    }
-                    else if (data.type === 'ghost-sync-payload') {
-                        if (globalPlayers[data.sender]) {
-                            globalPlayers[data.sender].initialFleet = [...data.mapBlueprint];
-                        }
-                    }
-                    else if (data.type === 'shot') {
-                        if (data.targetId === myId) {
-                            statIncomingShotsByPlayer[data.sender] = (statIncomingShotsByPlayer[data.sender] || 0) + 1;
-                            handleIncomingShot(data.coord);
-                        }
-                    } 
-                    else if (data.type === 'result') {
-                        // Append to global combat log matrix for tactical spectator mapping
-                        globalCombatStrikeLog.push({
-                            attacker: data.attackerId,
-                            target: data.targetId,
-                            coord: data.coord,
-                            hit: data.isHit
-                        });
-                        handleShotFeedback(data.attackerId, data.targetId, data.coord, data.isHit, data.sunkShipName, data.matchIsLost);
-                    }
-                    else if (data.type === 'global-ship-sunk') {
-                        if (data.ownerId !== myId) {
-                            statusBox.style.color = "#ff3838";
-                            statusBox.innerText = `ALERT: ${data.ownerName}'s ${data.shipName} was completely SUNK!`;
-                            showModal("VESSEL SCUTTLED", `<p>Tactical Feed Update:</p><p><strong>${data.ownerName}</strong> has lost their <strong>${data.shipName}</strong>!</p>`, "sunk-theme");
-                        }
-                    }
-                    else if (data.type === 'pass-turn') {
-                        currentTurnUserId = data.nextUserId;
-                        updateTurnHeader();
-                    }
-                    else if (data.type === 'endgame-reveal') {
-                        if (globalPlayers[data.sender]) {
-                            globalPlayers[data.sender].finalFleetMap = data.fleetLocations;
-                        }
-                        if (document.getElementById('enemy-target-picker').value === data.sender) {
-                            renderSelectedOpponentGrid();
-                        }
-                    }
-                    else if (data.type === 'broadcast-global-match-over') {
-                        handleGlobalMatchOverBroadcast(data.winnerName, data.finalMetricsMatrix);
-                    }
-                    else if (data.type === 'signal-room-rematch') {
-                        if (globalPlayers[data.sender]) {
-                            globalPlayers[data.sender].ready = false;
-                            globalPlayers[data.sender].lost = false;
-                            globalPlayers[data.sender].boardHits = Array(100).fill(0);
-                            globalPlayers[data.sender].initialFleet = Array(100).fill(0);
-                            delete globalPlayers[data.sender].finalFleetMap;
-                        }
-                        rebuildTargetDropdown();
-                    }
-                }
-            });
-            pubnub.subscribe({ channels: [myChannel] });
-            pubnub.publish({ channel: myChannel, message: { type: 'sync-identity', name: myName, sender: myId } });
-
-            document.getElementById('lobby-screen').classList.add('hidden');
-            document.getElementById('deployment-dock').classList.remove('hidden');
-            document.getElementById('game-screen').classList.remove('hidden');
-            document.getElementById('your-container').classList.remove('hidden');
-            statusBox.innerText = "Position vessels on your grid.";
-            
-            initFleetStructures();
-            buildDeploymentDock();
-            renderGrid('your-board', handleFleetDeploymentClick, true);
-        }
-
-        function initFleetStructures() {
-            shipTypes = JSON.parse(JSON.stringify(shipTypesArr));
-            shipTypes.forEach(s => { s.placed = false; s.hitsLogged = 0; s.coordinatedCoords = []; });
-            yourFleetLocations.fill(0);
-            cellToShipMap = {};
-            statShotsFired = 0;
-            statHitsLanded = 0;
-            statIncomingShotsByPlayer = {};
-            globalCombatStrikeLog = [];
-        }
-
-        function rebuildTargetDropdown() {
-    const picker = document.getElementById('enemy-target-picker');
-    const currentSelection = picker.value;
-    picker.innerHTML = '';
-    
-    let elementsAdded = 0;
-    const iAmSpectator = globalPlayers[myId] && globalPlayers[myId].lost;
-
-    for (let pId in globalPlayers) {
-        if (pId === myId) continue; 
-        
-        // CRITICAL UPDATE: If you are an active player, don't show eliminated targets.
-        // If you are a spectator, you get to see all players to monitor their maps.
-        if (!iAmSpectator && globalPlayers[pId].lost) continue;
-
-        const opt = document.createElement('option');
-        opt.value = pId;
-        opt.innerText = globalPlayers[pId].name + (globalPlayers[pId].lost ? " (ELIMINATED)" : "");
-        picker.appendChild(opt);
-        elementsAdded++;
-    }
-    
-    // Auto-fallback if your previously selected target was just removed
-    if (currentSelection && picker.querySelector(`option[value="${currentSelection}"]`)) {
-        picker.value = currentSelection;
-    } else if (picker.options.length > 0) {
-        picker.selectedIndex = 0;
-    }
-    
-    if (elementsAdded > 0) {
-        document.getElementById('target-selector-container').classList.remove('hidden');
-    } else {
-        document.getElementById('target-selector-container').classList.add('hidden');
-    }
-}
-
-        document.getElementById('enemy-target-picker').addEventListener('change', renderSelectedOpponentGrid);
-
-        // --- STEP 2: FLEET PREPARATION ---
-        function buildDeploymentDock() {
-            const container = document.getElementById('ship-buttons-container');
-            container.innerHTML = '';
-            shipTypes.forEach((ship, idx) => {
-                const btn = document.createElement('div');
-                btn.className = 'ship-btn' + (ship.placed ? ' placed' : '');
-                btn.id = `ship-btn-${idx}`;
-                btn.innerText = `${ship.name} (${ship.size})`;
-                btn.addEventListener('click', () => {
-                    if (ship.placed) pickupAndMoveShip(idx);
-                    else selectShipForPlacement(idx);
-                });
-                container.appendChild(btn);
-            });
-
-            document.getElementById('btn-dir').onclick = (e) => {
-                placementOrientation = placementOrientation === "H" ? "V" : "H";
-                e.target.innerText = `Direction: ${placementOrientation === "H" ? "HORIZONTAL" : "VERTICAL"}`;
-            };
-            document.getElementById('btn-auto').onclick = autoDeployAllShips;
-            
-            document.getElementById('btn-commence').onclick = () => {
-                iamReady = true;
-                globalPlayers[myId].ready = true;
-                document.getElementById('deployment-dock').classList.add('hidden');
-                renderGrid('your-board', null, false); 
-                
-                pubnub.publish({ channel: myChannel, message: { type: 'player-ready', sender: myId } });
-                statusBox.innerText = "Awaiting other battle fleets...";
-                evaluateHostInitiatedStart();
-            };
-        }
-
-        function selectShipForPlacement(idx) {
-            if (shipTypes[idx].placed) return;
-            currentSelectedShipIndex = idx;
-            document.querySelectorAll('.ship-btn').forEach(b => b.classList.remove('selected'));
-            document.getElementById(`ship-btn-${idx}`).classList.add('selected');
-        }
-
-        function pickupAndMoveShip(idx) {
-            const ship = shipTypes[idx];
-            if (!ship.placed) return;
-
-            ship.coordinatedCoords.forEach(c => {
-                yourFleetLocations[c] = 0;
-                delete cellToShipMap[c];
-            });
-            ship.placed = false;
-            ship.coordinatedCoords = [];
-
-            updateVisualDisplays();
-            verifyDeploymentCompletion();
-            selectShipForPlacement(idx);
-        }
-
-        function checkPlacementValidity(startCoord, size, orientation) {
-            let coords = [];
-            let row = Math.floor(startCoord / 10);
-            let col = startCoord % 10;
-            for (let i = 0; i < size; i++) {
-                let currentCoord = orientation === "H" ? startCoord + i : startCoord + (i * 10);
-                if (currentCoord < 0 || currentCoord >= 100) return false; 
-                if (orientation === "H" && Math.floor(currentCoord / 10) !== row) return false; 
-                if (orientation === "V" && (currentCoord % 10) !== col) return false; 
-                if (yourFleetLocations[currentCoord] !== 0) return false; 
-                coords.push(currentCoord);
-            }
-            return coords;
-        }
-
-        function handleHoverFeedback(startCoord, isEntering) {
-            if (currentSelectedShipIndex === null) return;
-            const size = shipTypes[currentSelectedShipIndex].size;
-            const validCoords = checkPlacementValidity(startCoord, size, placementOrientation);
-            
-            for (let i = 0; i < size; i++) {
-                let c = placementOrientation === "H" ? startCoord + i : startCoord + (i * 10);
-                let row = Math.floor(startCoord / 10);
-                if (c >= 0 && c < 100 && (placementOrientation === "V" || row === Math.floor(c / 10))) {
-                    const targetCell = document.querySelector(`#your-board [data-index="${c}"]`);
-                    if (targetCell) {
-                        if (isEntering) {
-                            targetCell.classList.add(validCoords ? 'preview-valid' : 'preview-invalid');
-                        } else {
-                            targetCell.classList.remove('preview-valid', 'preview-invalid');
-                        }
-                    }
-                }
-            }
-        }
-
-        function handleFleetDeploymentClick(coord) {
-            if (currentSelectedShipIndex === null) {
-                if (yourFleetLocations[coord] === 1 && cellToShipMap[coord]) {
-                    const matchedShipInstance = cellToShipMap[coord];
-                    const shipIdx = shipTypes.findIndex(s => s.name === matchedShipInstance.name);
-                    if (shipIdx !== -1) pickupAndMoveShip(shipIdx);
-                }
-                return;
-            }
-
-            const ship = shipTypes[currentSelectedShipIndex];
-            const validCoords = checkPlacementValidity(coord, ship.size, placementOrientation);
-            if (!validCoords) return;
-
-            validCoords.forEach(c => { yourFleetLocations[c] = 1; cellToShipMap[c] = ship; });
-            ship.coordinatedCoords = validCoords;
-            ship.placed = true;
-            document.getElementById(`ship-btn-${currentSelectedShipIndex}`).className = 'ship-btn placed';
-            currentSelectedShipIndex = null;
-            updateVisualDisplays();
-            verifyDeploymentCompletion();
-        }
-
-        function autoDeployAllShips() {
-            yourFleetLocations.fill(0);
-            cellToShipMap = {};
-            shipTypes.forEach(s => { s.placed = false; s.coordinatedCoords = []; });
-            shipTypes.forEach((ship) => {
-                let placed = false;
-                while (!placed) {
-                    let randCoord = Math.floor(Math.random() * 100);
-                    let randDir = Math.random() > 0.5 ? "H" : "V";
-                    let validCoords = checkPlacementValidity(randCoord, ship.size, randDir);
-                    if (validCoords) {
-                        validCoords.forEach(c => { yourFleetLocations[c] = 1; cellToShipMap[c] = ship; });
-                        ship.coordinatedCoords = validCoords;
-                        ship.placed = true;
-                        placed = true;
-                    }
-                }
-            });
-            buildDeploymentDock();
-            updateVisualDisplays();
-            verifyDeploymentCompletion();
-        }
-
-        function verifyDeploymentCompletion() {
-            const allPlaced = shipTypes.every(s => s.placed);
-            const commenceBtn = document.getElementById('btn-commence');
-            const totalPlacedCount = shipTypes.filter(s => s.placed).length;
-            commenceBtn.innerText = allPlaced ? "Commence Battle" : `Placed (${totalPlacedCount}/5 Vessels)`;
-            commenceBtn.disabled = !allPlaced;
-        }
-
-        // --- STEP 3: ORDER OF BATTLE HANDSHAKE ---
-        function evaluateHostInitiatedStart() {
-            let playerIds = Object.keys(globalPlayers);
-            if (playerIds.length < 2) return;
-
-            for (let pId in globalPlayers) {
-                if (!globalPlayers[pId].ready) return;
-            }
-
-            let sortedIds = [...playerIds].sort();
-            if (myId === sortedIds[0] && !matchIsActive) {
-                let shuffleOrder = [...sortedIds].sort(() => Math.random() - 0.5);
-                pubnub.publish({
-                    channel: myChannel,
-                    message: { type: 'start-match', order: shuffleOrder, sender: myId }
-                });
-            }
-        }
-
-        function executeGlobalMatchActivation(verifiedOrderArray) {
-            matchIsActive = true;
-            
-            activeTurnOrder = verifiedOrderArray;
-            currentTurnUserId = activeTurnOrder[0];
-
-            document.getElementById('opponent-container').classList.remove('hidden');
-            document.getElementById('board-divider').classList.remove('hidden');
-            document.getElementById('spectator-action-container').classList.add('hidden');
-            document.getElementById('game-over-container').classList.add('hidden');
-            
-            rebuildTargetDropdown();
-            renderSelectedOpponentGrid();
-            updateTurnHeader();
-            updateVisualDisplays();
-        }
-
-        // --- STEP 4: GRID INTERACTIONS & INTERACTIVE GHOST VIEW ---
-        function renderSelectedOpponentGrid() {
-            const targetId = document.getElementById('enemy-target-picker').value;
-            if (!targetId) return;
-            
-            renderGrid('opponent-board', handleMyStrikeClick, false);
-            
-            const targetProfile = globalPlayers[targetId];
-            const oppCells = document.querySelectorAll('#opponent-board .cell');
-            const iAmSpectator = globalPlayers[myId] && globalPlayers[myId].lost;
-
-            oppCells.forEach((cell, i) => {
-                if (targetProfile.boardHits[i] === 1) cell.className = 'cell hit';
-                else if (targetProfile.boardHits[i] === 2) cell.className = 'cell miss';
-                else if (iAmSpectator && targetProfile.initialFleet && targetProfile.initialFleet[i] === 1) {
-                    cell.className = 'cell spectator-ship';
-                }
-                
-                // If it's a spectator ship AND has been hit, ensure class compounding matches styles
-                if (iAmSpectator && targetProfile.initialFleet && targetProfile.initialFleet[i] === 1 && targetProfile.boardHits[i] === 1) {
-                    cell.className = 'cell spectator-ship hit';
-                }
-
-                if (targetProfile.finalFleetMap && targetProfile.finalFleetMap[i] === 1 && targetProfile.boardHits[i] === 0) {
-                    cell.className = 'cell revealed-ship';
-                }
-            });
-        }
-
-        function renderGrid(containerId, clickHandler, enableHovers) {
-            const container = document.getElementById(containerId);
-            container.innerHTML = '';
-            for (let i = 0; i < 100; i++) {
-                const cell = document.createElement('div');
-                cell.className = 'cell';
-                cell.setAttribute('data-index', i);
-                if (clickHandler) cell.addEventListener('click', () => clickHandler(i));
-                if (enableHovers) {
-                    cell.addEventListener('mouseenter', () => handleHoverFeedback(i, true));
-                    cell.addEventListener('mouseleave', () => handleHoverFeedback(i, false));
-                }
-                container.appendChild(cell);
-            }
-        }
-
-        function updateVisualDisplays() {
-            renderSelectedOpponentGrid();
-            const yourCells = document.querySelectorAll('#your-board .cell');
-            yourCells.forEach((cell, i) => {
-                if (!cell) return;
-                cell.className = 'cell';
-                if (yourFleetLocations[i] === 1) cell.className = 'cell ship';
-                if (yourFleetLocations[i] === 2) cell.className = 'cell miss'; 
-                if (yourFleetLocations[i] === 3) cell.className = 'cell hit';  
-            });
-        }
-
-        function updateTurnHeader() {
-            const attackHeader = document.getElementById('attack-header');
-            const activeTargetId = document.getElementById('enemy-target-picker').value;
-            const activeTargetName = activeTargetId ? globalPlayers[activeTargetId].name : "Enemy";
-
-            if (globalPlayers[myId] && globalPlayers[myId].lost) {
-                statusBox.style.color = "#95a5a6";
-                statusBox.innerText = "SPECTATOR ENGINE ACTIVE (Ghost View Unlocked)";
-                attackHeader.innerText = `OBSERVING: ${activeTargetName}`;
-                attackHeader.style.color = "#3498db";
-                return;
-            }
-
-            if (currentTurnUserId === myId) {
-                statusBox.style.color = "#00ffca";
-                statusBox.innerText = "Your Turn to Strike!";
-                attackHeader.innerText = `TARGET BOARD: ${activeTargetName} (OPEN FIRE)`;
-                attackHeader.style.color = "#00ffca";
-            } else {
-                const structuralName = globalPlayers[currentTurnUserId] ? globalPlayers[currentTurnUserId].name : "Player";
-                statusBox.style.color = "#ffb300";
-                statusBox.innerText = `Turn Order: Waiting for ${structuralName}...`;
-                attackHeader.innerText = `TARGET BOARD: ${activeTargetName} (LOCKED)`;
-                attackHeader.style.color = "#7f8c8d";
-            }
-        }
-
-        function handleMyStrikeClick(coord) {
-            const targetId = document.getElementById('enemy-target-picker').value;
-            if (!targetId) return;
-
-            // --- INTERACTIVE SPECTATOR ROUTING LAYER ---
-            if (globalPlayers[myId].lost) {
-                analyzeAndDisplaySpectatorShipMetrics(targetId, coord);
-                return; 
-            }
-            
-            if (!matchIsActive || currentTurnUserId !== myId) return;
-            if (globalPlayers[targetId].lost) return alert("This fleet is already scuttled! Choose a living target.");
-            if (globalPlayers[targetId].boardHits[coord] !== 0) return; 
-            
-            statShotsFired++;
-            statusBox.innerText = "Firing ordnance tracking vectors...";
-            
-            pubnub.publish({ 
-                channel: myChannel, 
-                message: { type: 'shot', coord: coord, targetId: targetId, sender: myId } 
-            });
-        }
-
-        // --- SPECTATOR INTEL PROCESSING MATRIX ---
-        function analyzeAndDisplaySpectatorShipMetrics(targetUserId, clickedCoord) {
-            const targetProfile = globalPlayers[targetUserId];
-            if (!targetProfile || !targetProfile.initialFleet) return;
-
-            // 1. Verify if a vessel occupies this specific tile location
-            if (targetProfile.initialFleet[clickedCoord] !== 1) {
-                showModal("TACTICAL INFO", `<p>Coordinate <strong>${clickedCoord}</strong> is empty open water.</p>`, "sunk-theme");
-                return;
-            }
-
-            // 2. Local reconstruction to map coordinate back to its specific ship type
-            // Ships were placed sequentially using standard lengths from shipTypesArr
-            let deducedShipName = "Unknown Combat Vessel";
-            let shipCoordinatedGroup = [];
-
-            // A helper scanning contiguous components to identify bounded ships dynamically
-            let visited = Array(100).fill(false);
-            let targetFleetMap = targetProfile.initialFleet;
-
-            function discoverShipCluster(start) {
-                let cluster = [start];
-                let queue = [start];
-                visited[start] = true;
-
-                while(queue.length > 0) {
-                    let curr = queue.shift();
-                    let r = Math.floor(curr / 10);
-                    let c = curr % 10;
-                    
-                    let neighbors = [];
-                    if (r > 0) neighbors.push(curr - 10);
-                    if (r < 9) neighbors.push(curr + 10);
-                    if (c > 0) neighbors.push(curr - 1);
-                    if (c < 9) neighbors.push(curr + 1);
-
-                    neighbors.forEach(n => {
-                        if (!visited[n] && targetFleetMap[n] === 1) {
-                            visited[n] = true;
-                            cluster.push(n);
-                            queue.push(n);
-                        }
-                    });
-                }
-                return cluster;
-            }
-
-            // Locate containing component cluster
-            for(let i=0; i<100; i++) {
-                if (targetFleetMap[i] === 1 && !visited[i]) {
-                    let currentCluster = discoverShipCluster(i);
-                    if (currentCluster.includes(clickedCoord)) {
-                        shipCoordinatedGroup = currentCluster;
-                        break;
-                    }
-                }
-            }
-
-            // Match cluster size to static fleet asset definitions
-            const clusterSize = shipCoordinatedGroup.length;
-            const matchedAsset = shipTypesArr.find(s => s.size === clusterSize);
-            if (matchedAsset) deducedShipName = matchedAsset.name;
-
-            // 3. Compile structural damage parameters and aggressor scoring points
-            let totalHitsOnThisVessel = 0;
-            let damageDealersMap = {};
-
-            shipCoordinatedGroup.forEach(coord => {
-                if (targetProfile.boardHits[coord] === 1) {
-                    totalHitsOnThisVessel++;
-                }
-                
-                // Track down matching records from global transaction history
-                globalCombatStrikeLog.forEach(log => {
-                    if (log.target === targetUserId && log.coord === coord && log.hit) {
-                        damageDealersMap[log.attacker] = (damageDealersMap[log.attacker] || 0) + 1;
-                    }
-                });
-            });
-
-            const isSunk = totalHitsOnThisVessel === clusterSize;
-            const healthStatusString = isSunk 
-                ? "<span style='color:#e74c3c; font-weight:bold;'>CRITICAL - DESTRUCTED</span>" 
-                : `<span style='color:#f1c40f; font-weight:bold;'>OPERATIONAL (${totalHitsOnThisVessel}/${clusterSize} Damage Points)</span>`;
-
-            // 4. Synthesize analytical layout
-            let feedbackHtml = `
-                <p>Target Profile: <strong>${targetProfile.name}</strong></p>
-                <table class="stats-table">
-                    <tr><td>Vessel Class</td><td class="stats-highlight">${deducedShipName}</td></tr>
-                    <tr><td>Hull Integrity</td><td>${healthStatusString}</td></tr>
-                </table>
-                <h4 style="margin:15px 0 5px 0; text-align:left; color:#3498db; font-size:0.9rem;">DAMAGE LOG LEDGER</h4>
-                <table class="stats-table">
-                    <tr><th>Aggressor Force</th><th>Scored Points (Hits)</th></tr>
-            `;
-
-            let damageLogged = false;
-            for (let attackerId in damageDealersMap) {
-                const name = globalPlayers[attackerId] ? globalPlayers[attackerId].name : "Unknown Fleet";
-                feedbackHtml += `<tr><td>${name}</td><td class="stats-highlight">+${damageDealersMap[attackerId]} Pts</td></tr>`;
-                damageLogged = true;
-            }
-
-            if (!damageLogged) {
-                feedbackHtml += `<tr><td colspan="2" style="text-align:center; color:#777;">No points scored on this vessel yet.</td></tr>`;
-            }
-            feedbackHtml += `</table>`;
-
-            showModal("TACTICAL INTEL OVERLAY", feedbackHtml, isSunk ? "sunk-theme" : "victory-theme");
-        }
-
-        function handleIncomingShot(coord) {
-            const currentCellState = yourFleetLocations[coord];
-            let isHit = currentCellState === 1 || currentCellState === 3;
-            let sunkShipName = null;
-
-            if (currentCellState === 1) { 
-                yourFleetLocations[coord] = 3; 
-                const targetedShip = cellToShipMap[coord];
-                if (targetedShip) {
-                    targetedShip.hitsLogged++;
-                    if (targetedShip.hitsLogged >= targetedShip.size) {
-                        sunkShipName = targetedShip.name;
-                    }
-                }
-            } else if (currentCellState === 0) {
-                yourFleetLocations[coord] = 2; 
-            }
-            
-            updateVisualDisplays();
-            const matchIsLost = shipTypes.every(s => s.hitsLogged >= s.size);
-
-            pubnub.publish({ 
-                channel: myChannel, 
-                message: { 
-                    type: 'result', 
-                    attackerId: currentTurnUserId, 
-                    targetId: myId,
-                    coord: coord, 
-                    isHit: isHit, 
-                    sunkShipName: sunkShipName,
-                    matchIsLost: matchIsLost,
-                    sender: myId 
-                } 
-            });
-            
-            if (sunkShipName) {
-                pubnub.publish({
-                    channel: myChannel,
-                    message: { type: 'global-ship-sunk', ownerId: myId, ownerName: myName, shipName: sunkShipName, sender: myId }
-                });
-                showModal("SHIP DESTROYED", `<p>An anonymous projectile completely sunk your <strong>${sunkShipName}</strong>!</p>`, "sunk-theme");
-            }
-
-            if (matchIsLost) {
-                globalPlayers[myId].lost = true;
-                statusBox.style.color = "#ff3838";
-                statusBox.innerText = "YOUR FLEET WAS ANNIHILATED!";
-                
-                pubnub.publish({ channel: myChannel, message: { type: 'endgame-reveal', fleetLocations: yourFleetLocations, sender: myId } });
-                document.getElementById('spectator-action-container').classList.remove('hidden');
-            }
-        }
-
-        function handleShotFeedback(attackerId, targetId, coord, isHit, sunkShipName, targetLostHandshake) {
-            if (globalPlayers[targetId]) {
-                globalPlayers[targetId].boardHits[coord] = isHit ? 1 : 2;
-                if (targetLostHandshake) globalPlayers[targetId].lost = true;
-            }
-            
-            updateVisualDisplays();
-
-            if (attackerId === myId) {
-                if (isHit) statHitsLanded++;
-                const targetedName = globalPlayers[targetId].name;
-                if (!targetLostHandshake && sunkShipName) {
-                    showModal("VEHICLE SUNK", `<p>Direct Hit! You completely sunk <strong>${targetedName}</strong>'s <strong>${sunkShipName}</strong>!</p>`, "victory-theme");
-                }
-                checkVictoryConditions();
-            }
-
-            if (targetId === myId) {
-                passTurnToNextPlayer();
-            }
-        }
-
-        function passTurnToNextPlayer() {
-            let currentIndex = activeTurnOrder.indexOf(currentTurnUserId);
-            let foundNext = false;
-            let loopCounter = 0;
-
-            while (!foundNext && loopCounter < activeTurnOrder.length) {
-                currentIndex = (currentIndex + 1) % activeTurnOrder.length;
-                let evaluationId = activeTurnOrder[currentIndex];
-                if (!globalPlayers[evaluationId].lost) {
-                    currentTurnUserId = evaluationId;
-                    foundNext = true;
-                }
-                loopCounter++;
-            }
-
-            pubnub.publish({ channel: myChannel, message: { type: 'pass-turn', nextUserId: currentTurnUserId, sender: myId } });
-        }
-
-        function checkVictoryConditions() {
-            let livingPlayers = [];
-            for (let pId in globalPlayers) {
-                if (!globalPlayers[pId].lost) livingPlayers.push(pId);
-            }
-
-            if (livingPlayers.length === 1 && matchIsActive) {
-                matchIsActive = false;
-                const winnerId = livingPlayers[0];
-                const winnerName = globalPlayers[winnerId].name;
-
-                // Build statistical snapshot for compiling across network nodes
-                let finalMetricsMatrix = [];
-                for (let pId in globalPlayers) {
-                    let accuracy = 0;
-                    let launched = 0;
-                    let landed = 0;
-                    
-                    if (pId === myId) {
-                        launched = statShotsFired;
-                        landed = statHitsLanded;
-                    } else {
-                        launched = globalPlayers[pId].boardHits.filter(x => x !== 0).length;
-                        landed = globalPlayers[pId].boardHits.filter(x => x === 1).length;
-                    }
-                    accuracy = launched > 0 ? Math.round((landed / launched) * 100) : 0;
-                    
-                    finalMetricsMatrix.push({
-                        name: globalPlayers[pId].name,
-                        shotsFired: launched,
-                        hitsLanded: landed,
-                        accuracy: accuracy,
-                        status: globalPlayers[pId].lost ? "ELIMINATED" : "VICTORIOUS"
-                    });
-                }
-
-                pubnub.publish({
-                    channel: myChannel,
-                    message: { 
-                        type: 'broadcast-global-match-over', 
-                        winnerName: winnerName, 
-                        finalMetricsMatrix: finalMetricsMatrix, 
-                        sender: myId 
-                    }
-                });
-            }
-        }
-
-        // --- STEP 5: GLOBAL ENDGAME STATISTICS PRESENTATION ---
-        function handleGlobalMatchOverBroadcast(winnerName, analyticsData) {
-            matchIsActive = false;
-            statusBox.style.color = "#2ecc71";
-            statusBox.innerText = `WAR ROOM OVER: ${winnerName} IS VICTORIOUS!`;
-            
-            document.getElementById('spectator-action-container').classList.add('hidden');
-            document.getElementById('game-over-container').classList.remove('hidden');
-
-            let htmlPayload = `
-                <p>The conflict has concluded. Final server mesh combat data logs:</p>
-                <table class="stats-table">
-                    <tr><th>Player</th><th>Status</th><th>Shots</th><th>Hits</th><th>Acc %</th></tr>
-            `;
-
-            analyticsData.forEach(row => {
-                const highlightStyle = row.status === "VICTORIOUS" ? "style='color:#2ecc71; font-weight:bold;'" : "";
-                htmlPayload += `
-                    <tr ${highlightStyle}>
-                        <td>${row.name}</td>
-                        <td>${row.status}</td>
-                        <td class="stats-highlight">${row.shotsFired}</td>
-                        <td>${row.hitsLanded}</td>
-                        <td class="stats-highlight">${row.accuracy}%</td>
-                    </tr>
-                `;
-            });
-            htmlPayload += `</table><p style="font-size:0.85rem; color:#f1c40f;">Select your next movement path below on the main screen.</p>`;
-
-            showModal(`VICTORY DECLARED: ${winnerName.toUpperCase()}`, htmlPayload, "victory-theme");
-        }
-
-        function triggerCombatMetricsDisplay(cardTitle) {
-            const accuracy = statShotsFired > 0 ? Math.round((statHitsLanded / statShotsFired) * 100) : 0;
-            let htmlPayload = `
-                <table class="stats-table">
-                    <tr><th>Metric Parameters</th><th>Value Data</th></tr>
-                    <tr><td>Total Artillery Launched</td><td class="stats-highlight">${statShotsFired}</td></tr>
-                    <tr><td>Confirmed Payload Hits</td><td style="color:#2ecc71; font-weight:bold;">${statHitsLanded}</td></tr>
-                    <tr><td>Weapons Fire Accuracy</td><td class="stats-highlight">${accuracy}%</td></tr>
-                </table>
-                <h4 style="margin:15px 0 5px 0; text-align:left; color:#e74c3c; font-size:0.9rem;">INCOMING ASSAULT PROFILE VECTOR</h4>
-                <table class="stats-table">
-                    <tr><th>Aggressor Source Identity</th><th>Projectiles Received</th></tr>
-            `;
-
-            let hasIncomingData = false;
-            for (let pId in globalPlayers) {
-                if (pId === myId) continue;
-                const count = statIncomingShotsByPlayer[pId] || 0;
-                htmlPayload += `<tr><td>${globalPlayers[pId].name}</td><td class="stats-highlight">${count}</td></tr>`;
-                if (count > 0) hasIncomingData = true;
-            }
-            if (!hasIncomingData) htmlPayload += `<tr><td colspan="2" style="text-align:center; color:#777;">No incoming data.</td></tr>`;
-            htmlPayload += `</table>`;
-
-            showModal(cardTitle, htmlPayload, "victory-theme");
-        }
-
-        document.getElementById('btn-spec-stats').addEventListener('click', () => triggerCombatMetricsDisplay("SPECTATOR METRICS LOGS"));
-
-        // --- STEP 6: BRANCHING DECISION ENGINE RESET ---
-        document.getElementById('btn-play-again').addEventListener('click', () => {
-            initFleetStructures();
-            iamReady = false;
-            matchIsActive = false;
-            activeTurnOrder = [];
-
-            for (let pId in globalPlayers) {
-                globalPlayers[pId].ready = false;
-                globalPlayers[pId].lost = false;
-                globalPlayers[pId].boardHits = Array(100).fill(0);
-                globalPlayers[pId].initialFleet = Array(100).fill(0);
-                delete globalPlayers[pId].finalFleetMap;
-            }
-
-            document.getElementById('game-over-container').classList.add('hidden');
-            document.getElementById('opponent-container').classList.add('hidden');
-            document.getElementById('board-divider').classList.add('hidden');
-            document.getElementById('target-selector-container').classList.add('hidden');
-            document.getElementById('deployment-dock').classList.remove('hidden');
-            
-            statusBox.style.color = "#00ffca";
-            statusBox.innerText = "Re-deploy fleet vessels to request matchmaking validation.";
-            
-            buildDeploymentDock();
-            renderGrid('your-board', handleFleetDeploymentClick, true);
-            updateVisualDisplays();
-
-            pubnub.publish({ channel: myChannel, message: { type: 'signal-room-rematch', sender: myId } });
-        });
-
-        document.getElementById('btn-exit-lobby').addEventListener('click', () => {
-            pubnub.unsubscribe({ channels: [myChannel] });
-            
-            globalPlayers = {};
-            activeTurnOrder = [];
-            currentTurnUserId = null;
-            iamReady = false;
-            matchIsActive = false;
-            initFleetStructures();
-
-            document.getElementById('game-over-container').classList.add('hidden');
-            document.getElementById('opponent-container').classList.add('hidden');
-            document.getElementById('board-divider').classList.add('hidden');
-            document.getElementById('target-selector-container').classList.add('hidden');
-            document.getElementById('game-screen').classList.add('hidden');
-            
-            document.getElementById('lobby-screen').classList.remove('hidden');
-            statusBox.style.color = "#00ffca";
-            statusBox.innerText = "System Reset. Disconnected from channel instance.";
         });
     </script>
 </body>
