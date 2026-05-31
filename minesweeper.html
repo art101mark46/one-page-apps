@@ -3,17 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Minesweeper Pro: Tactical Grid Command</title>
+    <title>Minesweeper Pro: Shift Storm Core</title>
     
     <script src="https://cdn.jsdelivr.net/npm/pubnub@7.2.2/dist/web/pubnub.min.js" onerror="console.log('PubNub CDN offline')"></script>
 
     <style>
-        body { font-family: -apple-system, sans-serif; background: #121212; color: #fff; text-align: center; margin: 0; padding: 10px; box-sizing: border-box; }
+        body { font-family: -apple-system, sans-serif; background: #0d0d0d; color: #fff; text-align: center; margin: 0; padding: 10px; box-sizing: border-box; }
         .hidden { display: none !important; }
-        h1 { font-size: 1.5rem; margin: 8px 0; color: #f1c40f; }
+        h1 { font-size: 1.5rem; margin: 8px 0; color: #e74c3c; text-transform: uppercase; letter-spacing: 1px; }
         
         .status { 
-            background: #222; 
+            background: #141414; 
             padding: 14px; 
             border-radius: 8px; 
             margin: 10px auto; 
@@ -21,24 +21,36 @@
             color: #00ffca; 
             max-width: 450px; 
             box-sizing: border-box; 
-            border: 1px solid #333;
+            border: 1px solid #ff3838;
             font-size: 1.05rem;
         }
+
+        .alert-banner {
+            background: #7f1d1d;
+            border: 1px dashed #ef4444;
+            color: #fca5a5;
+            padding: 8px;
+            font-size: 0.85rem;
+            border-radius: 4px;
+            max-width: 450px;
+            margin: 5px auto;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
         
-        .setup-card { background: #1a1a1a; padding: 25px; border-radius: 12px; max-width: 360px; margin: 20px auto; border: 1px solid #333; text-align: left; }
+        .setup-card { background: #161616; padding: 25px; border-radius: 12px; max-width: 360px; margin: 20px auto; border: 1px solid #333; text-align: left; }
         .setup-card label { font-size: 0.9rem; color: #aaa; font-weight: bold; display: block; margin-top: 12px; text-transform: uppercase; }
-        input, select { background: #333; color: #fff; border: 1px solid #555; padding: 14px; border-radius: 6px; font-size: 1.1rem; width: 100%; text-align: center; margin: 6px 0 18px 0; box-sizing: border-box; }
+        input, select { background: #222; color: #fff; border: 1px solid #444; padding: 14px; border-radius: 6px; font-size: 1.1rem; width: 100%; text-align: center; margin: 6px 0 18px 0; box-sizing: border-box; }
         
         .mode-badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; margin-bottom: 10px; }
-        .mode-online { background: #2ecc71; color: #fff; }
+        .mode-online { background: #e74c3c; color: #fff; }
 
         .controls { display: flex; justify-content: space-between; max-width: 450px; margin: 8px auto; gap: 8px; }
-        .sub-btn { background: #7f8c8d; padding: 12px; font-size: 0.9rem; flex: 1; border-radius: 4px; border: none; color: white; font-weight: bold; cursor: pointer; text-transform: uppercase; }
+        .sub-btn { background: #333; padding: 12px; font-size: 0.9rem; flex: 1; border-radius: 4px; border: none; color: white; font-weight: bold; cursor: pointer; text-transform: uppercase; }
 
-        /* Real-time Score Panel Stakes Widget */
         .live-scoreboard {
-            background: #161616;
-            border: 1px solid #333;
+            background: #111;
+            border: 1px solid #222;
             border-radius: 6px;
             max-width: 450px;
             margin: 10px auto;
@@ -49,16 +61,16 @@
             gap: 10px;
         }
         .player-score-card {
-            background: #222;
+            background: #1c1c1c;
             padding: 6px 12px;
             border-radius: 4px;
-            border-left: 3px solid #555;
+            border-left: 3px solid #444;
             font-size: 0.9rem;
             min-width: 80px;
         }
         .player-score-card.active-turn {
-            border-left-color: #00ffca;
-            background: #1b2826;
+            border-left-color: #ef4444;
+            background: #2d1a1a;
         }
         .player-score-card .p-name { font-weight: bold; color: #eee; }
         .player-score-card .p-pts { color: #f1c40f; font-weight: bold; font-size: 1rem; margin-top: 2px; }
@@ -74,75 +86,82 @@
             aspect-ratio: 1; 
             margin: 0 auto; 
             box-sizing: border-box; 
-            background: #151515; 
+            background: #0f0f0f; 
             padding: 4px; 
             border-radius: 6px; 
+            transition: transform 0.6s cubic-bezier(0.68, -0.55, 0.27, 1.55);
         }
         
-        .cell { background: #262626; aspect-ratio: 1; border-radius: 2px; border: 1px solid #111; position: relative; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1rem; user-select: none; }
-        .cell.revealed { background: #ecf0f1; border: 1px solid #bdc3c7; color: #2c3e50; }
-        .cell.mine { background: #e74c3c !important; border: 1px solid #c0392b; }
-        .cell.flagged { background: #f1c40f; border: 1px solid #d4ac0d; }
+        .cell { background: #222; aspect-ratio: 1; border-radius: 2px; border: 1px solid #111; position: relative; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1rem; user-select: none; }
+        .cell.revealed { background: #d1d5db; border: 1px solid #9ca3af; color: #111827; }
+        .cell.mine { background: #ef4444 !important; border: 1px solid #b91c1c; }
+        .cell.flagged { background: #dc2626; border: 1px solid #991b1b; animation: pulse 1.5s infinite; }
         
-        /* Cell color mappings */
-        .cell[data-count="1"] { color: #2980b9; }
-        .cell[data-count="2"] { color: #27ae60; }
-        .cell[data-count="3"] { color: #e74c3c; }
-        .cell[data-count="4"] { color: #8e44ad; }
-        .cell[data-count="5"] { color: #d35400; }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.6; }
+            100% { opacity: 1; }
+        }
+
+        .cell[data-count="1"] { color: #2563eb; }
+        .cell[data-count="2"] { color: #16a34a; }
+        .cell[data-count="3"] { color: #dc2626; }
+        .cell[data-count="4"] { color: #7c3aed; }
+        .cell[data-count="5"] { color: #ea580c; }
 
         .grid-small .cell { font-size: 1.2rem; }
         .grid-medium .cell { font-size: 0.95rem; }
         .grid-large .cell { font-size: 0.75rem; border-radius: 1px; }
 
         .stats-table { width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 15px; background: #111; border-radius: 6px; overflow: hidden; font-size: 0.85rem; }
-        .stats-table th { background: #2c3e50; color: #fff; padding: 8px; font-weight: bold; text-align: left; }
+        .stats-table th { background: #374151; color: #fff; padding: 8px; font-weight: bold; text-align: left; }
         .stats-table td { padding: 8px; border-bottom: 1px solid #222; text-align: left; color: #ccc; }
 
-        .main-btn { background: #3498db; color: white; border: none; padding: 16px; border-radius: 6px; cursor: pointer; font-size: 1.1rem; font-weight: bold; width: 100%; box-sizing: border-box; margin-top: 10px; text-transform: uppercase; }
-        .main-btn:disabled { background: #333; color: #666; cursor: not-allowed; border: 1px dashed #444; }
+        .main-btn { background: #dc2626; color: white; border: none; padding: 16px; border-radius: 6px; cursor: pointer; font-size: 1.1rem; font-weight: bold; width: 100%; box-sizing: border-box; margin-top: 10px; text-transform: uppercase; }
+        .main-btn:disabled { background: #222; color: #444; cursor: not-allowed; border: 1px dashed #333; }
 
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; box-sizing: border-box; }
-        .modal-content { background: #1a1a1a; border: 2px solid #3498db; border-radius: 12px; max-width: 440px; width: 100%; padding: 22px; box-sizing: border-box; text-align: center; box-shadow: 0 0 20px rgba(52, 152, 219, 0.4); max-height: 90vh; overflow-y: auto; }
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; box-sizing: border-box; }
+        .modal-content { background: #111; border: 2px solid #dc2626; border-radius: 12px; max-width: 440px; width: 100%; padding: 22px; box-sizing: border-box; text-align: center; box-shadow: 0 0 20px rgba(220, 38, 38, 0.4); max-height: 90vh; overflow-y: auto; }
     </style>
 </head>
 <body>
 
-    <h1>Minesweeper Pro: Multi-Ops Edition</h1>
-    <div id="status-box" class="status">Initializing Tactical Network Layer...</div>
+    <h1>Minesweeper Pro: Shift Distortion</h1>
+    <div id="status-box" class="status">Connecting Network System Architecture...</div>
+    <div id="alert-ticker" class="alert-banner hidden">STORM DISTORTION WARNING: MATRIX RADIAL ROTATION IMMINENT</div>
 
     <div id="game-modal" class="modal-overlay hidden">
         <div id="modal-card" class="modal-content">
             <h3 id="modal-title">Alert</h3>
             <div id="modal-body">Message contents...</div>
-            <button class="main-btn" style="margin-top:15px; padding:12px;" onclick="closeModal()">Close</button>
+            <button class="main-btn" style="margin-top:15px; padding:12px;" onclick="closeModal()">Dismiss</button>
         </div>
     </div>
 
     <div id="lobby-screen" class="hidden">
         <div class="setup-card" style="text-align: center;">
-            <div id="net-badge" class="mode-badge mode-online">ONLINE FIELD NODE ACTIVE</div>
+            <div id="net-badge" class="mode-badge mode-online">DISTORTION MATRIX MODE ACTIVE</div>
             
             <div style="text-align: left;">
-                <label for="name-input">Your Name Tag</label>
-                <input type="text" id="name-input" placeholder="e.g. Sweeper_Alpha" maxlength="12">
+                <label for="name-input">Operator Identifier</label>
+                <input type="text" id="name-input" placeholder="e.g. Recon_V" maxlength="12">
             </div>
 
             <div style="text-align: left;">
-                <label for="player-limit-input">Max Player Allocation Limit</label>
+                <label for="player-limit-input">Comms Array Allocation</label>
                 <select id="player-limit-input">
-                    <option value="2">2 Players Max (9x9 Field)</option>
-                    <option value="3">3 Players Max (12x12 Field)</option>
-                    <option value="4">4 Players Max (15x15 Field)</option>
+                    <option value="2">2 Players (9x9 Matrix - 12 Mines)</option>
+                    <option value="3">3 Players (12x12 Matrix - 26 Mines)</option>
+                    <option value="4">4 Players (15x15 Matrix - 45 Mines)</option>
                 </select>
             </div>
 
             <div id="online-controls">
                 <div style="text-align: left;">
-                    <label for="room-input">Tactical Channel Code</label>
-                    <input type="number" id="room-input" pattern="[0-9]*" placeholder="e.g. 5566">
+                    <label for="room-input">Matrix Frequency Patch</label>
+                    <input type="number" id="room-input" pattern="[0-9]*" placeholder="e.g. 8812">
                 </div>
-                <button class="main-btn" id="btn-start-online">Join Sweep Operation</button>
+                <button class="main-btn" id="btn-start-online">Initialize Operation</button>
             </div>
         </div>
     </div>
@@ -151,20 +170,20 @@
         <div id="live-stakes-board" class="live-scoreboard"></div>
 
         <div class="controls" id="gameplay-controls-panel">
-            <button class="sub-btn" id="btn-mode" style="background:#8e44ad;">Mode: DIGGING</button>
-            <button class="sub-btn" id="btn-pass" style="background: #e67e22;">Pass Turn</button>
+            <button class="sub-btn" id="btn-mode" style="background:#b91c1c;">Mode: DIGGING</button>
+            <button class="sub-btn" id="btn-pass" style="background: #d97706;">Pass Turn (+1 Distortion)</button>
         </div>
 
         <div class="grid-container">
             <div class="board-wrapper">
-                <div class="board-title" id="board-header">Minefield Command Operations</div>
+                <div class="board-title" id="board-header">Tactical Matrix Mapping</div>
                 <div id="minefield-board" class="grid"></div>
             </div>
             
             <div class="board-wrapper hidden" id="game-over-container">
-                <div style="background:#1a1a1a; padding:15px; border-radius:8px; border:1px solid #333; margin-bottom:10px;">
-                    <h4 style="margin:0 0 10px 0; color:#f1c40f;">OPERATION COMPLETED</h4>
-                    <button class="main-btn" style="background: #2ecc71; margin-top:0;" id="btn-exit-lobby">Return to Main Lobby</button>
+                <div style="background:#111; padding:15px; border-radius:8px; border:1px solid #333; margin-bottom:10px;">
+                    <h4 style="margin:0 0 10px 0; color:#ef4444;">COMMUNICATION LINK SEVERED</h4>
+                    <button class="main-btn" style="background: #16a34a; margin-top:0;" id="btn-exit-lobby">Re-Route to Command</button>
                 </div>
             </div>
         </div>
@@ -173,6 +192,7 @@
     <script>
         // --- GAME ENGINE AND NETWORK STATE CONTEXTS ---
         const statusBox = document.getElementById('status-box');
+        const alertTicker = document.getElementById('alert-ticker');
         let pubnub, myChannel, myName;
         let myId = "u_" + Math.random().toString(36).substring(2, 6);
         
@@ -182,14 +202,17 @@
         let maxPlayersAllowed = 2;
         let matchIsActive = false;
 
-        // Dynamic Board Dimensions Context Scale Properties
+        // Dynamic Parameters Context Scale Properties
         let gridSideDimension = 10; 
         let totalGridCellsCount = 100;
         let allocatedMinesCount = 15;
         let minefieldBlueprint = []; 
         let currentToolMode = "DIG"; 
 
-        // --- DIALOG MODAL LAYOUT HANDLERS ---
+        // Distortion Accumulator Parameters
+        let distortionActionCounter = 0;
+        let currentRotationAngleDegrees = 0;
+
         function showModal(title, htmlContent) {
             document.getElementById('modal-title').innerText = title;
             document.getElementById('modal-body').innerHTML = htmlContent;
@@ -199,32 +222,28 @@
             document.getElementById('game-modal').classList.add('hidden');
         }
 
-        // --- NETWORK STARTUP ---
         window.addEventListener('load', () => {
             if (typeof PubNub === 'undefined') {
-                statusBox.innerText = "Error: Network layer dependencies unavailable.";
+                statusBox.innerText = "Error: Quantum Telemetry layer missing.";
             } else {
-                statusBox.innerText = "Connected to global operations mesh.";
+                statusBox.innerText = "Comms receiver ready for allocation.";
                 document.getElementById('lobby-screen').classList.remove('hidden');
             }
         });
 
         function broadcastPayloadNetworkMessage(msg) {
-            if (pubnub) {
-                pubnub.publish({ channel: myChannel, message: msg });
-            }
+            if (pubnub) pubnub.publish({ channel: myChannel, message: msg });
         }
 
-        // --- ONLINE MESH NETWORKING LAYOUTS ---
         document.getElementById('btn-start-online').addEventListener('click', () => {
-            myName = document.getElementById('name-input').value.trim() || "Sweeper_" + Math.floor(Math.random()*90+10);
+            myName = document.getElementById('name-input').value.trim() || "Unit_" + Math.floor(Math.random()*900+100);
             maxPlayersAllowed = parseInt(document.getElementById('player-limit-input').value);
             const roomCode = document.getElementById('room-input').value.trim();
-            if (!roomCode) return alert("An operations channel code is required.");
+            if (!roomCode) return alert("System requires frequency link coordinate.");
             
             applyScaleDimensionsParameters(maxPlayersAllowed);
 
-            myChannel = 'msweep_v1_room_' + roomCode;
+            myChannel = 'msweep_distort_room_' + roomCode;
             pubnub = new PubNub({ publishKey: 'demo', subscribeKey: 'demo', userId: myId });
             setupPubNubChannelSubscription();
         });
@@ -232,13 +251,13 @@
         function applyScaleDimensionsParameters(limit) {
             if (limit === 2) {
                 gridSideDimension = 9;
-                allocatedMinesCount = 10;
+                allocatedMinesCount = 12; // High difficulty density matching
             } else if (limit === 3) {
                 gridSideDimension = 12;
-                allocatedMinesCount = 22;
+                allocatedMinesCount = 26;
             } else {
                 gridSideDimension = 15;
-                allocatedMinesCount = 40;
+                allocatedMinesCount = 45;
             }
             totalGridCellsCount = gridSideDimension * gridSideDimension;
         }
@@ -255,52 +274,44 @@
             
             document.getElementById('lobby-screen').classList.add('hidden');
             document.getElementById('game-screen').classList.remove('hidden');
-            statusBox.innerText = "Awaiting deployment connections...";
+            statusBox.innerText = "Searching grid arrays for sync signature...";
             
             initMinefieldMemoryStructures();
             renderDynamicFieldGrid();
             renderLiveStakesPanel();
         }
 
-        // --- INBOUND SYSTEM NETWORK MESSAGE ROUTINES ---
         function handleInboundUnifiedMessage(data) {
             if (data.type === 'sync-identity') {
                 if (Object.keys(globalPlayers).length >= data.limit || matchIsActive) {
-                    if (data.sender === myId) {
-                        handleRoomLockedKickback();
-                    } else {
-                        broadcastPayloadNetworkMessage({ type: 'room-locked-rejection', targetUser: data.sender });
-                    }
+                    if (data.sender === myId) handleRoomLockedKickback();
+                    else broadcastPayloadNetworkMessage({ type: 'room-locked-rejection', targetUser: data.sender });
                     return;
                 }
-                if (!globalPlayers[data.sender]) {
-                    globalPlayers[data.sender] = { name: data.name, ready: false, score: 0 };
-                }
+                if (!globalPlayers[data.sender]) globalPlayers[data.sender] = { name: data.name, ready: false, score: 0 };
                 maxPlayersAllowed = data.limit;
                 applyScaleDimensionsParameters(maxPlayersAllowed);
-                
                 renderDynamicFieldGrid();
 
                 broadcastPayloadNetworkMessage({ type: 'ack-identity', name: globalPlayers[myId].name, sender: myId });
                 evaluateAutomaticOperationStart();
             }
-            else if (data.type === 'room-locked-rejection') {
-                if (data.targetUser === myId) {
-                    handleRoomLockedKickback();
-                }
+            else if (data.type === 'room-locked-rejection' && data.targetUser === myId) {
+                handleRoomLockedKickback();
             }
             else if (data.type === 'ack-identity') {
-                if (!globalPlayers[data.sender]) {
-                    globalPlayers[data.sender] = { name: data.name, ready: false, score: 0 };
-                }
+                if (!globalPlayers[data.sender]) globalPlayers[data.sender] = { name: data.name, ready: false, score: 0 };
                 evaluateAutomaticOperationStart();
             }
             else if (data.type === 'ghost-sync-payload') {
                 minefieldBlueprint = data.fieldMap;
                 activeTurnOrder = data.order;
                 currentTurnUserId = activeTurnOrder[0];
+                distortionActionCounter = data.distortCount;
+                currentRotationAngleDegrees = data.rotDegrees;
                 matchIsActive = true;
                 
+                applyVisualMatrixTransforms();
                 updateVisualDisplays();
                 renderLiveStakesPanel();
                 updateTurnHeader();
@@ -309,13 +320,21 @@
                 minefieldBlueprint = data.fieldMap;
                 currentTurnUserId = data.nextUserId;
                 globalPlayers[data.actorId].score = data.actorUpdatedScore;
+                distortionActionCounter = data.distortCount;
+                currentRotationAngleDegrees = data.rotDegrees;
                 
+                applyVisualMatrixTransforms();
                 updateVisualDisplays();
                 renderLiveStakesPanel();
                 updateTurnHeader();
             }
             else if (data.type === 'pass-turn-action') {
                 currentTurnUserId = data.nextUserId;
+                distortionActionCounter = data.distortCount;
+                currentRotationAngleDegrees = data.rotDegrees;
+                
+                applyVisualMatrixTransforms();
+                updateVisualDisplays();
                 renderLiveStakesPanel();
                 updateTurnHeader();
             }
@@ -326,18 +345,16 @@
 
         function handleRoomLockedKickback() {
             if(pubnub) pubnub.unsubscribe({ channels: [myChannel] });
-            showModal("SECTOR CLOSED", "<p>This grid operation is full or currently active in scanning.</p>");
-            statusBox.innerText = "Error: Channel Locked.";
+            showModal("FREQUENCY JAMMED", "<p>This operations node is completely isolated or active.</p>");
+            statusBox.innerText = "Error: Grid Locked.";
             document.getElementById('lobby-screen').classList.remove('hidden');
             document.getElementById('game-screen').classList.add('hidden');
         }
 
-        // --- HOSTER INITIATED GRID MAP GENERATOR ---
         function evaluateAutomaticOperationStart() {
             let connectedIds = Object.keys(globalPlayers);
             if (connectedIds.length === maxPlayersAllowed) {
                 let sortedIds = [...connectedIds].sort();
-                
                 if (myId === sortedIds[0] && !matchIsActive) {
                     generateHostFieldBlueprint();
                     let shuffleTurnOrder = [...connectedIds].sort(() => Math.random() - 0.5);
@@ -345,19 +362,20 @@
                     broadcastPayloadNetworkMessage({ 
                         type: 'ghost-sync-payload', 
                         fieldMap: minefieldBlueprint, 
-                        order: shuffleTurnOrder, 
+                        order: shuffleTurnOrder,
+                        distortCount: distortionActionCounter,
+                        rotDegrees: currentRotationAngleDegrees,
                         sender: myId 
                     });
                 }
             } else {
-                statusBox.innerText = `Waiting for players (${connectedIds.length}/${maxPlayersAllowed})...`;
+                statusBox.innerText = `Establishing Sync Hooks (${connectedIds.length}/${maxPlayersAllowed})...`;
                 renderLiveStakesPanel();
             }
         }
 
         function generateHostFieldBlueprint() {
             initMinefieldMemoryStructures();
-            
             let planted = 0;
             while (planted < allocatedMinesCount) {
                 let randIndex = Math.floor(Math.random() * totalGridCellsCount);
@@ -366,9 +384,15 @@
                     planted++;
                 }
             }
+            recalculateNumericalClueBlueprints();
+        }
 
+        function recalculateNumericalClueBlueprints() {
             for (let i = 0; i < totalGridCellsCount; i++) {
-                if (minefieldBlueprint[i].isMine) continue;
+                if (minefieldBlueprint[i].isMine) {
+                    minefieldBlueprint[i].count = 0;
+                    continue;
+                }
                 minefieldBlueprint[i].count = calculateNeighboringMinesCount(i);
             }
         }
@@ -382,7 +406,6 @@
                 for (let cOffset = -1; cOffset <= 1; cOffset++) {
                     let targetRow = row + rOffset;
                     let targetCol = col + cOffset;
-                    
                     if (targetRow >= 0 && targetRow < gridSideDimension && targetCol >= 0 && targetCol < gridSideDimension) {
                         let targetIdx = targetRow * gridSideDimension + targetCol;
                         if (minefieldBlueprint[targetIdx].isMine) count++;
@@ -394,13 +417,14 @@
 
         function initMinefieldMemoryStructures() {
             minefieldBlueprint = [];
+            distortionActionCounter = 0;
+            currentRotationAngleDegrees = 0;
             for (let i = 0; i < totalGridCellsCount; i++) {
                 minefieldBlueprint.push({ isMine: false, isRevealed: false, isFlagged: false, count: 0 });
             }
             for (let p in globalPlayers) { globalPlayers[p].score = 0; }
         }
 
-        // --- LIVE SCORES ON THE GAME BOARD PANEL ---
         function renderLiveStakesPanel() {
             const stakesPanel = document.getElementById('live-stakes-board');
             stakesPanel.innerHTML = '';
@@ -409,34 +433,26 @@
                 const pData = globalPlayers[pId];
                 const card = document.createElement('div');
                 card.className = 'player-score-card';
-                if (matchIsActive && currentTurnUserId === pId) {
-                    card.classList.add('active-turn');
-                }
+                if (matchIsActive && currentTurnUserId === pId) card.classList.add('active-turn');
                 
                 const nameLabel = pId === myId ? `${pData.name} (You)` : pData.name;
                 card.innerHTML = `
                     <div class="p-name">${nameLabel}</div>
-                    <div class="p-pts">🚩 ${pData.score}</div>
+                    <div class="p-pts">🎯 Flags: ${pData.score}</div>
                 `;
                 stakesPanel.appendChild(card);
             });
         }
 
-        // --- GRID RENDERING HANDLERS ---
         function renderDynamicFieldGrid() {
             const container = document.getElementById('minefield-board');
             container.innerHTML = '';
-            
             container.style.gridTemplateColumns = `repeat(${gridSideDimension}, 1fr)`;
             
             container.className = 'grid';
-            if (gridSideDimension <= 9) {
-                container.classList.add('grid-small');
-            } else if (gridSideDimension <= 12) {
-                container.classList.add('grid-medium');
-            } else {
-                container.classList.add('grid-large');
-            }
+            if (gridSideDimension <= 9) container.classList.add('grid-small');
+            else if (gridSideDimension <= 12) container.classList.add('grid-medium');
+            else container.classList.add('grid-large');
 
             for (let i = 0; i < totalGridCellsCount; i++) {
                 const cell = document.createElement('div');
@@ -444,6 +460,18 @@
                 cell.setAttribute('data-index', i);
                 cell.addEventListener('click', () => handleGridCellInteractionClick(i));
                 container.appendChild(cell);
+            }
+        }
+
+        function applyVisualMatrixTransforms() {
+            const board = document.getElementById('minefield-board');
+            board.style.transform = `rotate(${currentRotationAngleDegrees}deg)`;
+            
+            if (distortionActionCounter > 0 && distortionActionCounter % 2 === 0) {
+                alertTicker.classList.remove('hidden');
+                alertTicker.innerText = `⚠️ CORE WARNING: GEOMETRIC DISTORTION ENGAGED (${currentRotationAngleDegrees}° SHIFT)`;
+            } else {
+                alertTicker.classList.add('hidden');
             }
         }
 
@@ -456,11 +484,14 @@
                 cell.innerText = '';
                 cell.removeAttribute('data-count');
 
+                // To counter rotation, individual labels rotate opposite to stay upright
+                cell.style.transform = `rotate(${-currentRotationAngleDegrees}deg)`;
+
                 if (data.isRevealed) {
                     cell.classList.add('revealed');
                     if (data.isMine) {
                         cell.classList.add('mine');
-                        cell.innerText = '💣';
+                        cell.innerText = '💥';
                     } else if (data.count > 0) {
                         cell.innerText = data.count;
                         cell.setAttribute('data-count', data.count);
@@ -472,7 +503,6 @@
             });
         }
 
-        // --- INTERACTION AND GAMEPLAY RULES METRICS LOOP ---
         function handleGridCellInteractionClick(index) {
             if (!matchIsActive || currentTurnUserId !== myId) return;
             
@@ -481,28 +511,69 @@
 
             if (currentToolMode === "FLAG") {
                 cell.isFlagged = !cell.isFlagged;
-                
-                // NEW STRATEGIC SCORING RULE: 
-                // Recalculate full player score based strictly on currently active accurate flags
                 recalculateMyAccurateFlagsScore();
-
+                
+                // Flag interactions increment the disruption counter slightly
+                distortionActionCounter++;
+                evaluateDistortionStormTrigger();
                 advanceTurnSequenceState();
             } else {
                 if (cell.isFlagged) return; 
-                
                 if (cell.isMine) {
                     cell.isRevealed = true;
-                    handleExplosionDefeatCondition(); // INSTANT LOSS TRIPPED
+                    handleExplosionDefeatCondition();
                 } else {
                     executeCascadeReveal(index);
+                    
+                    // Successful dig triggers tectonic shifts
+                    distortionActionCounter += 2;
+                    evaluateDistortionStormTrigger();
                     checkVictoryEnforcementStandard();
                 }
             }
         }
 
+        // --- HARDCORE DISTORTION ENGINE LOGIC ---
+        function evaluateDistortionStormTrigger() {
+            // Every 4 points of internal stress, the space shifts
+            if (distortionActionCounter >= 4) {
+                distortionActionCounter = 0;
+                currentRotationAngleDegrees += 90; // Rotate control space physically
+
+                // TECTONIC SHIFT: Shuffle all unrevealed elements to throw off static layout memorization
+                let unrevealedMinesPositions = [];
+                for (let i = 0; i < totalGridCellsCount; i++) {
+                    if (!minefieldBlueprint[i].isRevealed && minefieldBlueprint[i].isMine) {
+                        unrevealedMinesPositions.push(i);
+                        minefieldBlueprint[i].isMine = false; // Strip old layout data maps temporarily
+                    }
+                }
+
+                // Gather remaining valid slots that haven't been processed/cleared yet
+                let availableSlots = [];
+                for (let i = 0; i < totalGridCellsCount; i++) {
+                    if (!minefieldBlueprint[i].isRevealed) {
+                        availableSlots.push(i);
+                    }
+                }
+
+                // Randomly re-assign unrevealed mines into remaining safe spatial contexts
+                unrevealedMinesPositions.forEach(() => {
+                    if (availableSlots.length > 0) {
+                        let randSelectIdx = Math.floor(Math.random() * availableSlots.length);
+                        let targetCellIdx = availableSlots.splice(randSelectIdx, 1)[0];
+                        minefieldBlueprint[targetCellIdx].isMine = true;
+                    }
+                });
+
+                // Recompute tactical map values
+                recalculateNumericalClueBlueprints();
+                recalculateMyAccurateFlagsScore();
+            }
+        }
+
         function recalculateMyAccurateFlagsScore() {
             let accurateCount = 0;
-            // Scans the map to see how many of the map's current flags are correctly targeting mines
             for (let i = 0; i < totalGridCellsCount; i++) {
                 if (minefieldBlueprint[i].isFlagged && minefieldBlueprint[i].isMine) {
                     accurateCount++;
@@ -520,8 +591,6 @@
             if (cell.isRevealed || cell.isMine) return;
 
             cell.isRevealed = true;
-            
-            // If an unrevealed flagged cell is opened by a cascade, remove the flag status
             if (cell.isFlagged) {
                 cell.isFlagged = false;
                 recalculateMyAccurateFlagsScore();
@@ -540,29 +609,34 @@
             }
         }
 
-        // --- BUTTON UTILITY TOGGLES ---
         document.getElementById('btn-mode').addEventListener('click', () => {
             const btn = document.getElementById('btn-mode');
             if (currentToolMode === "DIG") {
                 currentToolMode = "FLAG";
                 btn.innerText = "Mode: FLAGGING";
-                btn.style.background = "#e74c3c";
+                btn.style.background = "#dc2626";
             } else {
                 currentToolMode = "DIG";
                 btn.innerText = "Mode: DIGGING";
-                btn.style.background = "#8e44ad";
+                btn.style.background = "#b91c1c";
             }
         });
 
         document.getElementById('btn-pass').addEventListener('click', () => {
             if (!matchIsActive || currentTurnUserId !== myId) return;
             
+            // Strategic choice: pass shifts distortion points forward
+            distortionActionCounter += 2;
+            evaluateDistortionStormTrigger();
+
             let nextIndex = (activeTurnOrder.indexOf(myId) + 1) % activeTurnOrder.length;
             let nextUserId = activeTurnOrder[nextIndex];
             
             broadcastPayloadNetworkMessage({
                 type: 'pass-turn-action',
                 nextUserId: nextUserId,
+                distortCount: distortionActionCounter,
+                rotDegrees: currentRotationAngleDegrees,
                 sender: myId
             });
         });
@@ -577,6 +651,8 @@
                 nextUserId: nextUserId,
                 actorId: myId,
                 actorUpdatedScore: globalPlayers[myId].score,
+                distortCount: distortionActionCounter,
+                rotDegrees: currentRotationAngleDegrees,
                 sender: myId
             });
         }
@@ -585,21 +661,20 @@
             const header = document.getElementById('board-header');
             if (currentTurnUserId === myId) {
                 statusBox.style.color = "#00ffca";
-                statusBox.innerText = "Your Turn! Clear or Flag.";
-                header.innerText = "YOUR GRID SCREEN FOCUS (ACTIVE)";
-                header.style.color = "#00ffca";
+                statusBox.innerText = "YOUR MATRIX WINDOW ACTIVE. OPERATE.";
+                header.innerText = "CRITICAL SCAN SEQUENCE ENFORCED";
+                header.style.color = "#ef4444";
                 document.getElementById('gameplay-controls-panel').classList.remove('hidden');
             } else {
-                let currentTurnName = globalPlayers[currentTurnUserId] ? globalPlayers[currentTurnUserId].name : "Operator";
-                statusBox.style.color = "#ffb300";
-                statusBox.innerText = `Awaiting sweep telemetry from ${currentTurnName}...`;
-                header.innerText = `OBSERVING GRID FIELD FOR: ${currentTurnName.toUpperCase()}`;
-                header.style.color = "#7f8c8d";
+                let currentTurnName = globalPlayers[currentTurnUserId] ? globalPlayers[currentTurnUserId].name : "Node";
+                statusBox.style.color = "#d97706";
+                statusBox.innerText = `Synchronizing telemetry from user: ${currentTurnName}...`;
+                header.innerText = `ARRAY MONITOR OVERRIDE: ${currentTurnName.toUpperCase()}`;
+                header.style.color = "#4b5563";
                 document.getElementById('gameplay-controls-panel').classList.add('hidden');
             }
         }
 
-        // --- EVALUATE RESOLUTIONS AND MATCH TERMINATIONS ---
         function handleExplosionDefeatCondition() {
             matchIsActive = false;
             let finalMetricsMatrix = compileFinalMetricsSummary();
@@ -625,7 +700,6 @@
             if (winMatch) {
                 matchIsActive = false;
                 let finalMetricsMatrix = compileFinalMetricsSummary();
-                
                 broadcastPayloadNetworkMessage({
                     type: 'broadcast-global-match-over',
                     outcome: 'VICTORY',
@@ -650,44 +724,41 @@
 
         function handleGlobalMatchOverBroadcast(outcome, triggerName, analyticsData) {
             matchIsActive = false;
-            statusBox.style.color = (outcome === 'VICTORY') ? "#2ecc71" : "#ff3838";
-            statusBox.innerText = `OPERATION RESOLVED: ${outcome}`;
+            statusBox.style.color = (outcome === 'VICTORY') ? "#16a34a" : "#ef4444";
+            statusBox.innerText = `TACTICAL OPERATION TERMINATED`;
 
             document.getElementById('gameplay-controls-panel').classList.add('hidden');
             document.getElementById('game-over-container').classList.remove('hidden');
+            alertTicker.classList.add('hidden');
+
+            // Force visual stabilization back to neutral alignment for clear overview
+            currentRotationAngleDegrees = 0;
+            applyVisualMatrixTransforms();
 
             minefieldBlueprint.forEach(cell => { if(cell.isMine) cell.isRevealed = true; });
             updateVisualDisplays();
             renderLiveStakesPanel();
 
-            let title = outcome === 'VICTORY' ? "GRID SECURED" : "TACTICAL DETONATION";
-            let messageHtml = "";
+            let title = outcome === 'VICTORY' ? "ARRAY CLASSIFIED" : "CRITICAL CASUALTY DETECTED";
+            let messageHtml = outcome === 'VICTORY' 
+                ? `<p style="color:#16a34a; font-weight:bold;">All safe terrain isolated successfully.</p>`
+                : `<p style="color:#ef4444; font-weight:bold;">Boom! ${triggerName} triggered a mine and caused full containment collapse!</p>`;
 
-            if (outcome === 'VICTORY') {
-                messageHtml = `<p style="color:#2ecc71; font-weight:bold;">Success! All safe terrain cleared.</p>`;
-            } else {
-                messageHtml = `<p style="color:#ff3838; font-weight:bold;">Boom! ${triggerName} triggered a mine and was instantly eliminated!</p>`;
-            }
-
-            messageHtml += `<h4>Tactical Flag Leaderboard (Accurate Flags Only):</h4>`;
-            messageHtml += `<table class="stats-table"><tr><th>Operator Node</th><th>Status</th><th>Accurate Flags</th></tr>`;
+            messageHtml += `<h4>Operation Synchronization Record:</h4>`;
+            messageHtml += `<table class="stats-table"><tr><th>Operator Node</th><th>Status</th><th>Confirmed Mines Disarmed</th></tr>`;
             
-            // Find the person who hit the mine to clearly label them as disqualified/eliminated
             analyticsData.forEach(p => {
-                if (p.name === triggerName && outcome === 'DEFEAT') {
-                    p.isEliminated = true;
-                }
+                if (p.name === triggerName && outcome === 'DEFEAT') p.isEliminated = true;
             });
 
-            // Sort by elimination status first, then by highest score
             analyticsData.sort((a,b) => {
                 if (a.isEliminated && !b.isEliminated) return 1;
-                if (!a.isEliminated && a.isEliminated) return -1;
+                if (!a.isEliminated && b.isEliminated) return -1;
                 return b.score - a.score;
             });
 
             analyticsData.forEach(r => {
-                let statusText = r.isEliminated ? `<span style="color:#ff3838;">💥 ELIMINATED</span>` : `<span style="color:#2ecc71;">SURVIVED</span>`;
+                let statusText = r.isEliminated ? `<span style="color:#ef4444;">💥 KILLED IN ACTION</span>` : `<span style="color:#16a34a;">SURVIVED</span>`;
                 let operationalScore = r.isEliminated ? "0" : r.score;
                 messageHtml += `<tr><td>${r.name}</td><td>${statusText}</td><td>🚩 ${operationalScore} / ${allocatedMinesCount}</td></tr>`;
             });
@@ -696,7 +767,6 @@
             showModal(title, messageHtml);
         }
 
-        // --- REBOOT TEARDOWN SYSTEM ROUTINES ---
         document.getElementById('btn-exit-lobby').addEventListener('click', () => {
             if (pubnub) pubnub.unsubscribe({ channels: [myChannel] });
             globalPlayers = {}; activeTurnOrder = []; currentTurnUserId = null; matchIsActive = false;
@@ -708,6 +778,7 @@
             
             statusBox.className = "status";
             statusBox.style.color = "#00ffca";
+            statusBox.style.borderColor = "#ff3838";
             statusBox.innerText = "Connected to global operations mesh.";
         });
     </script>
