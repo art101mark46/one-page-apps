@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My App Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent-gradient-1: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            --accent-gradient-2: linear-gradient(135deg, #ec4899, #8b5cf6);
+            --accent-gradient-3: linear-gradient(135deg, #10b981, #3b82f6);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 3rem 1.5rem;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 4rem;
+            max-width: 600px;
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.75rem;
+            background: linear-gradient(to right, #3b82f6, #ec4899);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        header p {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+
+        /* The Graphical Grid */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+            width: 100%;
+            max-width: 1100px;
+        }
+
+        /* Card Styling */
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 16px;
+            overflow: hidden;
+            text-decoration: none;
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        /* Visual Header of the Card */
+        .card-visual {
+            height: 140px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        /* Distinct gradients for different cards */
+        .card:nth-child(3n+1) .card-visual { background: var(--accent-gradient-1); }
+        .card:nth-child(3n+2) .card-visual { background: var(--accent-gradient-2); }
+        .card:nth-child(3n+3) .card-visual { background: var(--accent-gradient-3); }
+
+        /* Graphic/Icon Placeholder inside the card */
+        .card-icon {
+            font-size: 3rem;
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.2));
+            transition: transform 0.3s ease;
+        }
+
+        .card-content {
+            padding: 1.5rem;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card h2 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .card p {
+            color: var(--text-muted);
+            font-size: 0.925rem;
+            line-height: 1.5;
+        }
+
+        /* Hover Effects */
+        .card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .card:hover .card-icon {
+            transform: scale(1.15) rotate(-3deg);
+        }
+
+        /* Footer / GitHub Link */
+        footer {
+            margin-top: auto;
+            padding-top: 5rem;
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+        footer a {
+            color: #3b82f6;
+            text-decoration: none;
+        }
+        
+        footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>App Collection</h1>
+        <p>A suite of lightweight, single-page web applications.</p>
+    </header>
+
+    <main class="grid">
+
+        <a href="pool-scorer.html" class="card">
+            <div class="card-visual">
+                <div class="card-icon">🎱</div>
+            </div>
+            <div class="card-content">
+                <h2>Pool Scorer</h2>
+                <p>Track match progress with interactive scoring rules, point systems, and seamless undo history.</p>
+            </div>
+        </a>
+
+        <a href="another-app.html" class="card">
+            <div class="card-visual">
+                <div class="card-icon">⏱️</div>
+            </div>
+            <div class="card-content">
+                <h2>Focus Timer</h2>
+                <p>A minimalist productivity timer designed to keep workflows sharp and uninterrupted.</p>
+            </div>
+        </a>
+
+        <a href="third-app.html" class="card">
+            <div class="card-visual">
+                <div class="card-icon">🎨</div>
+            </div>
+            <div class="card-content">
+                <h2>Color Palette</h2>
+                <p>Generate, lock, and export custom contrast-compliant color harmonies instantly.</p>
+            </div>
+        </a>
+
+    </main>
+
+    <footer>
+        <p>View the source on <a href="https://github.com">GitHub</a></p>
+    </footer>
+
+</body>
+</html>
