@@ -3,10 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Battleships Pro: Cross-Platform Offline Hybrid</title>
+    <title>Battleships Pro: Online Fleet Command</title>
     
     <script src="https://cdn.jsdelivr.net/npm/pubnub@7.2.2/dist/web/pubnub.min.js" onerror="console.log('PubNub CDN offline')"></script>
-
 
     <style>
         body { font-family: -apple-system, sans-serif; background: #121212; color: #fff; text-align: center; margin: 0; padding: 10px; box-sizing: border-box; }
@@ -32,10 +31,6 @@
         
         .mode-badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; margin-bottom: 10px; }
         .mode-online { background: #2ecc71; color: #fff; }
-        .mode-offline { background: #e67e22; color: #fff; }
-
-        #qr-container { background: white; padding: 15px; display: inline-block; margin: 15px auto; border-radius: 8px; }
-        #video-preview { width: 100%; max-width: 320px; height: 240px; background: #000; border: 2px solid #3498db; border-radius: 8px; margin: 10px auto; object-fit: cover; }
 
         .dock { background: #1a1a1a; padding: 12px; border-radius: 8px; max-width: 400px; margin: 10px auto; text-align: left; box-sizing: border-box; border: 1px solid #333; }
         .dock h4 { margin: 0 0 4px 0; text-align: center; font-size: 0.95rem; letter-spacing: 1px; color: #aaa; }
@@ -74,7 +69,7 @@
 </head>
 <body>
 
-    <h1>Battleships Pro: integrated QR v5</h1>
+    <h1>Battleships Pro: Online Deployment</h1>
     <div id="status-box" class="status">Initializing Tactical Network Layer...</div>
 
     <div id="game-modal" class="modal-overlay hidden">
@@ -87,7 +82,7 @@
 
     <div id="lobby-screen" class="hidden">
         <div class="setup-card" style="text-align: center;">
-            <div id="net-badge" class="mode-badge mode-online">ONLINE MODE AVAILABLE</div>
+            <div id="net-badge" class="mode-badge mode-online">ONLINE COMMAND NODE ACTIVE</div>
             
             <div style="text-align: left;">
                 <label for="name-input">Your Calling Name</label>
@@ -96,18 +91,10 @@
 
             <div id="online-controls">
                 <div style="text-align: left;">
-                    <label for="room-input">Tactical Channel Code (Online)</label>
+                    <label for="room-input">Tactical Channel Code</label>
                     <input type="number" id="room-input" pattern="[0-9]*" placeholder="e.g. 9988">
                 </div>
                 <button class="main-btn" id="btn-start-online">Join Online Room</button>
-                <button class="main-btn" id="btn-switch-offline" style="background:#7f8c8d; margin-top:8px; font-size:0.9rem; padding:10px;">Force Offline Mode</button>
-            </div>
-
-            <div id="offline-controls" class="hidden">
-                <p style="font-size:0.85rem; color:#aaa; margin-top:0;">No Internet? Sync up instantly by letting the phones look at each other.</p>
-                <button class="main-btn" id="btn-host-offline" style="background:#9b59b6;">Host Offline Game</button>
-                <button class="main-btn" id="btn-join-offline" style="background:#e67e22;">Join Existing Host</button>
-                <button class="main-btn" id="btn-switch-online" style="background:#7f8c8d; margin-top:8px; font-size:0.9rem; padding:10px;">Force Online Mode</button>
             </div>
         </div>
     </div>
@@ -161,28 +148,6 @@
     </div>
 
     <script>
-        // --- SECURE STANDARDS-BASED QR ENGINE CODES ---
-        const QRManager = {
-            generate: function(elementId, textString) {
-                try {
-                    // Type 0 auto-detects optimal sizing grid matrix, Error Correction Level L keeps data footprint low
-                    const qr = qrcode(0, 'L');
-                    qr.addData(textString);
-                    qr.make();
-                    document.getElementById(elementId).innerHTML = qr.createImgTag(6, 12);
-                } catch(e) {
-                    console.error("QR Generation Error:", e);
-                }
-            },
-            decode: function(imageDataObj) {
-                if (typeof jsQR === 'undefined') return null;
-                const code = jsQR(imageDataObj.data, imageDataObj.width, imageDataObj.height, {
-                    inversionAttempts: "dontInvert",
-                });
-                return code ? code.data : null;
-            }
-        };
-
         // --- CORE APPLICATION LOGIC ENGINES ---
         const statusBox = document.getElementById('status-box');
         let pubnub, myChannel, myName;
@@ -193,11 +158,6 @@
         let currentTurnUserId = null;
         let iamReady = false;
         let matchIsActive = false;
-        let isNetworkOnline = true;
-
-        let localPeerConnection = null;
-        let localDataChannel = null;
-        let localVideoStreamStream = null;
 
         let statShotsFired = 0;
         let statHitsLanded = 0;
@@ -219,49 +179,21 @@
         }
         function closeModal() {
             document.getElementById('game-modal').classList.add('hidden');
-            killActiveCameraStream();
-        }
-        function killActiveCameraStream() {
-            if (localVideoStreamStream) {
-                localVideoStreamStream.getTracks().forEach(track => track.stop());
-                localVideoStreamStream = null;
-            }
         }
 
         // --- NETWORK UI LAYOUT ENGINE ---
         window.addEventListener('load', () => {
-            isNetworkOnline = navigator.onLine;
-            if (typeof PubNub === 'undefined' || typeof qrcode === 'undefined') isNetworkOnline = false;
-            
-            toggleNetworkModeUILayout(isNetworkOnline);
-            document.getElementById('lobby-screen').classList.remove('hidden');
+            if (typeof PubNub === 'undefined') {
+                statusBox.innerText = "Error: Network layer dependencies unavailable.";
+            } else {
+                statusBox.innerText = "Connected to global network mesh.";
+                document.getElementById('lobby-screen').classList.remove('hidden');
+            }
         });
 
-        function toggleNetworkModeUILayout(online) {
-            const badge = document.getElementById('net-badge');
-            if (online) {
-                badge.className = "mode-badge mode-online";
-                badge.innerText = "ONLINE MODE AVAILABLE";
-                document.getElementById('online-controls').classList.remove('hidden');
-                document.getElementById('offline-controls').classList.add('hidden');
-                statusBox.innerText = "Connected to global network mesh.";
-            } else {
-                badge.className = "mode-badge mode-offline";
-                badge.innerText = "AIR-GAPPED VISUAL MODE ACTIVE";
-                document.getElementById('online-controls').classList.add('hidden');
-                document.getElementById('offline-controls').classList.remove('hidden');
-                statusBox.innerText = "Ready for visual matrix sync handshakes.";
-            }
-        }
-
-        document.getElementById('btn-switch-offline').addEventListener('click', () => { isNetworkOnline = false; toggleNetworkModeUILayout(false); });
-        document.getElementById('btn-switch-online').addEventListener('click', () => { isNetworkOnline = navigator.onLine; toggleNetworkModeUILayout(isNetworkOnline); });
-
         function broadcastPayloadNetworkMessage(msg) {
-            if (isNetworkOnline && pubnub) {
+            if (pubnub) {
                 pubnub.publish({ channel: myChannel, message: msg });
-            } else if (localDataChannel && localDataChannel.readyState === 'open') {
-                localDataChannel.send(JSON.stringify(msg));
             }
         }
 
@@ -271,9 +203,7 @@
             const roomCode = document.getElementById('room-input').value.trim();
             if (!roomCode) return alert("A room code is required for online matches.");
             
-            isNetworkOnline = true;
             myChannel = 'bbship_v6_room_' + roomCode;
-            
             pubnub = new PubNub({ publishKey: 'demo', subscribeKey: 'demo', userId: myId });
             setupPubNubChannelSubscription();
         });
@@ -288,218 +218,6 @@
             pubnub.subscribe({ channels: [myChannel] });
             broadcastPayloadNetworkMessage({ type: 'sync-identity', name: myName, sender: myId });
             transitionToPlacementCanvas();
-        }
-
-        // --- DATA INTERCHANGE COMPRESSION ---
-        function packSessionDescriptionBlock(profileName, uid, sessionObj) {
-            const abbreviatedBlueprint = {
-                n: profileName,
-                i: uid,
-                s: sessionObj.sdp.replace(/[\r\n]+/g, '|').replace(/a=candidate:.+\|/g, '') 
-            };
-            return btoa(unescape(encodeURIComponent(JSON.stringify(abbreviatedBlueprint))));
-        }
-
-        function unpackSessionDescriptionBlock(packedString) {
-            const raw = JSON.parse(decodeURIComponent(escape(atob(packedString))));
-            return {
-                name: raw.n,
-                id: raw.i,
-                sdp: { type: raw.s.includes("offer") ? "offer" : "answer", sdp: raw.s.replace(/\|/g, '\r\n') }
-            };
-        }
-
-        const rtcIceFallbackConfiguration = { iceServers: [] }; 
-
-        document.getElementById('btn-host-offline').addEventListener('click', () => {
-            myName = document.getElementById('name-input').value.trim() || "Host_" + Math.floor(Math.random()*90+10);
-            isNetworkOnline = false;
-            document.getElementById('your-board-header').innerText = `${myName}'s Fleet`;
-            globalPlayers[myId] = { name: myName, active: true, ready: false, lost: false, boardHits: Array(100).fill(0), initialFleet: Array(100).fill(0) };
-
-            localPeerConnection = new RTCPeerConnection(rtcIceFallbackConfiguration);
-            localDataChannel = localPeerConnection.createDataChannel("battleshipsOfflineChannel");
-            configureDataChannelListeners();
-
-            localPeerConnection.onicecandidate = (e) => {
-                if (!e.candidate) {
-                    const compressedPayloadString = packSessionDescriptionBlock(myName, myId, localPeerConnection.localDescription);
-                    
-                    showModal("SCAN TO JOIN MATCH", `
-                        <p style='font-size:0.9rem; color:#aaa;'>Point Player 2's camera at this code block to sync up pipelines:</p>
-                        <div id="qr-container"></div>
-                        <p style='font-size:0.8rem; color:#777;'>Once scanned, Player 2 will display a return matrix verification code.</p>
-                        <button class="main-btn" id="btn-manual-response-link" style="background:#9b59b6; margin-top:10px; font-size:0.85rem; padding:10px;">I have Player 2's return code</button>
-                    `);
-
-                    QRManager.generate("qr-container", "BBSH:" + compressedPayloadString);
-
-                    document.getElementById('btn-manual-response-link').onclick = () => {
-                        showManualResponseCaptureOverlay();
-                    };
-                }
-            };
-
-            localPeerConnection.createOffer().then(offer => localPeerConnection.setLocalDescription(offer));
-        });
-
-        function showManualResponseCaptureOverlay() {
-            showModal("ENTER RETURN LINK", `
-                <p style='font-size:0.9rem; color:#aaa;'>Scan or paste Player 2's confirmation validation block:</p>
-                <button class="main-btn" id="btn-scan-return-cam" style="background:#27ae60; margin-bottom:10px;">Scan Return Code via Cam</button>
-                <input type="text" id="manual-payload-paste-box" placeholder="Paste response handshake code..." style="font-size:0.9rem;">
-                <button class="main-btn" id="btn-process-manual-handshake" style="background:#3498db;">Complete Interlock Connection</button>
-            `);
-
-            document.getElementById('btn-scan-return-cam').onclick = () => launchDirectCameraScannerPipeline(true);
-
-            document.getElementById('btn-process-manual-handshake').onclick = () => {
-                const text = document.getElementById('manual-payload-paste-box').value.trim();
-                if(!text) return;
-                const cleaned = text.startsWith("BBSH:") ? text.substring(5) : text;
-                const unpacked = unpackSessionDescriptionBlock(cleaned);
-                globalPlayers[unpacked.id] = { name: unpacked.name, active: true, ready: false, lost: false, boardHits: Array(100).fill(0), initialFleet: Array(100).fill(0) };
-                localPeerConnection.setRemoteDescription(new RTCSessionDescription(unpacked.sdp)).then(() => closeModal());
-            };
-        }
-
-        document.getElementById('btn-join-offline').addEventListener('click', () => {
-            myName = document.getElementById('name-input').value.trim() || "Peer_" + Math.floor(Math.random()*90+10);
-            isNetworkOnline = false;
-            document.getElementById('your-board-header').innerText = `${myName}'s Fleet`;
-            globalPlayers[myId] = { name: myName, active: true, ready: false, lost: false, boardHits: Array(100).fill(0), initialFleet: Array(100).fill(0) };
-
-            launchDirectCameraScannerPipeline(false);
-        });
-
-        // --- CAMERA INTERACTIVE CAPTURE ARRAYS ---
-        function launchDirectCameraScannerPipeline(isCapturingHostReturnCode) {
-            showModal("ALIGN SCANNER RADAR", `
-                <p style='font-size:0.9rem; color:#aaa;'>Center the target QR code system matrix within the viewport frame:</p>
-                <video id="video-preview" autoplay playsinline></video>
-                <canvas id="hidden-processing-canvas" class="hidden"></canvas>
-                <p style='font-size:0.85rem; color:#00ffca; font-weight:bold;' id="scanner-feedback-text">Scanning matrix arrays...</p>
-                <button class="main-btn" id="btn-force-text-fallback" style="background:#7f8c8d; margin-top:15px; font-size:0.85rem; padding:8px;">Switch to Manual String Paste</button>
-            `);
-
-            document.getElementById('btn-force-text-fallback').onclick = () => {
-                killActiveCameraStream();
-                fallbackToManualCodeTypingPasteBox(isCapturingHostReturnCode);
-            };
-
-            const video = document.getElementById('video-preview');
-            const canvas = document.getElementById('hidden-processing-canvas');
-            const ctx = canvas.getContext('2d');
-
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-                .then(stream => {
-                    localVideoStreamStream = stream;
-                    video.srcObject = stream;
-                    video.setAttribute("playsinline", true);
-                    video.play();
-                    requestAnimationFrame(processOpticalScannerFrameTick);
-                })
-                .catch(() => {
-                    fallbackToManualCodeTypingPasteBox(isCapturingHostReturnCode);
-                });
-
-            function processOpticalScannerFrameTick() {
-                if (!localVideoStreamStream) return;
-                if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                    canvas.height = video.videoHeight;
-                    canvas.width = video.videoWidth;
-                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                    
-                    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                    const decodedText = QRManager.decode(imgData);
-
-                    if (decodedText && decodedText.startsWith("BBSH:")) {
-                        killActiveCameraStream();
-                        if (!isCapturingHostReturnCode) {
-                            executeJoinerHandshakeResponse(decodedText.substring(5));
-                        } else {
-                            const unpacked = unpackSessionDescriptionBlock(decodedText.substring(5));
-                            localPeerConnection.setRemoteDescription(new RTCSessionDescription(unpacked.sdp)).then(() => closeModal());
-                        }
-                        return;
-                    }
-                }
-                requestAnimationFrame(processOpticalScannerFrameTick);
-            }
-        }
-
-        function fallbackToManualCodeTypingPasteBox(isCapturingHostReturnCode) {
-            showModal("MANUAL SIGNATURE INTERLOCK", `
-                <p style='font-size:0.9rem; color:#aaa;'>Paste the string payload copy-block directly into the space below:</p>
-                <textarea id="manual-fallback-text-area" style="width:100%; height:140px; background:#222; color:#00ffca; border:1px solid #444; border-radius:6px; font-family:monospace; font-size:0.8rem; padding:8px; box-sizing:border-box;"></textarea>
-                <button class="main-btn" id="btn-submit-fallback-string" style="background:#e67e22;">Establish Link Bridge</button>
-            `);
-
-            document.getElementById('btn-submit-fallback-string').onclick = () => {
-                const val = document.getElementById('manual-fallback-text-area').value.trim();
-                if(!val) return alert("Text area is empty.");
-                const cleanStr = val.startsWith("BBSH:") ? val.substring(5) : val;
-                try {
-                    if(!isCapturingHostReturnCode) {
-                        executeJoinerHandshakeResponse(cleanStr);
-                    } else {
-                        const unpacked = unpackSessionDescriptionBlock(cleanStr);
-                        localPeerConnection.setRemoteDescription(new RTCSessionDescription(unpacked.sdp)).then(() => closeModal());
-                    }
-                } catch(e) {
-                    alert("Invalid handshake format token string.");
-                }
-            };
-        }
-
-        function executeJoinerHandshakeResponse(hostPackedOfferString) {
-            const unpackedHostOffer = unpackSessionDescriptionBlock(hostPackedOfferString);
-            globalPlayers[unpackedHostOffer.id] = { name: unpackedHostOffer.name, active: true, ready: false, lost: false, boardHits: Array(100).fill(0), initialFleet: Array(100).fill(0) };
-
-            localPeerConnection = new RTCPeerConnection(rtcIceFallbackConfiguration);
-            localPeerConnection.ondatachannel = (event) => {
-                localDataChannel = event.channel;
-                configureDataChannelListeners();
-            };
-
-            localPeerConnection.onicecandidate = (e) => {
-                if (!e.candidate) {
-                    const compressedAnswerString = packSessionDescriptionBlock(myName, myId, localPeerConnection.localDescription);
-                    
-                    showModal("SHOW THIS TO THE HOST", `
-                        <p style='font-size:0.9rem; color:#aaa;'>The Host must scan this validation code block to lock the connection:</p>
-                        <div id="qr-container-answer"></div>
-                        <p style='font-size:0.8rem; color:#777;'>Alternatively, copy and share the raw signature validation data block below.</p>
-                        <button class="main-btn" id="btn-copy-handshake-string" style="background:#2980b9; font-size:0.9rem; padding:10px;">Copy Verification String</button>
-                    `);
-
-                    QRManager.generate("qr-container-answer", "BBSH:" + compressedAnswerString);
-
-                    document.getElementById('btn-copy-handshake-string').onclick = () => {
-                        navigator.clipboard.writeText("BBSH:" + compressedAnswerString);
-                        statusBox.innerText = "Verification handshake string copied!";
-                        alert("Verification string copied to clipboard! Share it with the host.");
-                    };
-                }
-            };
-
-            localPeerConnection.setRemoteDescription(new RTCSessionDescription(unpackedHostOffer.sdp))
-                .then(() => localPeerConnection.createAnswer())
-                .then(answer => localPeerConnection.setLocalDescription(answer))
-                .catch(() => {
-                    fallbackToManualCodeTypingPasteBox(false);
-                });
-        }
-
-        function configureDataChannelListeners() {
-            localDataChannel.onopen = () => {
-                closeModal();
-                broadcastPayloadNetworkMessage({ type: 'sync-identity', name: myName, sender: myId });
-                transitionToPlacementCanvas();
-            };
-            localDataChannel.onmessage = (e) => {
-                handleInboundUnifiedMessage(JSON.parse(e.data));
-            };
         }
 
         function transitionToPlacementCanvas() {
@@ -667,7 +385,7 @@
                 renderGrid('your-board', null, false); 
                 
                 broadcastPayloadNetworkMessage({ type: 'player-ready', sender: myId });
-                statusBox.innerText = "Awaiting verification handshakes...";
+                statusBox.innerText = "Awaiting other players...";
                 evaluateHostInitiatedStart();
             };
         }
@@ -957,8 +675,7 @@
         });
 
         document.getElementById('btn-exit-lobby').addEventListener('click', () => {
-            if (isNetworkOnline && pubnub) pubnub.unsubscribe({ channels: [myChannel] });
-            if (localPeerConnection) { localPeerConnection.close(); localPeerConnection = null; localDataChannel = null; }
+            if (pubnub) pubnub.unsubscribe({ channels: [myChannel] });
             globalPlayers = {}; activeTurnOrder = []; currentTurnUserId = null; iamReady = false; matchIsActive = false;
             initFleetStructures();
             document.getElementById('game-over-container').classList.add('hidden');
@@ -967,7 +684,7 @@
             document.getElementById('target-selector-container').classList.add('hidden');
             document.getElementById('game-screen').classList.add('hidden');
             document.getElementById('lobby-screen').classList.remove('hidden');
-            toggleNetworkModeUILayout(navigator.onLine);
+            statusBox.innerText = "Connected to global network mesh.";
         });
     </script>
 </body>
