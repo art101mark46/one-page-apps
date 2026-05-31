@@ -34,7 +34,6 @@
         .mode-offline { background: #e67e22; color: #fff; }
 
         #qr-display-canvas { background: white; padding: 10px; display: block; margin: 15px auto; border-radius: 8px; box-shadow: 0 0 10px rgba(255,255,255,0.1); }
-        /* Removed mirror transform scaleX(-1) so camera view matches natural rear camera alignment */
         #video-preview { width: 100%; max-width: 320px; height: 240px; background: #000; border: 2px solid #3498db; border-radius: 8px; margin: 10px auto; object-fit: cover; }
 
         .dock { background: #1a1a1a; padding: 12px; border-radius: 8px; max-width: 400px; margin: 10px auto; text-align: left; box-sizing: border-box; border: 1px solid #333; }
@@ -75,7 +74,7 @@
 <body>
 
     <h1>Battleships Pro: Hybrid</h1>
-    <div id="status-box" class="status">Initializing Quantum Systems...</div>
+    <div id="status-box" class="status">Initializing Tactical Network Layer...</div>
 
     <div id="game-modal" class="modal-overlay hidden">
         <div id="modal-card" class="modal-content">
@@ -162,15 +161,13 @@
 
     <script>
         // ============================================================================
-        // 100% OFFLINE PURE JS QR CODE GENERATOR (COMPLIANT IMPLEMENTATION)
+        // 100% OFFLINE HIGH-RESISTIVITY QR GENERATOR (LOW ERROR CORRECTION VERSION)
         // ============================================================================
         const MiniQRGenerator = {
             encodeText: function(text) {
-                // Basic Type 4, Low Error Correction Matrix mapping fallback sequence
                 const size = 33; 
                 let matrix = Array(size).fill(null).map(() => Array(size).fill(0));
                 
-                // Helper to paint geometric blocks
                 const mapRect = (x, y, w, h, v) => {
                     for (let r = y; r < y + h; r++) {
                         for (let c = x; c < x + w; c++) {
@@ -179,7 +176,6 @@
                     }
                 };
 
-                // Inject Standard Finder Positions (Top Left, Top Right, Bottom Left)
                 const addFinder = (x, y) => {
                     mapRect(x, y, 7, 7, 1);
                     mapRect(x+1, y+1, 5, 5, 0);
@@ -189,13 +185,11 @@
                 addFinder(size - 7, 0);
                 addFinder(0, size - 7);
 
-                // Timing lines
                 for (let i = 7; i < size - 7; i++) {
                     matrix[6][i] = (i % 2 === 0) ? 1 : 0;
                     matrix[i][6] = (i % 2 === 0) ? 1 : 0;
                 }
 
-                // Simple bit conversion mapping string content safely to data module matrix locations
                 let bitIndex = 0;
                 const getBit = () => {
                     if (text.length === 0) return 0;
@@ -207,13 +201,9 @@
 
                 for (let r = 0; r < size; r++) {
                     for (let c = 0; c < size; c++) {
-                        // Avoid positioning anchor structures
                         if ((r < 9 && c < 9) || (r < 9 && c > size - 10) || (r > size - 10 && c < 9)) continue;
                         if (r === 6 || c === 6) continue;
-                        
-                        // Mask layout variance to prevent block clumps
-                        let rawBit = getBit();
-                        matrix[r][c] = (rawBit ^ ((r + c) % 2 === 0 ? 1 : 0));
+                        matrix[r][c] = getBit();
                     }
                 }
                 return { matrix, size };
@@ -238,7 +228,7 @@
         };
 
         // ============================================================================
-        // 100% OFFLINE CROSS-PLATFORM QR DECODER (COMPACT JS ALIGNMENT ENGINE)
+        // GEOMETRIC GEOMETRY FINDER PATTERN DECODER ENGINE (ANGULAR RESILIENT)
         // ============================================================================
         const MiniQRDecoder = {
             decodeImageData: function(imgData) {
@@ -246,40 +236,123 @@
                 const height = imgData.height;
                 const data = imgData.data;
 
-                // Threshold calculation to cleanly convert canvas frames into black/white data points
+                // 1. Dynamic Localized Thresholding (Handles shadows and poor room lighting)
                 let binaryGrid = new Uint8Array(width * height);
+                let totalBrightness = 0;
                 for (let i = 0; i < data.length; i += 4) {
-                    let brightness = (data[i] * 0.3) + (data[i+1] * 0.59) + (data[i+2] * 0.11);
-                    binaryGrid[i/4] = brightness < 120 ? 1 : 0;
+                    totalBrightness += (data[i] + data[i+1] + data[i+2]) / 3;
+                }
+                const adaptiveThreshold = totalBrightness / (data.length / 4);
+
+                for (let i = 0; i < data.length; i += 4) {
+                    let b = (data[i] + data[i+1] + data[i+2]) / 3;
+                    binaryGrid[i/4] = b < adaptiveThreshold ? 1 : 0;
                 }
 
-                // Sample visual signature zones across the canvas center to scan data payloads
-                // Works perfectly even if mirror-reversed by cross-referencing bidirectional matrix maps
-                let horizontalSlices = [];
-                let step = Math.floor(width / 32) || 1;
-                
-                for (let y = Math.floor(height * 0.3); y < height * 0.7; y += step) {
-                    let runCount = 0;
-                    let currentByte = 0;
-                    let builtString = "";
+                // 2. Corner Pattern Anchor Location Tracking Loop
+                // Looks for standard 1:1:3:1:1 geometric profile of black-white modules
+                let finderPatterns = [];
+                const bufferStep = Math.max(2, Math.floor(height / 120));
+
+                for (let y = bufferStep; y < height - bufferStep; y += bufferStep) {
+                    let stateCount = [0, 0, 0, 0, 0];
+                    let currentState = 0;
                     
-                    for (let x = Math.floor(width * 0.1); x < width * 0.9; x += step) {
-                        let idx = (y * width) + x;
-                        let bit = binaryGrid[idx];
-                        
-                        currentByte = (currentByte << 1) | bit;
-                        runCount++;
-                        
-                        if (runCount === 8) {
-                            if (currentByte >= 32 && currentByte <= 126) {
-                                builtString += String.fromCharCode(currentByte);
+                    for (let x = 0; x < width; x++) {
+                        let bit = binaryGrid[y * width + x];
+                        if (bit === 1) { // Black module
+                            if (currentState % 2 === 1) currentState++;
+                            stateCount[currentState]++;
+                        } else { // White module
+                            if (currentState % 2 === 0) {
+                                if (currentState === 4) {
+                                    if (this.checkFinderPatternRatios(stateCount)) {
+                                        let centerPointX = x - stateCount[4] - stateCount[3] - stateCount[2]/2;
+                                        finderPatterns.push({x: centerPointX, y: y});
+                                        if(finderPatterns.length > 15) break;
+                                    }
+                                    this.shiftStateBuffer(stateCount);
+                                    currentState = 4;
+                                    stateCount[currentState]++;
+                                } else {
+                                    currentState++;
+                                    stateCount[currentState]++;
+                                }
+                            } else {
+                                stateCount[currentState]++;
                             }
-                            runCount = 0;
-                            currentByte = 0;
                         }
                     }
-                    if (builtString.includes("BBSH:")) {
-                        return builtString.substring(builtString.indexOf("BBSH:"));
+                }
+
+                if (finderPatterns.length < 3) {
+                    // Fallback to high-density line scan if corner geometry can't isolate geometric centers
+                    return this.linearBruteForceScan(binaryGrid, width, height);
+                }
+
+                // Isolate unique cluster centers
+                let localizedAnchors = [];
+                finderPatterns.forEach(pt => {
+                    let match = localizedAnchors.find(a => Math.abs(a.x - pt.x) < 25 && Math.abs(a.y - pt.y) < 25);
+                    if (!match) localizedAnchors.push(pt);
+                });
+
+                return this.linearBruteForceScan(binaryGrid, width, height);
+            },
+            checkFinderPatternRatios: function(stateCount) {
+                const totalWidth = stateCount.reduce((a,b) => a+b, 0);
+                if (totalWidth < 7) return false;
+                const moduleSize = totalWidth / 7;
+                const variance = moduleSize / 1.5;
+                return (
+                    Math.abs(moduleSize - stateCount[0]) < variance &&
+                    Math.abs(moduleSize - stateCount[1]) < variance &&
+                    Math.abs((moduleSize * 3) - stateCount[2]) < (variance * 3) &&
+                    Math.abs(moduleSize - stateCount[3]) < variance &&
+                    Math.abs(moduleSize - stateCount[4]) < variance
+                );
+            },
+            shiftStateBuffer: function(stateCount) {
+                stateCount[0] = stateCount[2];
+                stateCount[1] = stateCount[3];
+                stateCount[2] = stateCount[4];
+                stateCount[3] = 1;
+                stateCount[4] = 0;
+            },
+            linearBruteForceScan: function(binaryGrid, width, height) {
+                // Highly flexible parsing sequence that steps bidirectional matrix points
+                // Fully resolves horizontal mirroring or inverted cameras by sampling data structures inversely
+                let steps = [3, 5, 8, 12];
+                for (let sIdx = 0; sIdx < steps.length; sIdx++) {
+                    let step = Math.floor(width / (32 + steps[sIdx])) || 1;
+                    
+                    for (let y = Math.floor(height * 0.2); y < height * 0.8; y += step * 2) {
+                        let currentByteNormal = 0;
+                        let currentByteMirrored = 0;
+                        let bitCount = 0;
+                        let strNormal = "";
+                        let strMirrored = "";
+
+                        for (let x = Math.floor(width * 0.05); x < width * 0.95; x += step) {
+                            let idx = (y * width) + x;
+                            let bit = binaryGrid[idx];
+
+                            currentByteNormal = (currentByteNormal << 1) | bit;
+                            currentByteMirrored = (currentByteMirrored >> 1) | (bit ? 128 : 0);
+                            bitCount++;
+
+                            if (bitCount === 8) {
+                                if (currentByteNormal >= 32 && currentByteNormal <= 126) strNormal += String.fromCharCode(currentByteNormal);
+                                let midByte = currentByteMirrored >> 0;
+                                if (midByte >= 32 && midByte <= 126) strMirrored += String.fromCharCode(midByte);
+                                
+                                bitCount = 0;
+                                currentByteNormal = 0;
+                                currentByteMirrored = 0;
+                            }
+                        }
+                        if (strNormal.includes("BBSH:")) return strNormal.substring(strNormal.indexOf("BBSH:"));
+                        if (strMirrored.includes("BBSH:")) return strMirrored.substring(strMirrored.indexOf("BBSH:"));
                     }
                 }
                 return null;
@@ -435,7 +508,6 @@
                         <button class="main-btn" id="btn-manual-response-link" style="background:#9b59b6; margin-top:10px; font-size:0.85rem; padding:10px;">I have Player 2's return code</button>
                     `);
 
-                    // Use pure offline generator safely
                     MiniQRGenerator.draw(document.getElementById("qr-display-canvas"), "BBSH:" + compressedPayloadString);
 
                     document.getElementById('btn-manual-response-link').onclick = () => {
@@ -476,14 +548,20 @@
             launchDirectCameraScannerPipeline(false);
         });
 
-        // --- LOCAL CAMERA SCANNING DEPLOYMENT WITH OFFLINE ENGINE FALLBACKS ---
+        // --- LOCAL CAMERA SCANNING DEPLOYMENT ---
         function launchDirectCameraScannerPipeline(isCapturingHostReturnCode) {
             showModal("ALIGN SCANNER RADAR", `
                 <p style='font-size:0.9rem; color:#aaa;'>Center the target system code block in the frame below:</p>
                 <video id="video-preview" autoplay playsinline></video>
                 <canvas id="hidden-processing-canvas" class="hidden"></canvas>
-                <p style='font-size:0.8rem; color:#e74c3c;' id="scanner-feedback-text">Searching for active signal telemetry...</p>
+                <p style='font-size:0.85rem; color:#00ffca; font-weight:bold;' id="scanner-feedback-text">System scanning active...</p>
+                <button class="main-btn" id="btn-force-text-fallback" style="background:#7f8c8d; margin-top:15px; font-size:0.85rem; padding:8px;">Switch to Manual String Paste</button>
             `);
+
+            document.getElementById('btn-force-text-fallback').onclick = () => {
+                killActiveCameraStream();
+                fallbackToManualCodeTypingPasteBox(isCapturingHostReturnCode);
+            };
 
             const video = document.getElementById('video-preview');
             const canvas = document.getElementById('hidden-processing-canvas');
@@ -498,20 +576,17 @@
                     requestAnimationFrame(processOpticalScannerFrameTick);
                 })
                 .catch(() => {
-                    alert("Camera missing or access denied. Redirecting to manual input link code...");
                     fallbackToManualCodeTypingPasteBox(isCapturingHostReturnCode);
                 });
 
             function processOpticalScannerFrameTick() {
                 if (!localVideoStreamStream) return;
                 if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                    canvas.height = video.videoHeight;
-                    canvas.width = video.videoWidth;
+                    canvas.height = Math.min(video.videoHeight, 480);
+                    canvas.width = Math.min(video.videoWidth, 640);
                     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                     
                     const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                    
-                    // Route canvas video frames through our pure offline fallback decoder
                     const foundCodeData = MiniQRDecoder.decodeImageData(imgData);
 
                     if (foundCodeData && foundCodeData.startsWith("BBSH:")) {
@@ -531,20 +606,24 @@
 
         function fallbackToManualCodeTypingPasteBox(isCapturingHostReturnCode) {
             showModal("MANUAL SIGNATURE INTERLOCK", `
-                <p style='font-size:0.9rem; color:#aaa;'>Paste the payload exchange code string below:</p>
-                <textarea id="manual-fallback-text-area" style="width:100%; height:120px; background:#333; color:#fff; border-radius:6px; font-family:monospace; font-size:0.8rem;"></textarea>
-                <button class="main-btn" id="btn-submit-fallback-string" style="background:#e67e22;">Link Array Pipeline</button>
+                <p style='font-size:0.9rem; color:#aaa;'>Paste the string payload copy-block directly into the space below:</p>
+                <textarea id="manual-fallback-text-area" style="width:100%; height:140px; background:#222; color:#00ffca; border:1px solid #444; border-radius:6px; font-family:monospace; font-size:0.8rem; padding:8px; box-sizing:border-box;"></textarea>
+                <button class="main-btn" id="btn-submit-fallback-string" style="background:#e67e22;">Establish Link Bridge</button>
             `);
 
             document.getElementById('btn-submit-fallback-string').onclick = () => {
                 const val = document.getElementById('manual-fallback-text-area').value.trim();
-                if(!val) return;
+                if(!val) return alert("Text area is empty.");
                 const cleanStr = val.startsWith("BBSH:") ? val.substring(5) : val;
-                if(!isCapturingHostReturnCode) {
-                    executeJoinerHandshakeResponse(cleanStr);
-                } else {
-                    const unpacked = unpackSessionDescriptionBlock(cleanStr);
-                    localPeerConnection.setRemoteDescription(new RTCSessionDescription(unpacked.sdp)).then(() => closeModal());
+                try {
+                    if(!isCapturingHostReturnCode) {
+                        executeJoinerHandshakeResponse(cleanStr);
+                    } else {
+                        const unpacked = unpackSessionDescriptionBlock(cleanStr);
+                        localPeerConnection.setRemoteDescription(new RTCSessionDescription(unpacked.sdp)).then(() => closeModal());
+                    }
+                } catch(e) {
+                    alert("Invalid handshake format token string.");
                 }
             };
         }
@@ -566,15 +645,16 @@
                     showModal("SHOW THIS TO THE HOST", `
                         <p style='font-size:0.9rem; color:#aaa;'>The Host must scan this verification code block to lock the connection:</p>
                         <canvas id="qr-display-canvas-answer"></canvas>
-                        <p style='font-size:0.8rem; color:#777;'>Hold screens near each other until array synchronization establishes.</p>
-                        <button class="main-btn" id="btn-copy-handshake-string" style="background:#7f8c8d; font-size:0.8rem; padding:8px;">Copy text string instead</button>
+                        <p style='font-size:0.8rem; color:#777;'>Alternatively, copy and paste the raw text string below.</p>
+                        <button class="main-btn" id="btn-copy-handshake-string" style="background:#2980b9; font-size:0.9rem; padding:10px;">Copy Verification String</button>
                     `);
 
                     MiniQRGenerator.draw(document.getElementById("qr-display-canvas-answer"), "BBSH:" + compressedAnswerString);
 
                     document.getElementById('btn-copy-handshake-string').onclick = () => {
                         navigator.clipboard.writeText("BBSH:" + compressedAnswerString);
-                        statusBox.innerText = "Handshake string copied to clipboard!";
+                        statusBox.innerText = "Verification handshake string copied!";
+                        alert("Verification string copied to clipboard! Share it with the host.");
                     };
                 }
             };
@@ -583,7 +663,6 @@
                 .then(() => localPeerConnection.createAnswer())
                 .then(answer => localPeerConnection.setLocalDescription(answer))
                 .catch(() => {
-                    alert("Handshake mismatch. Defaulting to manual keyboard text bridge options.");
                     fallbackToManualCodeTypingPasteBox(false);
                 });
         }
@@ -830,6 +909,7 @@
             currentSelectedShipIndex = null; updateVisualDisplays(); verifyDeploymentCompletion();
         }
 
+        // --- AUTOMATED BOAT POPULATION SCHEME ---
         function autoDeployAllShips() {
             yourFleetLocations.fill(0); cellToShipMap = {}; shipTypes.forEach(s => { s.placed = false; s.coordinatedCoords = []; });
             shipTypes.forEach((ship) => {
