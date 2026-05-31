@@ -54,11 +54,18 @@
         .cell.revealed-ship { background: #d35400; border: 1px solid #e67e22; opacity: 0.85; } 
         .cell.spectator-ship { background: #1b5e20; border: 1px solid #2e7d32; opacity: 0.7; } 
         
+        /* Drag and Drop Placement Blueprints */
+        .cell.preview-valid { background: #2ecc71 !important; border: 1px solid #27ae60 !important; opacity: 0.8; }
+        .cell.preview-invalid { background: #e74c3c !important; border: 1px solid #c0392b !important; opacity: 0.8; }
+        
         .cell.hit::after { content: '×'; color: #fff; font-size: 18px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-weight: bold; }
         
         .stats-table { width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 15px; background: #111; border-radius: 6px; overflow: hidden; font-size: 0.85rem; }
         .stats-table th { background: #2c3e50; color: #fff; padding: 8px; font-weight: bold; text-align: left; }
         .stats-table td { padding: 8px; border-bottom: 1px solid #222; text-align: left; color: #ccc; }
+
+        .strike-log-box { text-align: left; background: #111; border-radius: 6px; border: 1px solid #333; padding: 10px; max-height: 150px; overflow-y: auto; font-family: monospace; font-size: 0.8rem; color: #aaa; margin-top: 10px; }
+        .strike-log-entry { padding: 4px 0; border-bottom: 1px dashed #222; }
 
         .main-btn { background: #3498db; color: white; border: none; padding: 16px; border-radius: 6px; cursor: pointer; font-size: 1.1rem; font-weight: bold; width: 100%; box-sizing: border-box; margin-top: 10px; }
         .main-btn:disabled { background: #333; color: #666; cursor: not-allowed; border: 1px dashed #444; }
@@ -69,7 +76,7 @@
 </head>
 <body>
 
-    <h1>Battleships Pro: Online Deployment</h1>
+    <h1>Battleships Pro: Online Deployment - Battle Stats</h1>
     <div id="status-box" class="status">Initializing Tactical Network Layer...</div>
 
     <div id="game-modal" class="modal-overlay hidden">
@@ -170,6 +177,7 @@
         let placementOrientation = "H"; 
         let yourFleetLocations = Array(100).fill(0); 
         let cellToShipMap = {}; 
+        let cellToShipNameMap = {}; // Tracks specific ship identities per coordinate for tracking hits
 
         // --- DIALOG MODAL LAYOUT HANDLERS ---
         function showModal(title, htmlContent) {
@@ -269,11 +277,12 @@
             }
             else if (data.type === 'start-match') {
                 executeGlobalMatchActivation(data.order);
-                broadcastPayloadNetworkMessage({ type: 'ghost-sync-payload', mapBlueprint: yourFleetLocations, sender: myId });
+                broadcastPayloadNetworkMessage({ type: 'ghost-sync-payload', mapBlueprint: yourFleetLocations, sender: myId, shipNamesMap: cellToShipNameMap });
             }
             else if (data.type === 'ghost-sync-payload') {
                 if (globalPlayers[data.sender]) {
                     globalPlayers[data.sender].initialFleet = [...data.mapBlueprint];
+                    globalPlayers[data.sender].shipNamesMap = data.shipNamesMap || {};
                 }
             }
             else if (data.type === 'shot') {
@@ -283,7 +292,14 @@
                 }
             } 
             else if (data.type === 'result') {
-                globalCombatStrikeLog.push({ attacker: data.attackerId, target: data.targetId, coord: data.coord, hit: data.isHit });
+                const affectedVessel = (globalPlayers[data.targetId] && globalPlayers[data.targetId].shipNamesMap) ? globalPlayers[data.targetId].shipNamesMap[data.coord] : null;
+                globalCombatStrikeLog.push({ 
+                    attacker: data.attackerId, 
+                    target: data.targetId, 
+                    coord: data.coord, 
+                    hit: data.isHit,
+                    vessel: affectedVessel
+                });
                 handleShotFeedback(data.attackerId, data.targetId, data.coord, data.isHit, data.sunkShipName, data.matchIsLost);
             }
             else if (data.type === 'global-ship-sunk') {
@@ -302,7 +318,7 @@
                 if (document.getElementById('enemy-target-picker').value === data.sender) renderSelectedOpponentGrid();
             }
             else if (data.type === 'broadcast-global-match-over') {
-                handleGlobalMatchOverBroadcast(data.winnerName, data.finalMetricsMatrix);
+                handleGlobalMatchOverBroadcast(data.winnerName, data.finalMetricsMatrix, data.finalStrikeLog);
             }
             else if (data.type === 'signal-room-rematch') {
                 if (globalPlayers[data.sender]) {
@@ -310,6 +326,7 @@
                     globalPlayers[data.sender].lost = false;
                     globalPlayers[data.sender].boardHits = Array(100).fill(0);
                     globalPlayers[data.sender].initialFleet = Array(100).fill(0);
+                    globalPlayers[data.sender].shipNamesMap = {};
                     delete globalPlayers[data.sender].finalFleetMap;
                 }
                 rebuildTargetDropdown();
@@ -322,6 +339,7 @@
             shipTypes.forEach(s => { s.placed = false; s.hitsLogged = 0; s.coordinatedCoords = []; });
             yourFleetLocations.fill(0);
             cellToShipMap = {};
+            cellToShipNameMap = {};
             statShotsFired = 0;
             statHitsLanded = 0;
             statIncomingShotsByPlayer = {};
@@ -400,7 +418,11 @@
         function pickupAndMoveShip(idx) {
             const ship = shipTypes[idx];
             if (!ship.placed) return;
-            ship.coordinatedCoords.forEach(c => { yourFleetLocations[c] = 0; delete cellToShipMap[c]; });
+            ship.coordinatedCoords.forEach(c => { 
+                yourFleetLocations[c] = 0; 
+                delete cellToShipMap[c]; 
+                delete cellToShipNameMap[c];
+            });
             ship.placed = false; ship.coordinatedCoords = [];
             updateVisualDisplays(); verifyDeploymentCompletion(); selectShipForPlacement(idx);
         }
@@ -445,14 +467,18 @@
             const ship = shipTypes[currentSelectedShipIndex];
             const validCoords = checkPlacementValidity(coord, ship.size, placementOrientation);
             if (!validCoords) return;
-            validCoords.forEach(c => { yourFleetLocations[c] = 1; cellToShipMap[c] = ship; });
+            validCoords.forEach(c => { 
+                yourFleetLocations[c] = 1; 
+                cellToShipMap[c] = ship; 
+                cellToShipNameMap[c] = ship.name;
+            });
             ship.coordinatedCoords = validCoords; ship.placed = true;
             document.getElementById(`ship-btn-${currentSelectedShipIndex}`).className = 'ship-btn placed';
             currentSelectedShipIndex = null; updateVisualDisplays(); verifyDeploymentCompletion();
         }
 
         function autoDeployAllShips() {
-            yourFleetLocations.fill(0); cellToShipMap = {}; shipTypes.forEach(s => { s.placed = false; s.coordinatedCoords = []; });
+            yourFleetLocations.fill(0); cellToShipMap = {}; cellToShipNameMap = {}; shipTypes.forEach(s => { s.placed = false; s.coordinatedCoords = []; });
             shipTypes.forEach((ship) => {
                 let placed = false;
                 while (!placed) {
@@ -460,7 +486,11 @@
                     let randDir = Math.random() > 0.5 ? "H" : "V";
                     let validCoords = checkPlacementValidity(randCoord, ship.size, randDir);
                     if (validCoords) {
-                        validCoords.forEach(c => { yourFleetLocations[c] = 1; cellToShipMap[c] = ship; });
+                        validCoords.forEach(c => { 
+                            yourFleetLocations[c] = 1; 
+                            cellToShipMap[c] = ship; 
+                            cellToShipNameMap[c] = ship.name;
+                        });
                         ship.coordinatedCoords = validCoords; ship.placed = true; placed = true;
                     }
                 }
@@ -550,7 +580,9 @@
 
             if (globalPlayers[myId].lost) {
                 statusBox.style.color = "#95a5a6"; statusBox.innerText = "SPECTATOR MODE ACTIVE";
-                attackHeader.innerText = `OBSERVING: ${activeTargetName}`; attackHeader.style.color = "#3498db"; return;
+                attackHeader.innerText = `OBSERVING: ${activeTargetName}`; attackHeader.style.color = "#3498db"; 
+                document.getElementById('spectator-action-container').classList.remove('hidden');
+                return;
             }
             if (currentTurnUserId === myId) {
                 statusBox.style.color = "#00ffca"; statusBox.innerText = "Your Turn to Strike!";
@@ -635,11 +667,30 @@
                     let hit = pId === myId ? statHitsLanded : globalPlayers[pId].boardHits.filter(x => x === 1).length;
                     return { name: globalPlayers[pId].name, shotsFired: fire, hitsLanded: hit, accuracy: fire > 0 ? Math.round((hit/fire)*100) : 0, status: globalPlayers[pId].lost ? "ELIMINATED" : "VICTORIOUS" };
                 });
-                broadcastPayloadNetworkMessage({ type: 'broadcast-global-match-over', winnerName: globalPlayers[alive[0]].name, finalMetricsMatrix: finalMetricsMatrix, sender: myId });
+                broadcastPayloadNetworkMessage({ type: 'broadcast-global-match-over', winnerName: globalPlayers[alive[0]].name, finalMetricsMatrix: finalMetricsMatrix, finalStrikeLog: globalCombatStrikeLog, sender: myId });
             }
         }
 
-        function handleGlobalMatchOverBroadcast(winnerName, analyticsData) {
+        function buildStrikeLogHTML(strikeLog) {
+            if (!strikeLog || strikeLog.length === 0) return "<p style='color:#666;'>No artillery logs saved.</p>";
+            let html = `<div class="strike-log-box">`;
+            strikeLog.forEach(entry => {
+                const attackerName = globalPlayers[entry.attacker] ? globalPlayers[entry.attacker].name : "Unknown Player";
+                const targetName = globalPlayers[entry.target] ? globalPlayers[entry.target].name : "Unknown Target";
+                const coordLabel = `[${Math.floor(entry.coord/10)}, ${entry.coord%10}]`;
+                
+                if (entry.hit) {
+                    const vesselLabel = entry.vessel ? ` (${entry.vessel})` : "";
+                    html += `<div class="strike-log-entry" style="color: #ff3838;">💥 <strong>${attackerName}</strong> struck <strong>${targetName}</strong> at ${coordLabel}${vesselLabel}</div>`;
+                } else {
+                    html += `<div class="strike-log-entry" style="color: #3867ff;">💦 <strong>${attackerName}</strong> missed <strong>${targetName}</strong> at ${coordLabel}</div>`;
+                }
+            });
+            html += `</div>`;
+            return html;
+        }
+
+        function handleGlobalMatchOverBroadcast(winnerName, analyticsData, finalStrikeLog) {
             matchIsActive = false; statusBox.innerText = `${winnerName.toUpperCase()} IS VICTORIOUS!`;
             document.getElementById('spectator-action-container').classList.add('hidden');
             document.getElementById('game-over-container').classList.remove('hidden');
@@ -648,12 +699,22 @@
             analyticsData.forEach(r => {
                 html += `<tr ${r.status==="VICTORIOUS"?"style='color:#2ecc71; font-weight:bold;'":''}><td>${r.name}</td><td>${r.status}</td><td>${r.shotsFired}</td><td>${r.accuracy}%</td></tr>`;
             });
-            showModal(`VICTORY: ${winnerName.toUpperCase()}`, html + "</table>");
+            html += "</table>";
+            
+            html += `<h4 style="margin: 15px 0 5px 0; text-align: left; font-size: 0.9rem; color: #f1c40f;">TACTICAL STRIKE LOG</h4>`;
+            html += buildStrikeLogHTML(finalStrikeLog || globalCombatStrikeLog);
+
+            showModal(`VICTORY: ${winnerName.toUpperCase()}`, html);
         }
 
         document.getElementById('btn-spec-stats').addEventListener('click', () => {
             const acc = statShotsFired > 0 ? Math.round((statHitsLanded / statShotsFired) * 100) : 0;
-            showModal("TACTICAL RECORDS", `<p>Artillery Launched: ${statShotsFired}</p><p>Accuracy ratio: ${acc}%</p>`);
+            let html = `<p>Artillery Launched: ${statShotsFired}</p><p>Accuracy ratio: ${acc}%</p>`;
+            
+            html += `<h4 style="margin: 15px 0 5px 0; text-align: left; font-size: 0.9rem; color: #f1c40f;">LIVE COMBAT LOG</h4>`;
+            html += buildStrikeLogHTML(globalCombatStrikeLog);
+            
+            showModal("TACTICAL RECORDS", html);
         });
 
         // --- TEARDOWN ENGINE MANAGEMENT ---
@@ -662,6 +723,7 @@
             for (let p in globalPlayers) {
                 globalPlayers[p].ready = false; globalPlayers[p].lost = false;
                 globalPlayers[p].boardHits = Array(100).fill(0); globalPlayers[p].initialFleet = Array(100).fill(0);
+                globalPlayers[p].shipNamesMap = {};
                 delete globalPlayers[p].finalFleetMap;
             }
             document.getElementById('game-over-container').classList.add('hidden');
