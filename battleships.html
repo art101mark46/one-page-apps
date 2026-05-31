@@ -29,8 +29,13 @@
         .setup-card label { font-size: 0.9rem; color: #aaa; font-weight: bold; display: block; margin-top: 12px; text-transform: uppercase; }
         input, select { background: #333; color: #fff; border: 1px solid #555; padding: 14px; border-radius: 6px; font-size: 1.1rem; width: 100%; text-align: center; margin: 6px 0 18px 0; box-sizing: border-box; }
         
+        .checkbox-container { display: flex; align-items: center; gap: 10px; margin: 5px 0 15px 0; cursor: pointer; }
+        .checkbox-container input { width: auto; margin: 0; transform: scale(1.3); }
+        .checkbox-label { font-size: 1rem; color: #f1c40f; font-weight: bold; }
+
         .mode-badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; margin-bottom: 10px; }
         .mode-online { background: #2ecc71; color: #fff; }
+        .mode-spec { background: #34495e; color: #fff; border: 1px solid #3498db; }
 
         .dock { background: #1a1a1a; padding: 12px; border-radius: 8px; max-width: 400px; margin: 10px auto; text-align: left; box-sizing: border-box; border: 1px solid #333; }
         .dock h4 { margin: 0 0 4px 0; text-align: center; font-size: 0.95rem; letter-spacing: 1px; color: #aaa; }
@@ -75,7 +80,7 @@
 </head>
 <body>
 
-    <h1>Battleships Pro: Hidden Misses</h1>
+    <h1>Battleships Pro: E-Sports Edition</h1>
     <div id="status-box" class="status">Initializing Tactical Network Layer...</div>
 
     <div id="game-modal" class="modal-overlay hidden">
@@ -93,6 +98,11 @@
             <div style="text-align: left;">
                 <label for="name-input">Your Calling Name</label>
                 <input type="text" id="name-input" placeholder="e.g. Captain_James" maxlength="12">
+            </div>
+
+            <div class="checkbox-container">
+                <input type="checkbox" id="spectator-checkbox">
+                <label for="spectator-checkbox" class="checkbox-label">Join as Spectator (E-Sports Broadcast)</label>
             </div>
 
             <div id="online-controls">
@@ -122,7 +132,7 @@
 
     <div id="game-screen" class="hidden">
         <div style="width: 100%; max-width: 400px; margin: 0 auto 5px auto;" id="target-selector-container" class="hidden">
-            <label style="font-size: 0.8rem; font-weight: bold; color: #aaa; display: block; text-align: left; margin-bottom: 4px; text-transform: uppercase;">Select System Target:</label>
+            <label id="selector-label" style="font-size: 0.8rem; font-weight: bold; color: #aaa; display: block; text-align: left; margin-bottom: 4px; text-transform: uppercase;">Select System Target:</label>
             <select id="enemy-target-picker" style="margin-bottom:8px;"></select>
         </div>
 
@@ -164,6 +174,7 @@
         let currentTurnUserId = null;
         let iamReady = false;
         let matchIsActive = false;
+        let isTrueSpectator = false;
 
         let statShotsFired = 0;
         let statHitsLanded = 0;
@@ -210,21 +221,34 @@
             const roomCode = document.getElementById('room-input').value.trim();
             if (!roomCode) return alert("A room code is required for online matches.");
             
+            isTrueSpectator = document.getElementById('spectator-checkbox').checked;
             myChannel = 'bbship_v6_room_' + roomCode;
             pubnub = new PubNub({ publishKey: 'demo', subscribeKey: 'demo', userId: myId });
             setupPubNubChannelSubscription();
         });
 
         function setupPubNubChannelSubscription() {
-            document.getElementById('your-board-header').innerText = `${myName}'s Fleet`;
-            globalPlayers[myId] = { name: myName, active: true, ready: false, lost: false, boardHits: Array(100).fill(0), initialFleet: Array(100).fill(0) };
+            if (isTrueSpectator) {
+                document.getElementById('your-board-header').innerText = `Spectator Console`;
+                // Spectators do not count toward active combat logs or ship counts
+                globalPlayers[myId] = { name: myName + " (SPEC)", active: false, ready: true, lost: true, boardHits: Array(100).fill(0), initialFleet: Array(100).fill(0), isSpectator: true };
+            } else {
+                document.getElementById('your-board-header').innerText = `${myName}'s Fleet`;
+                globalPlayers[myId] = { name: myName, active: true, ready: false, lost: false, boardHits: Array(100).fill(0), initialFleet: Array(100).fill(0), isSpectator: false };
+            }
 
             pubnub.addListener({
                 message: function(event) { handleInboundUnifiedMessage(event.message); }
             });
             pubnub.subscribe({ channels: [myChannel] });
-            broadcastPayloadNetworkMessage({ type: 'sync-identity', name: myName, sender: myId });
-            transitionToPlacementCanvas();
+            
+            broadcastPayloadNetworkMessage({ type: 'sync-identity', name: globalPlayers[myId].name, sender: myId, isSpectator: isTrueSpectator });
+            
+            if (isTrueSpectator) {
+                transitionToSpectatorView();
+            } else {
+                transitionToPlacementCanvas();
+            }
         }
 
         function transitionToPlacementCanvas() {
@@ -239,20 +263,41 @@
             renderGrid('your-board', handleFleetDeploymentClick, true);
         }
 
+        function transitionToSpectatorView() {
+            document.getElementById('lobby-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('hidden');
+            document.getElementById('opponent-container').classList.remove('hidden');
+            document.getElementById('spectator-action-container').classList.remove('hidden');
+            document.getElementById('selector-label').innerText = "OBSERVE LIVE COMBATANT:";
+            
+            statusBox.className = "status mode-spec";
+            statusBox.innerText = "E-Sports Feed: Connecting to match pipeline...";
+            
+            initFleetStructures();
+            rebuildTargetDropdown();
+            renderSelectedOpponentGrid();
+        }
+
         // --- INBOUND SYSTEM SYNCHRONIZATION ROUTINES ---
         function handleInboundUnifiedMessage(data) {
             if (data.type === 'sync-identity') {
-                if (matchIsActive) {
+                if (matchIsActive && !data.isSpectator) {
                     broadcastPayloadNetworkMessage({ type: 'room-locked-rejection', targetUser: data.sender });
                     return;
                 }
                 if (!globalPlayers[data.sender]) {
-                    globalPlayers[data.sender] = { name: data.name, active: true, ready: false, lost: false, boardHits: Array(100).fill(0), initialFleet: Array(100).fill(0) };
+                    globalPlayers[data.sender] = { 
+                        name: data.name, 
+                        active: !data.isSpectator, 
+                        ready: data.isSpectator, 
+                        lost: data.isSpectator, 
+                        boardHits: Array(100).fill(0), 
+                        initialFleet: Array(100).fill(0),
+                        isSpectator: data.isSpectator 
+                    };
                     rebuildTargetDropdown();
                 }
-                if (data.sender !== myId) {
-                    broadcastPayloadNetworkMessage({ type: 'ack-identity', name: myName, sender: myId });
-                }
+                broadcastPayloadNetworkMessage({ type: 'ack-identity', name: globalPlayers[myId].name, sender: myId, isSpectator: isTrueSpectator });
             }
             else if (data.type === 'room-locked-rejection') {
                 if (data.targetUser === myId && !matchIsActive) {
@@ -265,8 +310,16 @@
                 }
             }
             else if (data.type === 'ack-identity') {
-                if (!matchIsActive && !globalPlayers[data.sender]) {
-                    globalPlayers[data.sender] = { name: data.name, active: true, ready: false, lost: false, boardHits: Array(100).fill(0), initialFleet: Array(100).fill(0) };
+                if (!globalPlayers[data.sender]) {
+                    globalPlayers[data.sender] = { 
+                        name: data.name, 
+                        active: !data.isSpectator, 
+                        ready: data.isSpectator, 
+                        lost: data.isSpectator, 
+                        boardHits: Array(100).fill(0), 
+                        initialFleet: Array(100).fill(0),
+                        isSpectator: data.isSpectator
+                    };
                     rebuildTargetDropdown();
                 }
             }
@@ -276,12 +329,17 @@
             }
             else if (data.type === 'start-match') {
                 executeGlobalMatchActivation(data.order);
-                broadcastPayloadNetworkMessage({ type: 'ghost-sync-payload', mapBlueprint: yourFleetLocations, sender: myId, shipNamesMap: cellToShipNameMap });
+                if (!isTrueSpectator) {
+                    broadcastPayloadNetworkMessage({ type: 'ghost-sync-payload', mapBlueprint: yourFleetLocations, sender: myId, shipNamesMap: cellToShipNameMap });
+                }
             }
             else if (data.type === 'ghost-sync-payload') {
                 if (globalPlayers[data.sender]) {
                     globalPlayers[data.sender].initialFleet = [...data.mapBlueprint];
                     globalPlayers[data.sender].shipNamesMap = data.shipNamesMap || {};
+                    if (document.getElementById('enemy-target-picker').value === data.sender) {
+                        renderSelectedOpponentGrid();
+                    }
                 }
             }
             else if (data.type === 'shot') {
@@ -302,11 +360,8 @@
                 handleShotFeedback(data.attackerId, data.targetId, data.coord, data.isHit, data.sunkShipName, data.matchIsLost);
             }
             else if (data.type === 'global-ship-sunk') {
-                if (data.ownerId !== myId) {
-                    statusBox.style.color = "#ff3838";
-                    statusBox.innerText = `ALERT: ${data.ownerName}'s ${data.shipName} was completely SUNK!`;
-                    showModal("VESSEL SCUTTLED", `<p><strong>${data.ownerName}</strong> has lost their <strong>${data.shipName}</strong>!</p>`);
-                }
+                statusBox.style.color = "#ff3838";
+                statusBox.innerText = `ALERT: ${data.ownerName}'s ${data.shipName} was completely SUNK!`;
             }
             else if (data.type === 'pass-turn') {
                 currentTurnUserId = data.nextUserId;
@@ -321,14 +376,18 @@
             }
             else if (data.type === 'signal-room-rematch') {
                 if (globalPlayers[data.sender]) {
-                    globalPlayers[data.sender].ready = false;
-                    globalPlayers[data.sender].lost = false;
+                    globalPlayers[data.sender].ready = globalPlayers[data.sender].isSpectator;
+                    globalPlayers[data.sender].lost = globalPlayers[data.sender].isSpectator;
                     globalPlayers[data.sender].boardHits = Array(100).fill(0);
                     globalPlayers[data.sender].initialFleet = Array(100).fill(0);
                     globalPlayers[data.sender].shipNamesMap = {};
                     delete globalPlayers[data.sender].finalFleetMap;
                 }
                 rebuildTargetDropdown();
+                if (isTrueSpectator) {
+                    statusBox.innerText = "E-Sports Feed: Standing by for next match sequence...";
+                    renderSelectedOpponentGrid();
+                }
             }
         }
 
@@ -351,12 +410,12 @@
             picker.innerHTML = '';
             
             let elementsAdded = 0;
-            const iAmSpectator = globalPlayers[myId] && globalPlayers[myId].lost;
-
             let optionsPool = [];
+            
             for (let pId in globalPlayers) {
                 if (pId === myId) continue;
-                if (!iAmSpectator && globalPlayers[pId].lost) continue;
+                if (globalPlayers[pId].isSpectator) continue; // Filter out other spectators
+                
                 optionsPool.push({ id: pId, name: globalPlayers[pId].name, lost: globalPlayers[pId].lost });
             }
             
@@ -381,13 +440,14 @@
         }
 
         function triggerAlphabeticalTargetSwitch() {
+            if (isTrueSpectator) return; // Spectators manually control their focus cards
             const picker = document.getElementById('enemy-target-picker');
             const currentSelection = picker.value;
 
             if (!currentSelection || (globalPlayers[currentSelection] && globalPlayers[currentSelection].lost)) {
                 let optionsPool = [];
                 for (let pId in globalPlayers) {
-                    if (pId === myId || globalPlayers[pId].lost) continue;
+                    if (pId === myId || globalPlayers[pId].lost || globalPlayers[pId].isSpectator) continue;
                     optionsPool.push({ id: pId, name: globalPlayers[pId].name });
                 }
                 if (optionsPool.length > 0) {
@@ -453,6 +513,7 @@
             updateVisualDisplays(); verifyDeploymentCompletion(); selectShipForPlacement(idx);
         }
 
+        // --- CORE GEOMETRIC GRID VERIFICATIONS ---
         function checkPlacementValidity(startCoord, size, orientation) {
             let coords = []; let row = Math.floor(startCoord / 10); let col = startCoord % 10;
             for (let i = 0; i < size; i++) {
@@ -533,11 +594,13 @@
 
         function evaluateHostInitiatedStart() {
             let playerIds = Object.keys(globalPlayers);
-            if (playerIds.length < 2) return;
+            let combatants = playerIds.filter(pId => !globalPlayers[pId].isSpectator);
+            if (combatants.length < 2) return;
+            
             for (let pId in globalPlayers) { if (!globalPlayers[pId].ready) return; }
-            let sortedIds = [...playerIds].sort();
+            let sortedIds = [...combatants].sort();
             if (myId === sortedIds[0] && !matchIsActive) {
-                let shuffleOrder = [...sortedIds].sort(() => Math.random() - 0.5);
+                let shuffleOrder = [...combatants].sort(() => Math.random() - 0.5);
                 broadcastPayloadNetworkMessage({ type: 'start-match', order: shuffleOrder, sender: myId });
             }
         }
@@ -545,10 +608,19 @@
         function executeGlobalMatchActivation(verifiedOrderArray) {
             matchIsActive = true; activeTurnOrder = verifiedOrderArray; currentTurnUserId = activeTurnOrder[0];
             document.getElementById('opponent-container').classList.remove('hidden');
-            document.getElementById('board-divider').classList.remove('hidden');
-            document.getElementById('spectator-action-container').classList.add('hidden');
             document.getElementById('game-over-container').classList.add('hidden');
-            rebuildTargetDropdown(); renderGrid('your-board', handleFleetDeploymentClick, false); renderSelectedOpponentGrid(); updateTurnHeader(); updateVisualDisplays();
+            
+            rebuildTargetDropdown(); 
+            
+            if (!isTrueSpectator) {
+                document.getElementById('board-divider').classList.remove('hidden');
+                document.getElementById('spectator-action-container').classList.add('hidden');
+                renderGrid('your-board', handleFleetDeploymentClick, false); 
+            }
+            
+            renderSelectedOpponentGrid(); 
+            updateTurnHeader(); 
+            updateVisualDisplays();
         }
 
         // --- PLAY CANVAS RENDERING WITH PRIVATE FOG OF WAR ---
@@ -559,27 +631,27 @@
             
             const targetProfile = globalPlayers[targetId];
             const oppCells = document.querySelectorAll('#opponent-board .cell');
-            const iAmSpectator = globalPlayers[myId] && globalPlayers[myId].lost;
+            const iAmObserver = isTrueSpectator || (globalPlayers[myId] && globalPlayers[myId].lost);
 
             oppCells.forEach((cell, i) => {
                 const markerValue = targetProfile.boardHits[i];
 
                 if (markerValue === 1) {
-                    // Hits are perfectly public to all observers
+                    // Hits are completely transparent and open to all active nodes and spectators
                     cell.className = 'cell hit';
                 } 
                 else if (markerValue === 2) {
-                    // Fog of War: Misses are only visible to the specific attacker or inside the full post-game analysis matrix
+                    // Fog of war check: active attacker can see, but spectators or other competitors cannot
                     const didIFireThisMiss = globalCombatStrikeLog.some(log => log.attacker === myId && log.target === targetId && log.coord === i && !log.hit);
                     if (didIFireThisMiss) {
                         cell.className = 'cell miss';
                     }
                 }
-                else if (iAmSpectator && targetProfile.initialFleet && targetProfile.initialFleet[i] === 1) {
+                else if (iAmObserver && targetProfile.initialFleet && targetProfile.initialFleet[i] === 1) {
                     cell.className = 'cell spectator-ship';
                 }
                 
-                if (iAmSpectator && targetProfile.initialFleet && targetProfile.initialFleet[i] === 1 && markerValue === 1) {
+                if (iAmObserver && targetProfile.initialFleet && targetProfile.initialFleet[i] === 1 && markerValue === 1) {
                     cell.className = 'cell spectator-ship hit';
                 }
                 if (targetProfile.finalFleetMap && targetProfile.finalFleetMap[i] === 1 && markerValue === 0) {
@@ -608,7 +680,7 @@
             
             const targetShipName = profile.shipNamesMap ? profile.shipNamesMap[coord] : null;
             if (!targetShipName) {
-                showModal("SCAN INTELLIGENCE", `<p><strong>Location:</strong> [${Math.floor(coord/10)}, ${coord%10}]<br>No ship was placed at this coordinate by <strong>${profile.name}</strong>.</p>`);
+                showModal("SCAN INTELLIGENCE", `<p><strong>Location:</strong> [Row ${Math.floor(coord/10)}, Col ${coord%10}]<br>No ship was placed at this coordinate by <strong>${profile.name}</strong>.</p>`);
                 return;
             }
 
@@ -643,10 +715,10 @@
         // --- ARTILLERY INTERACTIVE COMMAND LAYERS ---
         function updateVisualDisplays() {
             renderSelectedOpponentGrid();
+            if (isTrueSpectator) return;
+
             document.querySelectorAll('#your-board .cell').forEach((cell, i) => {
                 if (!cell) return; cell.className = 'cell';
-                
-                // On your own board, you always see your own ships, hits sustained, and incoming misses
                 if (yourFleetLocations[i] === 1) cell.className = 'cell ship';
                 if (yourFleetLocations[i] === 2) cell.className = 'cell miss'; 
                 if (yourFleetLocations[i] === 3) cell.className = 'cell hit';  
@@ -656,7 +728,15 @@
         // --- GAME MECHANICS AND COMPONENT SYNC LOOP ---
         function updateTurnHeader() {
             const attackHeader = document.getElementById('attack-header');
-            const activeTargetName = document.getElementById('enemy-target-picker').value ? globalPlayers[document.getElementById('enemy-target-picker').value].name : "Enemy";
+            const activeTargetName = document.getElementById('enemy-target-picker').value ? globalPlayers[document.getElementById('enemy-target-picker').value].name : "Combatant";
+
+            if (isTrueSpectator) {
+                const turnOwnerName = globalPlayers[currentTurnUserId] ? globalPlayers[currentTurnUserId].name : "Awaiting Host";
+                statusBox.innerText = `BROADCAST FEED // ACTIVE TURN: ${turnOwnerName.toUpperCase()}`;
+                attackHeader.innerText = `MONITORING ARCHITECTURE: ${activeTargetName}`;
+                attackHeader.style.color = "#3498db";
+                return;
+            }
 
             if (globalPlayers[myId].lost) {
                 statusBox.style.color = "#95a5a6"; statusBox.innerText = "SPECTATOR MODE ACTIVE";
@@ -677,7 +757,8 @@
             const targetId = document.getElementById('enemy-target-picker').value;
             if (!targetId) return;
 
-            if (globalPlayers[myId].lost) {
+            // Direct inspection access if user is dead or a dedicated spectator
+            if (isTrueSpectator || globalPlayers[myId].lost) {
                 inspectTargetCoordinateAsSpectator(targetId, coord);
                 return;
             }
@@ -742,6 +823,9 @@
                 if (!targetLostHandshake && sunkShipName) showModal("VEHICLE SUNK", `<p>You completely scuttled ${globalPlayers[targetId].name}'s ${sunkShipName}!</p>`);
                 checkVictoryConditions();
             }
+            if (isTrueSpectator) {
+                updateTurnHeader();
+            }
             if (targetId === myId) passTurnToNextPlayer();
         }
 
@@ -756,10 +840,10 @@
         }
 
         function checkVictoryConditions() {
-            let alive = Object.keys(globalPlayers).filter(pId => !globalPlayers[pId].lost);
+            let alive = Object.keys(globalPlayers).filter(pId => !globalPlayers[pId].lost && !globalPlayers[pId].isSpectator);
             if (alive.length === 1 && matchIsActive) {
                 matchIsActive = false;
-                let finalMetricsMatrix = Object.keys(globalPlayers).map(pId => {
+                let finalMetricsMatrix = Object.keys(globalPlayers).filter(pId => !globalPlayers[pId].isSpectator).map(pId => {
                     let fire = pId === myId ? statShotsFired : globalPlayers[pId].boardHits.filter(x => x !== 0).length;
                     let hit = pId === myId ? statHitsLanded : globalPlayers[pId].boardHits.filter(x => x === 1).length;
                     return { name: globalPlayers[pId].name, shotsFired: fire, hitsLanded: hit, accuracy: fire > 0 ? Math.round((hit/fire)*100) : 0, status: globalPlayers[pId].lost ? "ELIMINATED" : "VICTORIOUS" };
@@ -806,7 +890,7 @@
 
         document.getElementById('btn-spec-stats').addEventListener('click', () => {
             const acc = statShotsFired > 0 ? Math.round((statHitsLanded / statShotsFired) * 100) : 0;
-            let html = `<p>Artillery Launched: ${statShotsFired}</p><p>Accuracy ratio: ${acc}%</p>`;
+            let html = isTrueSpectator ? `<p>E-Sports Analysis Console</p>` : `<p>Artillery Launched: ${statShotsFired}</p><p>Accuracy ratio: ${acc}%</p>`;
             
             html += `<h4 style="margin: 15px 0 5px 0; text-align: left; font-size: 0.9rem; color: #f1c40f;">LIVE COMBAT LOG</h4>`;
             html += buildStrikeLogHTML(globalCombatStrikeLog);
@@ -818,25 +902,39 @@
         document.getElementById('btn-play-again').addEventListener('click', () => {
             initFleetStructures(); iamReady = false; matchIsActive = false; activeTurnOrder = [];
             for (let p in globalPlayers) {
-                globalPlayers[p].ready = false; globalPlayers[p].lost = false;
+                globalPlayers[p].ready = globalPlayers[p].isSpectator; 
+                globalPlayers[p].lost = globalPlayers[p].isSpectator;
                 globalPlayers[p].boardHits = Array(100).fill(0); globalPlayers[p].initialFleet = Array(100).fill(0);
                 globalPlayers[p].shipNamesMap = {};
                 delete globalPlayers[p].finalFleetMap;
             }
             document.getElementById('game-over-container').classList.add('hidden');
             document.getElementById('opponent-container').classList.add('hidden');
-            document.getElementById('board-divider').classList.add('hidden');
             document.getElementById('target-selector-container').classList.add('hidden');
-            document.getElementById('deployment-dock').classList.remove('hidden');
-            statusBox.innerText = "Re-deploy fleet vessels.";
-            buildDeploymentDock(); renderGrid('your-board', handleFleetDeploymentClick, true); updateVisualDisplays();
+            
+            if (isTrueSpectator) {
+                document.getElementById('opponent-container').classList.remove('hidden');
+                document.getElementById('spectator-action-container').classList.remove('hidden');
+                statusBox.innerText = "E-Sports Feed: Awaiting next deployment cycle...";
+                rebuildTargetDropdown();
+                renderSelectedOpponentGrid();
+            } else {
+                document.getElementById('board-divider').classList.add('hidden');
+                document.getElementById('deployment-dock').classList.remove('hidden');
+                statusBox.innerText = "Re-deploy fleet vessels.";
+                buildDeploymentDock(); 
+                renderGrid('your-board', handleFleetDeploymentClick, true); 
+                updateVisualDisplays();
+            }
+            
             broadcastPayloadNetworkMessage({ type: 'signal-room-rematch', sender: myId });
         });
 
         document.getElementById('btn-exit-lobby').addEventListener('click', () => {
             if (pubnub) pubnub.unsubscribe({ channels: [myChannel] });
-            globalPlayers = {}; activeTurnOrder = []; currentTurnUserId = null; iamReady = false; matchIsActive = false;
+            globalPlayers = {}; activeTurnOrder = []; currentTurnUserId = null; iamReady = false; matchIsActive = false; isTrueSpectator = false;
             initFleetStructures();
+            statusBox.className = "status";
             document.getElementById('game-over-container').classList.add('hidden');
             document.getElementById('opponent-container').classList.add('hidden');
             document.getElementById('board-divider').classList.add('hidden');
