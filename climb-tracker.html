@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kids' Climbing Tracker</title>
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --primary-hover: #1d4ed8;
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-color: #1e293b;
+            --border-color: #cbd5e1;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 20px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.8rem;
+            color: #0f172a;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        button, .file-label {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 0.9rem;
+            transition: background-color 0.2s;
+            display: inline-flex;
+            align-items: center;
+        }
+
+        button:hover, .file-label:hover {
+            background-color: var(--primary-hover);
+        }
+
+        button.secondary {
+            background-color: #64748b;
+        }
+        button.secondary:hover {
+            background-color: #475569;
+        }
+
+        button.danger {
+            background-color: #ef4444;
+            padding: 4px 8px;
+            font-size: 0.8rem;
+        }
+        button.danger:hover {
+            background-color: #dc2626;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .table-container {
+            overflow-x: auto;
+            margin-top: 20px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            background: white;
+        }
+
+        th, td {
+            border: 1px solid var(--border-color);
+            padding: 10px;
+            min-width: 100px;
+        }
+
+        th {
+            background-color: #f1f5f9;
+            font-weight: 600;
+            text-align: center;
+        }
+
+        .child-header {
+            position: relative;
+        }
+
+        .delete-child-btn {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            background: none;
+            border: none;
+            color: #94a3b8;
+            cursor: pointer;
+            font-size: 0.8rem;
+            padding: 2px 5px;
+        }
+        .delete-child-btn:hover {
+            color: #ef4444;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            box-sizing: border-box;
+            border: 1px solid transparent;
+            padding: 6px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            text-align: center;
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--primary-color);
+            outline: none;
+            background-color: #eff6ff;
+        }
+
+        .climb-name-input {
+            text-align: left !important;
+            font-weight: 500;
+        }
+
+        .footer-controls {
+            margin-top: 20px;
+            display: flex;
+            justify-content: space-between;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>🧗 Climbing Wall Tracker</h1>
+        <div class="btn-group">
+            <button onclick="addChild()">+ Add Child</button>
+            <label class="file-label" for="importFile">📥 Import Data</label>
+            <input type="file" id="importFile" accept=".json" onchange="importData(event)">
+            <button class="secondary" onclick="exportData()">📤 Export Data</button>
+        </div>
+    </header>
+
+    <div class="table-container">
+        <table id="trackerTable">
+            <thead>
+                <tr id="headerRow1">
+                    <th rowspan="2" style="min-width: 150px;">Climb Name / #</th>
+                    </tr>
+                <tr id="headerRow2">
+                    </tr>
+            </thead>
+            <tbody id="tableBody">
+                </tbody>
+        </table>
+    </div>
+
+    <div class="footer-controls">
+        <button onclick="addClimbRow()">+ Add Climb Row</button>
+    </div>
+</div>
+
+<script>
+    // Initial state template if no local storage or import exists
+    let state = {
+        children: ["Child 1", "Child 2"],
+        climbs: [
+            { name: "Climb 1", data: { "Child 1": { grade: "", earn: "" }, "Child 2": { grade: "", earn: "" } } },
+            { name: "Climb 2", data: { "Child 1": { grade: "", earn: "" }, "Child 2": { grade: "", earn: "" } } }
+        ]
+    };
+
+    // Load data from LocalStorage on page load
+    if (localStorage.getItem('climbingTrackerState')) {
+        try {
+            state = JSON.parse(localStorage.getItem('climbingTrackerState'));
+        } catch (e) {
+            console.error("Error parsing local storage state", e);
+        }
+    }
+
+    function saveState() {
+        localStorage.setItem('climbingTrackerState', JSON.stringify(state));
+    }
+
+    function renderTable() {
+        const headerRow1 = document.getElementById('headerRow1');
+        const headerRow2 = document.getElementById('headerRow2');
+        const tableBody = document.getElementById('tableBody');
+
+        // Reset Headers (Keep the first column)
+        headerRow1.innerHTML = '<th rowspan="2" style="min-width: 150px;">Climb Name / #</th>';
+        headerRow2.innerHTML = '';
+
+        // Build Child Headers
+        state.children.forEach((child, childIdx) => {
+            // Main Header
+            const th = document.createElement('th');
+            th.colSpan = 2;
+            th.className = 'child-header';
+            
+            const nameInput = document.createElement('input');
+            nameInput.type = 'text';
+            nameInput.value = child;
+            nameInput.style.fontWeight = 'bold';
+            nameInput.onchange = (e) => renameChild(childIdx, e.target.value);
+            th.appendChild(nameInput);
+
+            // Delete button for children
+            const delBtn = document.createElement('button');
+            delBtn.innerHTML = '✕';
+            delBtn.className = 'delete-child-btn';
+            delBtn.title = `Delete ${child}`;
+            delBtn.onclick = () => deleteChild(childIdx);
+            th.appendChild(delBtn);
+
+            headerRow1.appendChild(th);
+
+            // Sub Headers
+            const thGrade = document.createElement('th');
+            thGrade.textContent = 'Grade';
+            const thEarn = document.createElement('th');
+            thEarn.textContent = 'Earn (£/$)';
+            
+            headerRow2.appendChild(thGrade);
+            headerRow2.appendChild(thEarn);
+        });
+
+        // Build Rows
+        tableBody.innerHTML = '';
+        state.climbs.forEach((climb, climbIdx) => {
+            const tr = document.createElement('tr');
+
+            // Climb Identifier Cell
+            const idTd = document.createElement('td');
+            const idInput = document.createElement('input');
+            idInput.type = 'text';
+            idInput.className = 'climb-name-input';
+            idInput.value = climb.name;
+            idInput.onchange = (e) => {
+                state.climbs[climbIdx].name = e.target.value;
+                saveState();
+            };
+            idTd.appendChild(idInput);
+            tr.appendChild(idTd);
+
+            // Child Grade & Earn Cells
+            state.children.forEach(child => {
+                if (!climb.data[child]) {
+                    climb.data[child] = { grade: '', earn: '' };
+                }
+
+                // Grade Input
+                const tdGrade = document.createElement('td');
+                const inputGrade = document.createElement('input');
+                inputGrade.type = 'text';
+                inputGrade.value = climb.data[child].grade || '';
+                inputGrade.onchange = (e) => {
+                    state.climbs[climbIdx].data[child].grade = e.target.value;
+                    saveState();
+                };
+                tdGrade.appendChild(inputGrade);
+                tr.appendChild(tdGrade);
+
+                // Earn Input
+                const tdEarn = document.createElement('td');
+                const inputEarn = document.createElement('input');
+                inputEarn.type = 'text';
+                inputEarn.value = climb.data[child].earn || '';
+                inputEarn.onchange = (e) => {
+                    state.climbs[climbIdx].data[child].earn = e.target.value;
+                    saveState();
+                };
+                tdEarn.appendChild(inputEarn);
+                tr.appendChild(tdEarn);
+            });
+
+            // Optional: Quick Delete Row action on hover/right-side could go here, 
+            // but keeping it minimal for text-entry focus. Let's add a small delete cell.
+            const actionTd = document.createElement('td');
+            actionTd.style.border = 'none';
+            actionTd.style.backgroundColor = 'transparent';
+            const delRowBtn = document.createElement('button');
+            delRowBtn.innerHTML = '✕';
+            delRowBtn.className = 'danger';
+            delRowBtn.onclick = () => deleteRow(climbIdx);
+            actionTd.appendChild(delRowBtn);
+            tr.appendChild(actionTd);
+
+            tableBody.appendChild(tr);
+        });
+    }
+
+    function addChild() {
+        const newChildName = `Child ${state.children.length + 1}`;
+        state.children.push(newChildName);
+        state.climbs.forEach(climb => {
+            climb.data[newChildName] = { grade: '', earn: '' };
+        });
+        saveState();
+        renderTable();
+    }
+
+    function renameChild(index, newName) {
+        const oldName = state.children[index];
+        if (!newName.trim() || state.children.includes(newName)) {
+            renderTable(); // Reset if blank or duplicate
+            return;
+        }
+        state.children[index] = newName;
+        state.climbs.forEach(climb => {
+            if (climb.data[oldName]) {
+                climb.data[newName] = climb.data[oldName];
+                delete climb.data[oldName];
+            }
+        });
+        saveState();
+        renderTable();
+    }
+
+    function deleteChild(index) {
+        if (confirm(`Are you sure you want to remove ${state.children[index]} and all their tracked records?`)) {
+            const childName = state.children[index];
+            state.children.splice(index, 1);
+            state.climbs.forEach(climb => {
+                delete climb.data[childName];
+            });
+            saveState();
+            renderTable();
+        }
+    }
+
+    function addClimbRow() {
+        const nextNum = state.climbs.length + 1;
+        const newClimb = {
+            name: `Climb ${nextNum}`,
+            data: {}
+        };
+        state.children.forEach(child => {
+            newClimb.data[child] = { grade: '', earn: '' };
+        });
+        state.climbs.push(newClimb);
+        saveState();
+        renderTable();
+    }
+
+    function deleteRow(index) {
+        state.climbs.splice(index, 1);
+        saveState();
+        renderTable();
+    }
+
+    // Export Functionality
+    function exportData() {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state, null, 2));
+        const downloadAnchor = document.createElement('a');
+        downloadAnchor.setAttribute("href", dataStr);
+        downloadAnchor.setAttribute("download", `climbing_tracker_${new Date().toISOString().slice(0,10)}.json`);
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+        downloadAnchor.remove();
+    }
+
+    // Import Functionality
+    function importData(event) {
+        const fileReader = new FileReader();
+        fileReader.onload = function(e) {
+            try {
+                const importedState = JSON.parse(e.target.result);
+                if (importedState.children && importedState.climbs) {
+                    state = importedState;
+                    saveState();
+                    renderTable();
+                    alert("Data imported successfully!");
+                } else {
+                    alert("Invalid file format.");
+                }
+            } catch (err) {
+                alert("Error parsing file.");
+            }
+        };
+        fileReader.readAsText(event.target.files[0]);
+    }
+
+    // Initial Render
+    renderTable();
+</script>
+
+</body>
+</html>
