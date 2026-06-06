@@ -1,4 +1,159 @@
-// =========================================================================
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Security Verification - CAPTCHA</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/dist/face-api.js"></script>
+    
+    <style>
+        /* Pure, maximum-brightness white canvas to act as a face fill light */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: #ffffff; 
+            color: #000000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        #captcha-container {
+            background: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.05);
+            padding: 32px;
+            max-width: 760px;
+            width: 100%;
+            box-sizing: border-box;
+            text-align: center;
+        }
+
+        .captcha-header {
+            background: #1a73e8; /* Clean blue branding */
+            color: white;
+            padding: 18px;
+            margin: -32px -32px 24px -32px;
+            border-top-left-radius: 7px;
+            border-top-right-radius: 7px;
+            text-align: left;
+        }
+
+        .captcha-header h2 { margin: 0; font-size: 1.5rem; font-weight: 500; letter-spacing: 0.25px; }
+        .captcha-header p { margin: 4px 0 0 0; font-size: 0.95rem; opacity: 0.9; }
+
+        .camera-box {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            margin: 0 auto 24px auto;
+            background: #000;
+            border-radius: 6px;
+            overflow: hidden;
+            border: 1px solid #dcdcdc;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1); /* Mirror view */
+        }
+
+        .progress-container {
+            width: 100%;
+            background-color: #f1f3f4;
+            border-radius: 10px;
+            height: 16px;
+            overflow: hidden;
+            margin: 15px 0;
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.06);
+        }
+
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            background-color: #34a853; /* Success green */
+            transition: width 0.1s linear;
+        }
+
+        #prompt-text {
+            font-size: 1.4rem;
+            font-weight: bold;
+            color: #1a73e8;
+            margin-bottom: 8px;
+            line-height: 1.3;
+        }
+
+        #scold-banner {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: #ffffff;
+            background-color: #d93025; /* Warning Red */
+            padding: 12px;
+            border-radius: 4px;
+            margin: 12px 0 20px 0;
+            min-height: 24px;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        #scold-banner.visible {
+            opacity: 1;
+        }
+
+        #success-screen {
+            display: none;
+            padding: 50px 10px;
+        }
+
+        .success-icon {
+            color: #34a853;
+            font-size: 5.5rem;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="captcha-container">
+        
+        <div class="captcha-header">
+            <h2>ExpressionCAPTCHA™</h2>
+            <p>Biometric Verification Portal (Automated Startup)</p>
+        </div>
+
+        <div id="game-play">
+            <div id="prompt-text">Initializing high-res camera matrix...</div>
+            <div id="scold-banner">Analyzing tracking points...</div>
+            
+            <div class="camera-box">
+                <video id="webcam" autoplay muted playsinline></video>
+            </div>
+
+            <label style="font-size:0.9rem; font-weight:700; color:#5f6368; text-transform:uppercase; letter-spacing: 0.75px;">
+                Verification Hold Progress:
+            </label>
+            <div class="progress-container">
+                <div id="hold-progress" class="progress-bar"></div>
+            </div>
+        </div>
+
+        <div id="success-screen">
+            <div class="success-icon">✓</div>
+            <h3 style="margin:0; color:#202124; font-size:1.8rem;">Verification Confirmed</h3>
+            <p style="color:#5f6368; margin-top:10px; font-size:1.1rem;">Forwarding destination terminal request...</p>
+        </div>
+
+    </div>
+
+    <script>
+ // =========================================================================
 // CONFIGURATION PARAMETERS
 // =========================================================================
 const SUCCESS_REDIRECT_URL = "https://www.google.com"; 
@@ -152,3 +307,6 @@ function evaluateFaceKNN(liveDetection) {
 }
 
 initApplication();
+    </script>
+</body>
+</html>
