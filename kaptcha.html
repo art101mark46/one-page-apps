@@ -294,7 +294,8 @@ function generateRoastMessage(target, actual) {
 async function executeTrackingLoop() {
     if (video.paused || video.ended || currentChallengeIndex >= randomizedExpressionsQueue.length) return;
 
-    const highResOptions = new faceapi.TinyFaceDetectorOptions({ inputSize: 1280, scoreThreshold: 0.5 });
+    // Scale down the processing footprint so the game holds smooth tracking on mobile webviews
+    const highResOptions = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });
     const detection = await faceapi.detectSingleFace(video, highResOptions).withFaceLandmarks();
 
     if (detection) {
