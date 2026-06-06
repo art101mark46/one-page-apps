@@ -153,7 +153,7 @@
     </div>
 
     <script>
-        // =========================================================================
+ // =========================================================================
 // CONFIGURATION PARAMETERS
 // =========================================================================
 
@@ -175,6 +175,7 @@ const progressBar = document.getElementById('hold-progress');
 let trainedProfiles = [];
 let randomizedExpressionsQueue = [];
 let currentChallengeIndex = 0;
+let mobileOptimizedOptions = null; // Global storage for tracking params
 
 let matchingFramesCounterCount = 0;
 const TARGET_HOLD_MS = 5000;
@@ -214,30 +215,40 @@ async function initApplication() {
         const uniqueKeys = [...new Set(rawKeysList)];
         randomizedExpressionsQueue = shuffleArray(uniqueKeys);
 
-        promptText.innerHTML = `Initializing high-res camera matrix...`;
+        promptText.innerHTML = `Initializing tracking engines...`;
         await initAIModels();
+        
+        promptText.innerHTML = `Spawning camera stream...`;
         bootWebcam();
 
     } catch (err) {
         promptText.innerHTML = `
-            <span style="color:#d93025; font-weight:bold;">Server Fetch Failure:</span><br>
+            <span style="color:#d93025; font-weight:bold;">Initialization Interrupted:</span><br>
             <span style="font-size:0.95rem; color:#555;">
-                Could not find or parse "${DATASET_FILE_URL}".<br>
-                Reason: ${err.message}
+                Reason: ${err.message}<br>
+                Check that your JSON file is named correctly and hosted in the same directory.
             </span>
         `;
-        console.error("Asset load error:", err);
+        console.error("Initialization failure:", err);
     }
 }
 
 async function initAIModels() {
     const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
     try {
+        // Explicitly await weight downloads completely before allocating options
         await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
         await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+        
+        // Safely set mobile target dimension profiles once backend is ready
+        mobileOptimizedOptions = new faceapi.TinyFaceDetectorOptions({ 
+            inputSize: 224, 
+            scoreThreshold: 0.5 
+        });
+        
         console.log("HD Processing cores online.");
     } catch (err) {
-        alert("Error loading verification resources: " + err.message);
+        throw new Error(`Model Asset Load Failed: ${err.message}`);
     }
 }
 
@@ -256,7 +267,9 @@ function bootWebcam() {
             executeTrackingLoop();
         };
     })
-    .catch(err => alert("Webcam initialization failure. Check hardware and permissions."));
+    .catch(err => {
+        promptText.innerHTML = `<span style="color:#d93025;">Camera Connection Failed</span><br><span style="font-size:0.9rem; color:#555;">Please verify webcam permissions are active.</span>`;
+    });
 }
 
 function updateChallengePrompt() {
@@ -294,9 +307,8 @@ function generateRoastMessage(target, actual) {
 async function executeTrackingLoop() {
     if (video.paused || video.ended || currentChallengeIndex >= randomizedExpressionsQueue.length) return;
 
-    // Scale down the processing footprint so the game holds smooth tracking on mobile webviews
-    const highResOptions = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });
-    const detection = await faceapi.detectSingleFace(video, highResOptions).withFaceLandmarks();
+    // Use our verified global tracking parameters to bypass execution stalls
+    const detection = await faceapi.detectSingleFace(video, mobileOptimizedOptions).withFaceLandmarks();
 
     if (detection) {
         const targetGoalLabel = randomizedExpressionsQueue[currentChallengeIndex];
@@ -369,16 +381,7 @@ function evaluateFaceKNN(livePoints) {
 }
 
 // Fire application initialization
-initApplication();estLabelName = profile.expressionLabel;
-                }
-            }
-
-            const MAX_ALLOWED_DISTANCE_VARIANCE_TOLERANCE = 1400; 
-            return (minimumVarianceScore < MAX_ALLOWED_DISTANCE_VARIANCE_TOLERANCE) ? closestLabelName : "unknown";
-        }
-
-        // Run application setup instantly on DOM execution
-        initApplication();
+initApplication();
     </script>
 </body>
 </html>
