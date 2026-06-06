@@ -371,18 +371,34 @@ function startVideo() {
 
 async function processWireframeLoop() {
     if (video.paused || video.ended) return;
+
     const trackingOptions = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });
     const detection = await faceapi.detectSingleFace(video, trackingOptions).withFaceLandmarks();
+    
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     if (detection) {
-        const resizedResults = faceapi.resizeResults(detection, { width: canvas.width, height: canvas.height });
+        // 1. Read the actual CSS layout dimensions of the video box on screen
+        const displaySize = { 
+            width: video.offsetWidth, 
+            height: video.offsetHeight 
+        };
+
+        // 2. Force the drawing canvas properties to match the visual box exactly
+        if (canvas.width !== displaySize.width || canvas.height !== displaySize.height) {
+            canvas.width = displaySize.width;
+            canvas.height = displaySize.height;
+        }
+
+        // 3. Scale and display the skeletal map onto the updated portrait/landscape space
+        const resizedResults = faceapi.resizeResults(detection, displaySize);
         latestDetection = resizedResults;
         faceapi.draw.drawFaceLandmarks(canvas, resizedResults);
     } else {
         latestDetection = null;
     }
+
     requestAnimationFrame(processWireframeLoop);
 }
 
