@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>High-Res Expression Dataset Studio</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/dist/face-api.js"></script>
+    
+    <style>
+        /* Pure, maximum-brightness white canvas to act as a face fill light */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #ffffff;
+            color: #000000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 { color: #1a73e8; margin-bottom: 5px; }
+        p { color: #5f6368; margin-top: 0; margin-bottom: 25px; }
+
+        #main-studio {
+            display: flex;
+            gap: 25px;
+            max-width: 1400px;
+            width: 100%;
+        }
+
+        .left-column {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            flex: 3;
+        }
+
+        .right-column {
+            flex: 1;
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 15px;
+            border: 1px solid #e0e0e0;
+            display: flex;
+            flex-direction: column;
+            max-height: 640px;
+        }
+
+        .import-box {
+            background: #ffffff;
+            padding: 15px;
+            border-radius: 12px;
+            border: 2px dashed #1a73e8;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        #trainer-container {
+            background: #ffffff;
+            padding: 25px;
+            border-radius: 15px;
+            border: 1px solid #e0e0e0;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+        }
+
+        .view-panel {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 3px solid #dcdcdc;
+        }
+
+        video, #overlay-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            transform: scaleX(-1); /* Mirror view */
+        }
+
+        #overlay-canvas {
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        /* Giant visual countdown text overlay centered above video layer */
+        #countdown-overlay {
+            display: none;
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255, 255, 255, 0.4);
+            z-index: 10;
+            align-items: center;
+            justify-content: center;
+            font-size: 6rem;
+            font-weight: bold;
+            color: #1a73e8;
+            text-shadow: 0 0 20px rgba(255,255,255,0.8);
+            pointer-events: none;
+        }
+
+        .interactive-footer {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+
+        .control-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        label { font-weight: bold; color: #1a73e8; font-size: 0.95rem;}
+
+        input[type="text"] {
+            padding: 12px;
+            border-radius: 6px;
+            border: 1px solid #chchch;
+            background: #ffffff;
+            color: #000;
+            font-size: 1rem;
+        }
+
+        input[type="text"]::placeholder {
+            color: #aaa;
+        }
+
+        .btn-stack {
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            flex: 1;
+            padding: 14px;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        button:hover { opacity: 0.9; }
+        button:disabled { background: #e0e0e0; color: #999; cursor: not-allowed; }
+
+        #snap-btn { background: #d93025; color: white; }
+        #export-btn { background: #34a853; color: white; }
+
+        #log-box {
+            flex: 1;
+            background: #f1f3f4;
+            padding: 12px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            height: 110px;
+            overflow-y: auto;
+            color: #333;
+            border: 1px solid #e0e0e0;
+        }
+
+        .dataset-header {
+            margin-top: 0;
+            color: #1a73e8;
+            font-size: 1.2rem;
+            border-bottom: 1px solid #e0e0e0;
+            padding-bottom: 10px;
+        }
+
+        .entry-list {
+            overflow-y: auto;
+            flex: 1;
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .entry-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #ffffff;
+            padding: 10px 12px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+            border-left: 4px solid #d93025;
+            border-top: 1px solid #e0e0e0;
+            border-right: 1px solid #e0e0e0;
+            border-bottom: 1px solid #e0e0e0;
+            cursor: pointer;
+        }
+
+        .entry-item:hover { background: #f8f9fa; border-left-color: #1a73e8; }
+        .entry-meta { color: #5f6368; font-size: 0.75rem; text-align: right; }
+
+        #preview-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(255,255,255,0.95);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: #ffffff;
+            padding: 20px;
+            border-radius: 12px;
+            border: 2px solid #1a73e8;
+            text-align: center;
+            position: relative;
+            max-width: 900px;
+            width: 95%;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.1);
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 10px; right: 15px; font-size: 1.7rem; cursor: pointer; color: #5f6368;
+        }
+
+        #modal-image {
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            background: #f1f3f4;
+            border-radius: 6px;
+            margin-top: 10px;
+            border: 1px solid #e0e0e0;
+            object-fit: contain;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>High-Res Expression Dataset Studio</h1>
+    <p>Capturing structural facial layouts matching modern high-fidelity inputs.</p>
+
+    <div id="main-studio">
+        
+        <div class="left-column">
+            <div class="import-box">
+                <div>
+                    <label style="display:block; margin-bottom:5px;">Load Existing File:</label>
+                    <input type="file" id="file-loader" accept=".json">
+                </div>
+                <div style="text-align: right; color: #5f6368; font-size: 0.85rem;">
+                    Total Set Size: <span id="file-count" style="color: #1a73e8; font-weight: bold;">0</span>
+                </div>
+            </div>
+
+            <div id="trainer-container">
+                <div class="view-panel">
+                    <video id="webcam" autoplay muted playsinline></video>
+                    <canvas id="overlay-canvas"></canvas>
+                    
+                    <div id="countdown-overlay">2</div>
+                </div>
+
+                <div class="interactive-footer">
+                    <div class="control-panel">
+                        <div class="input-group">
+                            <label for="expression-label">Expression Key/Label:</label>
+                            <input type="text" id="expression-label" placeholder="e.g. angry_cat, smile_huge">
+                        </div>
+
+                        <div class="btn-stack">
+                            <button id="snap-btn" disabled>Add High-Res Frame</button>
+                            <button id="export-btn" disabled>Export Dataset (.json)</button>
+                        </div>
+                    </div>
+                    
+                    <div id="log-box">System booting...</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="right-column">
+            <h3 class="dataset-header">Current Library Entries</h3>
+            <ul class="entry-list" id="ui-entry-list"></ul>
+        </div>
+
+    </div>
+
+    <div id="preview-modal">
+        <div class="modal-content">
+            <span class="modal-close" id="close-modal-btn">&times;</span>
+            <h3 id="modal-title" style="margin: 0; color: #1a73e8;">Matrix Blueprint</h3>
+            <img id="modal-image" src="" alt="Skeletal Face Blueprint">
+        </div>
+    </div>
+
+    <script>
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('overlay-canvas');
+        const snapBtn = document.getElementById('snap-btn');
+        const exportBtn = document.getElementById('export-btn');
+        const logBox = document.getElementById('log-box');
+        const labelInput = document.getElementById('expression-label');
+        const fileLoader = document.getElementById('file-loader');
+        const fileCountSpan = document.getElementById('file-count');
+        const uiEntryList = document.getElementById('ui-entry-list');
+        const countdownOverlay = document.getElementById('countdown-overlay');
+        
+        const modal = document.getElementById('preview-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalImg = document.getElementById('modal-image');
+        const closeModalBtn = document.getElementById('close-modal-btn');
+
+        let latestLandmarks = null;
+        let datasetSessionMemory = [];
+
+        function log(msg) {
+            logBox.innerHTML += `<div>[${new Date().toLocaleTimeString()}] ${msg}</div>`;
+            logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        async function init() {
+            if (typeof faceapi === 'undefined') {
+                log("Critical Error: global faceapi script target missing.");
+                return;
+            }
+            const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
+            try {
+                log("Downloading advanced tracking engines...");
+                await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+                await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+                log("Engines ready. Booting high-res stream...");
+                startVideo();
+            } catch (err) {
+                log(`Init Error: ${err.message}`);
+            }
+        }
+
+        function startVideo() {
+            navigator.mediaDevices.getUserMedia({ 
+                video: { 
+                    width: { ideal: 1280 }, 
+                    height: { ideal: 720 },
+                    facingMode: "user"
+                } 
+            })
+            .then(stream => {
+                video.srcObject = stream;
+                video.onloadedmetadata = () => {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    log(`HD Matrix Frame aligned: ${video.videoWidth}x${video.videoHeight}`);
+                    snapBtn.disabled = false;
+                    processWireframeLoop();
+                };
+            })
+            .catch(err => log(`Webcam Connection Error: ${err.message}`));
+        }
+
+        async function processWireframeLoop() {
+            if (video.paused || video.ended) return;
+
+            const highResOptions = new faceapi.TinyFaceDetectorOptions({ inputSize: 1280, scoreThreshold: 0.5 });
+            const detection = await faceapi.detectSingleFace(video, highResOptions).withFaceLandmarks();
+
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (detection) {
+                const resizedResults = faceapi.resizeResults(detection, { width: canvas.width, height: canvas.height });
+                latestLandmarks = resizedResults.landmarks;
+                faceapi.draw.drawFaceLandmarks(canvas, resizedResults);
+            } else {
+                latestLandmarks = null;
+            }
+
+            requestAnimationFrame(processWireframeLoop);
+        }
+
+        function refreshDatasetUI() {
+            uiEntryList.innerHTML = '';
+            fileCountSpan.innerText = datasetSessionMemory.length;
+
+            if (datasetSessionMemory.length > 0) {
+                exportBtn.disabled = false;
+            }
+
+            datasetSessionMemory.forEach((item, index) => {
+                const li = document.createElement('li');
+                li.className = 'entry-item';
+                const briefTime = item.capturedAt ? item.capturedAt.split('T')[1].substring(0, 8) : 'Imported';
+                
+                li.innerHTML = `
+                    <div><strong>${item.expressionLabel}</strong></div>
+                    <div class="entry-meta">View Map (${item.sourceResolution || "720p"})<br><span style="color:#666;">${briefTime}</span></div>
+                `;
+
+                li.addEventListener('click', () => showWireframePreview(index));
+                uiEntryList.insertBefore(li, uiEntryList.firstChild);
+            });
+        }
+
+        function showWireframePreview(itemIndex) {
+            const targetRecord = datasetSessionMemory[itemIndex];
+            if (!targetRecord) return;
+
+            modalTitle.innerText = `HD Template View: "${targetRecord.expressionLabel}"`;
+            modalImg.src = targetRecord.wireframeVisual || "";
+            modal.style.display = "flex";
+        }
+
+        closeModalBtn.addEventListener('click', () => modal.style.display = "none");
+        modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = "none"; });
+
+        fileLoader.addEventListener('change', (event) => {
+            const selectedFile = event.target.files[0];
+            if (!selectedFile) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const parsedData = JSON.parse(e.target.result);
+                    if (Array.isArray(parsedData)) {
+                        datasetSessionMemory = datasetSessionMemory.concat(parsedData);
+                        log(`Successfully read ${parsedData.length} entries.`);
+                        refreshDatasetUI();
+                    } else {
+                        alert("File validation failed.");
+                    }
+                } catch (err) {
+                    alert("JSON parse error.");
+                }
+            };
+            reader.readAsText(selectedFile);
+        });
+
+        snapBtn.addEventListener('click', () => {
+            const labelValue = labelInput.value.trim().toLowerCase();
+            if (!labelValue) {
+                alert("Please declare an expression code text label first.");
+                return;
+            }
+
+            snapBtn.disabled = true;
+            let secondsRemaining = 2;
+            
+            log(`Capture triggered! Freeze frame in ${secondsRemaining}s...`);
+            
+            countdownOverlay.innerText = secondsRemaining;
+            countdownOverlay.style.display = "flex";
+
+            const timerInterval = setInterval(() => {
+                secondsRemaining--;
+                
+                if (secondsRemaining > 0) {
+                    countdownOverlay.innerText = secondsRemaining;
+                } else {
+                    clearInterval(timerInterval);
+                    countdownOverlay.style.display = "none";
+                    executeActualCapture(labelValue);
+                    snapBtn.disabled = false;
+                }
+            }, 1000);
+        });
+
+        function executeActualCapture(labelValue) {
+            if (!latestLandmarks) {
+                log("Capture failed: No face detected at the exact capture milestone.");
+                alert("Face track dropped! No coordinate data stored. Try holding steadier.");
+                return;
+            }
+
+            const trackingPoints = latestLandmarks.positions;
+            const wireframeImageBase64 = canvas.toDataURL('image/png');
+
+            const trainingFrame = {
+                expressionLabel: labelValue,
+                pointsCount: trackingPoints.length,
+                landmarksCoordinates: trackingPoints,
+                sourceResolution: `${video.videoWidth}x${video.videoHeight}`,
+                wireframeVisual: wireframeImageBase64,
+                capturedAt: new Date().toISOString()
+            };
+
+            datasetSessionMemory.push(trainingFrame);
+            log(`Logged ${video.videoWidth}p snapshot for "${labelValue}"`);
+            refreshDatasetUI();
+        }
+
+        exportBtn.addEventListener('click', () => {
+            if (datasetSessionMemory.length === 0) return;
+
+            const jsonString = JSON.stringify(datasetSessionMemory, null, 2);
+            const dataBlob = new Blob([jsonString], { type: 'application/json' });
+            const downloadUrl = URL.createObjectURL(dataBlob);
+            
+            const dummyLink = document.createElement('a');
+            dummyLink.href = downloadUrl;
+            dummyLink.download = `hd_expression_dataset_${Date.now()}.json`;
+            
+            document.body.appendChild(dummyLink);
+            dummyLink.click();
+            document.body.removeChild(dummyLink);
+            
+            log(`High-res data array exported.`);
+        });
+
+        init();
+    </script>
+</body>
+</html>

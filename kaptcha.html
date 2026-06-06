@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Security Verification - CAPTCHA</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/dist/face-api.js"></script>
+    
+    <style>
+        /* Pure, maximum-brightness white canvas to act as a face fill light */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: #ffffff; 
+            color: #000000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        #captcha-container {
+            background: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.05);
+            padding: 32px;
+            max-width: 760px;
+            width: 100%;
+            box-sizing: border-box;
+            text-align: center;
+        }
+
+        .captcha-header {
+            background: #1a73e8; /* Clean blue branding */
+            color: white;
+            padding: 18px;
+            margin: -32px -32px 24px -32px;
+            border-top-left-radius: 7px;
+            border-top-right-radius: 7px;
+            text-align: left;
+        }
+
+        .captcha-header h2 { margin: 0; font-size: 1.5rem; font-weight: 500; letter-spacing: 0.25px; }
+        .captcha-header p { margin: 4px 0 0 0; font-size: 0.95rem; opacity: 0.9; }
+
+        .camera-box {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            margin: 0 auto 24px auto;
+            background: #000;
+            border-radius: 6px;
+            overflow: hidden;
+            border: 1px solid #dcdcdc;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1); /* Mirror view */
+        }
+
+        .progress-container {
+            width: 100%;
+            background-color: #f1f3f4;
+            border-radius: 10px;
+            height: 16px;
+            overflow: hidden;
+            margin: 15px 0;
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.06);
+        }
+
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            background-color: #34a853; /* Success green */
+            transition: width 0.1s linear;
+        }
+
+        #prompt-text {
+            font-size: 1.4rem;
+            font-weight: bold;
+            color: #1a73e8;
+            margin-bottom: 8px;
+            line-height: 1.3;
+        }
+
+        #scold-banner {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: #ffffff;
+            background-color: #d93025; /* Warning Red */
+            padding: 12px;
+            border-radius: 4px;
+            margin: 12px 0 20px 0;
+            min-height: 24px;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        #scold-banner.visible {
+            opacity: 1;
+        }
+
+        #success-screen {
+            display: none;
+            padding: 50px 10px;
+        }
+
+        .success-icon {
+            color: #34a853;
+            font-size: 5.5rem;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="captcha-container">
+        
+        <div class="captcha-header">
+            <h2>ExpressionCAPTCHA™</h2>
+            <p>Biometric Verification Portal (Automated Startup)</p>
+        </div>
+
+        <div id="game-play">
+            <div id="prompt-text">Initializing high-res camera matrix...</div>
+            <div id="scold-banner">Analyzing tracking points...</div>
+            
+            <div class="camera-box">
+                <video id="webcam" autoplay muted playsinline></video>
+            </div>
+
+            <label style="font-size:0.9rem; font-weight:700; color:#5f6368; text-transform:uppercase; letter-spacing: 0.75px;">
+                Verification Hold Progress:
+            </label>
+            <div class="progress-container">
+                <div id="hold-progress" class="progress-bar"></div>
+            </div>
+        </div>
+
+        <div id="success-screen">
+            <div class="success-icon">✓</div>
+            <h3 style="margin:0; color:#202124; font-size:1.8rem;">Verification Confirmed</h3>
+            <p style="color:#5f6368; margin-top:10px; font-size:1.1rem;">Forwarding destination terminal request...</p>
+        </div>
+
+    </div>
+
+    <script>
+        // =========================================================================
+// CONFIGURATION PARAMETERS
+// =========================================================================
+
+// 1. The target URL to forward to upon successful face shape verification
+const SUCCESS_REDIRECT_URL = "https://www.google.com"; 
+
+// 2. The relative path or filename of your dataset on your local server
+const DATASET_FILE_URL = "hd_expression_dataset.json"; 
+
+// =========================================================================
+
+const video = document.getElementById('webcam');
+const gameplayDiv = document.getElementById('game-play');
+const successScreen = document.getElementById('success-screen');
+const promptText = document.getElementById('prompt-text');
+const scoldBanner = document.getElementById('scold-banner');
+const progressBar = document.getElementById('hold-progress');
+
+let trainedProfiles = [];
+let randomizedExpressionsQueue = [];
+let currentChallengeIndex = 0;
+
+let matchingFramesCounterCount = 0;
+const TARGET_HOLD_MS = 5000;
+const FRAME_INTERVAL_MS = 100;
+const REQUIRED_MATCHING_FRAMES = TARGET_HOLD_MS / FRAME_INTERVAL_MS;
+
+// Fisher-Yates Shuffling Algorithm
+function shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+}
+
+// Background Asset Loader Loop
+async function initApplication() {
+    gameplayDiv.style.display = 'block';
+    promptText.innerHTML = `Downloading dataset matrix...`;
+
+    try {
+        // Fetch the external JSON asset from the local server
+        const response = await fetch(DATASET_FILE_URL);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP Error Status: ${response.status}`);
+        }
+
+        trainedProfiles = await response.json();
+
+        if (!Array.isArray(trainedProfiles) || trainedProfiles.length === 0) {
+            throw new Error("The target JSON database file structure is empty.");
+        }
+
+        // Set up tracking queue properties
+        const rawKeysList = trainedProfiles.map(p => p.expressionLabel);
+        const uniqueKeys = [...new Set(rawKeysList)];
+        randomizedExpressionsQueue = shuffleArray(uniqueKeys);
+
+        promptText.innerHTML = `Initializing high-res camera matrix...`;
+        await initAIModels();
+        bootWebcam();
+
+    } catch (err) {
+        promptText.innerHTML = `
+            <span style="color:#d93025; font-weight:bold;">Server Fetch Failure:</span><br>
+            <span style="font-size:0.95rem; color:#555;">
+                Could not find or parse "${DATASET_FILE_URL}".<br>
+                Reason: ${err.message}
+            </span>
+        `;
+        console.error("Asset load error:", err);
+    }
+}
+
+async function initAIModels() {
+    const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
+    try {
+        await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+        await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+        console.log("HD Processing cores online.");
+    } catch (err) {
+        alert("Error loading verification resources: " + err.message);
+    }
+}
+
+function bootWebcam() {
+    navigator.mediaDevices.getUserMedia({ 
+        video: { 
+            width: { ideal: 1280 }, 
+            height: { ideal: 720 },
+            facingMode: "user"
+        } 
+    })
+    .then(stream => {
+        video.srcObject = stream;
+        video.onloadedmetadata = () => {
+            updateChallengePrompt();
+            executeTrackingLoop();
+        };
+    })
+    .catch(err => alert("Webcam initialization failure. Check hardware and permissions."));
+}
+
+function updateChallengePrompt() {
+    if (currentChallengeIndex < randomizedExpressionsQueue.length) {
+        matchingFramesCounterCount = 0;
+        progressBar.style.width = '0%';
+        scoldBanner.classList.remove('visible');
+        
+        const promptLabel = randomizedExpressionsQueue[currentChallengeIndex].toUpperCase().replace('_', ' ');
+        promptText.innerHTML = `VERIFY IDENTITY:<br><span style="color:#1a73e8; font-size:1.6rem;">HOLD "${promptLabel}" NOW</span>`;
+    } else {
+        gameplayDiv.style.display = 'none';
+        successScreen.style.display = 'block';
+        
+        const stream = video.srcObject;
+        if (stream) stream.getTracks().forEach(t => t.stop());
+
+        // Redirect sequence trigger
+        setTimeout(() => {
+            window.location.href = SUCCESS_REDIRECT_URL;
+        }, 400); 
+    }
+}
+
+function generateRoastMessage(target, actual) {
+    const targetClean = target.replace('_', ' ');
+    const actualClean = actual.replace('_', ' ');
+
+    if (actual === 'unknown') {
+        return `Expression doesn't match baseline values. Adjust posture!`;
+    }
+    return `Incorrect expression! Expected "${targetClean}", but detected "${actualClean}"!`;
+}
+
+async function executeTrackingLoop() {
+    if (video.paused || video.ended || currentChallengeIndex >= randomizedExpressionsQueue.length) return;
+
+    const highResOptions = new faceapi.TinyFaceDetectorOptions({ inputSize: 1280, scoreThreshold: 0.5 });
+    const detection = await faceapi.detectSingleFace(video, highResOptions).withFaceLandmarks();
+
+    if (detection) {
+        const targetGoalLabel = randomizedExpressionsQueue[currentChallengeIndex];
+        const livePoints = detection.landmarks.positions;
+        
+        const matchedExpression = evaluateFaceKNN(livePoints);
+
+        if (matchedExpression === targetGoalLabel) {
+            matchingFramesCounterCount++;
+            
+            if (matchingFramesCounterCount > 3) {
+                scoldBanner.classList.remove('visible');
+            }
+
+            const currentPercentage = (matchingFramesCounterCount / REQUIRED_MATCHING_FRAMES) * 100;
+            progressBar.style.width = `${Math.min(currentPercentage, 100)}%`;
+
+            if (matchingFramesCounterCount >= REQUIRED_MATCHING_FRAMES) {
+                currentChallengeIndex++;
+                updateChallengePrompt();
+            }
+        } else {
+            if (matchingFramesCounterCount > 0) {
+                matchingFramesCounterCount = Math.max(0, matchingFramesCounterCount - 3);
+                const currentPercentage = (matchingFramesCounterCount / REQUIRED_MATCHING_FRAMES) * 100;
+                progressBar.style.width = `${currentPercentage}%`;
+            }
+
+            const roastText = generateRoastMessage(targetGoalLabel, matchedExpression);
+            scoldBanner.innerText = `⚠️ ${roastText}`;
+            scoldBanner.classList.add('visible');
+        }
+    }
+
+    setTimeout(() => executeTrackingLoop(), FRAME_INTERVAL_MS);
+}
+
+function evaluateFaceKNN(livePoints) {
+    let closestLabelName = null;
+    let minimumVarianceScore = Infinity;
+    const anchorPt = livePoints[27]; // nose bridge index
+
+    for (let profile of trainedProfiles) {
+        let cumulativeDistanceVariance = 0;
+        const baselinePoints = profile.landmarksCoordinates;
+
+        for (let i = 0; i < 68; i++) {
+            if (!baselinePoints[i] || !livePoints[i]) continue;
+
+            const baselineDeltaX = baselinePoints[i].x - profile.landmarksCoordinates[27].x;
+            const baselineDeltaY = baselinePoints[i].y - profile.landmarksCoordinates[27].y;
+            
+            const liveDeltaX = livePoints[i].x - anchorPt.x;
+            const liveDeltaY = livePoints[i].y - anchorPt.y;
+
+            const diffX = baselineDeltaX - liveDeltaX;
+            const diffY = baselineDeltaY - liveDeltaY;
+            
+            cumulativeDistanceVariance += Math.sqrt(diffX * diffX + diffY * diffY);
+        }
+
+        if (cumulativeDistanceVariance < minimumVarianceScore) {
+            minimumVarianceScore = cumulativeDistanceVariance;
+            closestLabelName = profile.expressionLabel;
+        }
+    }
+
+    const MAX_ALLOWED_DISTANCE_VARIANCE_TOLERANCE = 1400; 
+    return (minimumVarianceScore < MAX_ALLOWED_DISTANCE_VARIANCE_TOLERANCE) ? closestLabelName : "unknown";
+}
+
+// Fire application initialization
+initApplication();estLabelName = profile.expressionLabel;
+                }
+            }
+
+            const MAX_ALLOWED_DISTANCE_VARIANCE_TOLERANCE = 1400; 
+            return (minimumVarianceScore < MAX_ALLOWED_DISTANCE_VARIANCE_TOLERANCE) ? closestLabelName : "unknown";
+        }
+
+        // Run application setup instantly on DOM execution
+        initApplication();
+    </script>
+</body>
+</html>
