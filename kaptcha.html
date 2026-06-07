@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Security Verification - CAPTCHA</title>
     
-    <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/dist/face-api.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/dist/face-api.js" crossorigin="anonymous"></script>
     
     <style>
         body {
@@ -361,7 +361,32 @@ async function initApplication() {
             return (minimumVarianceScore < MAX_ALLOWED_DISTANCE_VARIANCE_TOLERANCE) ? closestLabelName : "unknown";
         }
 
+        // Wrap initialization inside a verified DOM lifecycle listener 
+// This prevents mobile browsers from locking up if the CDN script loads out of order
+document.addEventListener("DOMContentLoaded", () => {
+    // 1. Create a failsafe global timeout tracker
+    const failSafeTimeout = setTimeout(() => {
+        const promptText = document.getElementById('prompt-text');
+        if (promptText && promptText.innerHTML.includes("Downloading dataset matrix...")) {
+            promptText.innerHTML = `
+                <span style="color:#d93025; font-weight:bold;">Loader Lifecycle Timeout:</span><br>
+                <span style="font-size:0.95rem; color:#333; display:inline-block; margin-top:8px; background:#fff5f5; padding:8px; border:1px solid #d93025; border-radius:4px; text-align:left;">
+                    The script engine took too long to fire.<br>
+                    • Try hitting refresh on your browser.<br>
+                    • If on a phone, ensure you aren't on strict data-saver mode.
+                </span>
+            `;
+        }
+    }, 8000); // Trigger warning if stuck for 8 seconds
+
+    // 2. Clear the timeout and execute safely once DOM is verified ready
+    try {
+        clearTimeout(failSafeTimeout);
         initApplication();
+    } catch (bootstrapError) {
+        console.error("Lifecycle execution failed:", bootstrapError);
+    }
+});
     </script>
 </body>
 </html>
