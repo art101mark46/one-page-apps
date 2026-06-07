@@ -7,13 +7,23 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="app-container">
+    <div id="login-container" class="app-container">
+        <header>
+            <h1>BSL Trainer Setup</h1>
+            <p>Enter your username to track your fingerspelling metrics.</p>
+        </header>
+        <div class="input-panel">
+            <input type="text" id="username-input" placeholder="e.g., Alex" autocomplete="off">
+            <button id="btn-login" class="btn-success">Start Training</button>
+        </div>
+    </div>
+
+    <div id="main-app-container" class="app-container hidden">
         <header>
             <h1>BSL Fingerspelling Trainer</h1>
-            <p>Train your receptive skills by decoding the signs.</p>
+            <p>Welcome back, <span id="display-username" style="font-weight: bold; color: var(--primary);">User</span>!</p>
         </header>
 
-        <!-- Main Visual Display Zone -->
         <main class="display-card">
             <div class="image-wrapper">
                 <img id="sign-viewer" src="assets/letters/placeholder.png" alt="BSL Sign Placeholder">
@@ -21,7 +31,6 @@
             <div id="status-indicator" class="status-idle">Ready</div>
         </main>
 
-        <!-- Controls Zone -->
         <section class="controls-panel">
             <div class="control-group">
                 <label for="difficulty-select">Difficulty:</label>
@@ -41,13 +50,35 @@
             <button id="btn-replay" class="btn-secondary" disabled>Replay (Space)</button>
         </section>
 
-        <!-- Interactive Input Zone -->
         <section class="input-panel">
             <input type="text" id="user-guess" placeholder="Type what you see..." autocomplete="off" disabled>
             <button id="btn-submit" class="btn-success" disabled>Check</button>
         </section>
 
         <div id="feedback-message" class="feedback-container"></div>
+
+        <hr class="divider">
+        <section class="dashboard-panel">
+            <h3>Your Metrics Dashboard</h3>
+            <table class="metrics-table">
+                <thead>
+                    <tr>
+                        <th>Category</th>
+                        <th>Correct</th>
+                        <th>Attempts</th>
+                        <th>Total Replays</th>
+                    </tr>
+                </thead>
+                <tbody id="metrics-tbody">
+                    </tbody>
+            </table>
+
+            <div class="csv-actions">
+                <button id="btn-export" class="btn-dash">📥 Export Scores (CSV)</button>
+                <label for="csv-import" class="btn-dash-label">📤 Import Scores (CSV)</label>
+                <input type="file" id="csv-import" accept=".csv" style="display: none;">
+            </div>
+        </section>
     </div>
 
     <script type="module" src="app.js"></script>
