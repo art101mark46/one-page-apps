@@ -8,7 +8,12 @@
     --border-radius: 12px;
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, sans-serif; }
+* { 
+    box-sizing: border-box; 
+    margin: 0; 
+    padding: 0; 
+    font-family: system-ui, sans-serif; 
+}
 
 body {
     background-color: var(--bg-color);
@@ -20,7 +25,12 @@ body {
     padding: 20px;
 }
 
-.app-container {
+.hidden { 
+    display: none !important; 
+}
+
+/* Force both view screens to size completely uniformly */
+#login-container, #main-app-container {
     width: 100%;
     max-width: 500px;
     background: var(--card-bg);
@@ -29,9 +39,19 @@ body {
     box-shadow: 0 10px 25px rgba(0,0,0,0.05);
 }
 
-header { text-align: center; margin-bottom: 25px; }
-header h1 { font-size: 1.6rem; color: #1a252f; margin-bottom: 5px; }
-header p { font-size: 0.9rem; color: #7f8c8d; }
+header { 
+    text-align: center; 
+    margin-bottom: 25px; 
+}
+header h1 { 
+    font-size: 1.6rem; 
+    color: #1a252f; 
+    margin-bottom: 5px; 
+}
+header p { 
+    font-size: 0.9rem; 
+    color: #7f8c8d; 
+}
 
 .display-card {
     background: #f8f9fa;
@@ -44,7 +64,7 @@ header p { font-size: 0.9rem; color: #7f8c8d; }
 }
 
 .image-wrapper {
-    height: 220px; /* Forces stable vertical height during letter swaps */
+    height: 220px;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -103,16 +123,16 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
     gap: 10px;
     margin-bottom: 15px;
 }
-#user-guess {
+#user-guess, #username-input {
     flex: 1;
     padding: 12px;
     border: 2px solid #cbd5e1;
     border-radius: 8px;
     font-size: 1.1rem;
-    text-transform: uppercase;
     text-align: center;
 }
-#user-guess:focus { border-color: var(--primary); outline: none; }
+#user-guess { text-transform: uppercase; }
+#user-guess:focus, #username-input:focus { border-color: var(--primary); outline: none; }
 .btn-success { background: var(--success); color: white; padding: 0 25px; }
 
 .feedback-container {
@@ -125,10 +145,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .correct { background: #e8f8f0; color: var(--success); }
 .incorrect { background: #fdedec; color: var(--error); }
 
-/* Appended Utility and Dashboard Layout Styles */
-.hidden { display: none !important; }
 .divider { border: 0; height: 1px; background: #e2e8f0; margin: 25px 0; }
-
 .dashboard-panel h3 { font-size: 1rem; margin-bottom: 12px; color: #34495e; text-transform: uppercase; letter-spacing: 0.5px; }
 
 .metrics-table {

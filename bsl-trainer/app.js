@@ -11,7 +11,6 @@ let state = {
     playbackTimeout: null,
     speed: 800,
     assetsPath: 'assets/letters/',
-    // Complete relational score structure
     scores: {} 
 };
 
@@ -38,7 +37,7 @@ const btnSubmit = document.getElementById('btn-submit');
 const btnExport = document.getElementById('btn-export');
 const csvImportInput = document.getElementById('csv-import');
 
-// --- Initialization & Profile Tracking Logic ---
+// --- Profile Initialization Tracking ---
 btnLogin.addEventListener('click', initUserProfile);
 usernameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') initUserProfile(); });
 
@@ -49,13 +48,13 @@ function initUserProfile() {
     state.username = rawName;
     displayUsername.textContent = state.username;
     
-    // Load local storage db or create schema if fresh
+    // Fetch system historical database
     const localData = localStorage.getItem('bsl_trainer_scores');
     state.scores = localData ? JSON.parse(localData) : {};
     
     ensureUserSchemaExists(state.username);
     
-    // UI Visual Switch
+    // UI Screen Swap
     loginContainer.classList.add('hidden');
     mainAppContainer.classList.remove('hidden');
     
@@ -78,8 +77,8 @@ function saveScoresToDisk() {
 }
 
 function renderScoreboard() {
+    if (!state.username || !state.scores[state.username]) return;
     const uData = state.scores[state.username];
-    if (!uData) return;
 
     metricsTbody.innerHTML = `
         <tr>
@@ -103,7 +102,7 @@ function renderScoreboard() {
     `;
 }
 
-// --- Playback and Game Engine Control ---
+// --- Playback Controller Framework ---
 speedRange.addEventListener('input', (e) => {
     state.speed = parseInt(e.target.value);
     speedVal.textContent = state.speed;
@@ -127,14 +126,14 @@ function startNewTurn() {
     
     state.currentCategory = difficultySelect.value;
     state.currentWord = getRandomWord(state.currentCategory).toUpperCase();
-    state.currentWordReplays = 0; // Reset tracking counters for the specific turn
+    state.currentWordReplays = 0; 
     
     determineAndPlayWord(state.currentWord);
 }
 
 function handleReplayTrigger() {
     if (state.isPlaying) return;
-    state.currentWordReplays++; // Increment counter
+    state.currentWordReplays++; 
     determineAndPlayWord(state.currentWord);
 }
 
@@ -209,7 +208,6 @@ function checkAnswer() {
 
     saveScoresToDisk();
     
-    // Disable further evaluation submissions until Next is pressed
     userGuess.disabled = true;
     btnSubmit.disabled = true;
 }
@@ -242,14 +240,13 @@ function clearFeedback() {
     feedbackMessage.className = "feedback-container";
 }
 
-// --- CSV Import & Export Utilities ---
+// --- CSV Portability Operations ---
 btnExport.addEventListener('click', exportScoresToCSV);
 csvImportInput.addEventListener('change', importScoresFromCSV);
 
 function exportScoresToCSV() {
     let csvRows = ['Username,Category,Correct,Attempts,TotalReplays'];
     
-    // Flatten relational structural memory objects to strings
     for (const [user, categories] of Object.entries(state.scores)) {
         for (const [cat, data] of Object.entries(categories)) {
             csvRows.push(`${user},${cat},${data.correct},${data.attempts},${data.totalReplays}`);
@@ -276,7 +273,6 @@ function importScoresFromCSV(event) {
         const text = e.target.result;
         const lines = text.split('\n');
         
-        // Loop headers fallback confirmation check
         if(lines.length <= 1 || !lines[0].includes('Category')) return;
 
         for (let i = 1; i < lines.length; i++) {
