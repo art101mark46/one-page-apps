@@ -242,21 +242,19 @@
     const ctx = canvas.getContext('2d');
 
     if (detection) {
-        // 1. Establish structural display bounding markers
         const displaySize = { width: video.offsetWidth, height: video.offsetHeight };
-        
-        // 2. Synchronize dimensions explicitly with the face-api engine
         faceapi.matchDimensions(canvas, displaySize);
 
-        // 3. Scale raw camera tensors cleanly to match our viewport box layout
+        // 1. Scale the raw detection map to match the CSS viewport bounds
         const resizedResults = faceapi.resizeResults(detection, displaySize);
         
-        // 4. Wipe old dots cleanly and paint the new wireframe overlay
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         faceapi.draw.drawFaceLandmarks(canvas, resizedResults);
 
         const targetGoalLabel = randomizedExpressionsQueue[currentChallengeIndex];
-        const matchedExpression = evaluateFaceKNN(detection);
+        
+        // 2. Pass the RESIZED result so coordinates line up perfectly
+        const matchedExpression = evaluateFaceKNN(resizedResults);
 
         if (matchedExpression === targetGoalLabel) {
             matchingFramesCounterCount++;
@@ -279,7 +277,6 @@
             scoldBanner.classList.add('visible');
         }
     } else {
-        // If no face is caught, clear old frame outlines smoothly so artifacts don't stick
         ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
     
@@ -287,34 +284,40 @@
 }
 
         function evaluateFaceKNN(liveDetection) {
-            let closestLabelName = null;
-            let minimumVarianceScore = Infinity;
+    let closestLabelName = null;
+    let minimumVarianceScore = Infinity;
 
-            const box = liveDetection.detection.box;
-            const livePoints = liveDetection.landmarks.positions;
+    // Correctly pull the box and positions from the matched frame properties
+    const box = liveDetection.detection.box;
+    const livePoints = liveDetection.landmarks.positions;
 
-            // Normalize coordinate data to prevent portrait scale/aspect distortions
-            const normalizedLive = livePoints.map(p => ({
-                x: (p.x - box.x) / box.width,
-                y: (p.y - box.y) / box.height
-            }));
+    // Normalize coordinate metrics cleanly 
+    const normalizedLive = livePoints.map(p => ({
+        x: (p.x - box.x) / box.width,
+        y: (p.y - box.y) / box.height
+    }));
 
-            for (let profile of trainedProfiles) {
-                let cumulativeDistanceVariance = 0;
-                const baselinePoints = profile.landmarksCoordinates;
+    for (let profile of trainedProfiles) {
+        let cumulativeDistanceVariance = 0;
+        const baselinePoints = profile.landmarksCoordinates;
 
-                for (let i = 0; i < 68; i++) {
-                    if (!baselinePoints[i] || !normalizedLive[i]) continue;
-                    const diffX = baselinePoints[i].x - normalizedLive[i].x;
-                    const diffY = baselinePoints[i].y - normalizedLive[i].y;
-                    cumulativeDistanceVariance += Math.sqrt(diffX * diffX + diffY * diffY);
-                }
+        for (let i = 0; i < 68; i++) {
+            if (!baselinePoints[i] || !normalizedLive[i]) continue;
+            const diffX = baselinePoints[i].x - normalizedLive[i].x;
+            const diffY = baselinePoints[i].y - normalizedLive[i].y;
+            cumulativeDistanceVariance += Math.sqrt(diffX * diffX + diffY * diffY);
+        }
 
-                if (cumulativeDistanceVariance < minimumVarianceScore) {
-                    minimumVarianceScore = cumulativeDistanceVariance;
-                    closestLabelName = profile.expressionLabel;
-                }
-            }
+        if (cumulativeDistanceVariance < minimumVarianceScore) {
+            minimumVarianceScore = cumulativeDistanceVariance;
+            closestLabelName = profile.expressionLabel;
+        }
+    }
+
+    // Sweet-spot tolerance threshold for percentage variations
+    const MAX_ALLOWED_DISTANCE_VARIANCE_TOLERANCE = 3.5; 
+    return (minimumVarianceScore < MAX_ALLOWED_DISTANCE_VARIANCE_TOLERANCE) ? closestLabelName : "unknown";
+}
 
             // Expanded tolerance slightly to 3.2 to make matching easier on phones
             const MAX_ALLOWED_DISTANCE_VARIANCE_TOLERANCE = 3.2; 
