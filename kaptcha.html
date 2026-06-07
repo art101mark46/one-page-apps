@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Security Verification - CAPTCHA</title>
     
-<script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/dist/face-api.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/dist/face-api.js" crossorigin="anonymous"></script>
     
     <style>
         body {
@@ -168,7 +168,7 @@
         let mobileOptimizedOptions = null;
 
         let matchingFramesCounterCount = 0;
-        const TARGET_HOLD_MS = 3000; // Dropped to 3 seconds for less user fatigue
+        const TARGET_HOLD_MS = 3000; 
         const FRAME_INTERVAL_MS = 100;
         const REQUIRED_MATCHING_FRAMES = TARGET_HOLD_MS / FRAME_INTERVAL_MS;
 
@@ -180,59 +180,55 @@
             return array;
         }
 
-        // Background Asset Loader Loop with Strict Format Interrogation
-async function initApplication() {
-    gameplayDiv.style.display = 'block';
-    promptText.innerHTML = `Downloading dataset matrix...`;
-    
-    try {
-        // Clear cache tracking by appending a dynamic execution timestamp query
-        const cacheBusterUrl = `${DATASET_FILE_URL}?t=${new Date().getTime()}`;
-        const response = await fetch(cacheBusterUrl);
-        
-        if (!response.ok) {
-            throw new Error(`Server responded with HTTP code ${response.status}. Verify the file isn't missing.`);
-        }
+        async function initApplication() {
+            gameplayDiv.style.display = 'block';
+            promptText.innerHTML = `Downloading dataset matrix...`;
+            
+            try {
+                const cacheBusterUrl = `${DATASET_FILE_URL}?t=${new Date().getTime()}`;
+                const response = await fetch(cacheBusterUrl);
+                
+                if (!response.ok) {
+                    throw new Error(`Server responded with HTTP code ${response.status}. Verify the file isn't missing.`);
+                }
 
-        const rawTextData = await response.text();
-        
-        try {
-            trainedProfiles = JSON.parse(rawTextData);
-        } catch (jsonErr) {
-            throw new Error(`JSON Formatting Syntax Error: ${jsonErr.message}. Ensure your exported file isn't corrupted.`);
-        }
+                const rawTextData = await response.text();
+                
+                try {
+                    trainedProfiles = JSON.parse(rawTextData);
+                } catch (jsonErr) {
+                    throw new Error(`JSON Formatting Syntax Error: ${jsonErr.message}. Ensure your exported file isn't corrupted.`);
+                }
 
-        if (!Array.isArray(trainedProfiles) || trainedProfiles.length === 0) {
-            throw new Error("Dataset found, but the internal array is empty. Re-run trainer.html to populate vectors.");
-        }
+                if (!Array.isArray(trainedProfiles) || trainedProfiles.length === 0) {
+                    throw new Error("Dataset found, but the internal array is empty. Re-run trainer.html to populate vectors.");
+                }
 
-        // Structural verification: Check if data is pixel-based or normalized percentages
-        const sampleRecord = trainedProfiles[0];
-        if (sampleRecord && sampleRecord.landmarksCoordinates && sampleRecord.landmarksCoordinates[0]) {
-            const sampleCoordinate = sampleRecord.landmarksCoordinates[0].x;
-            if (sampleCoordinate > 1) {
-                throw new Error(`Legacy Data Conflict: The dataset contains pixel values (e.g. ${Math.round(sampleCoordinate)}px) instead of normalized decimals (e.g. 0.45). You must record new profiles using the updated tracker template.`);
+                const sampleRecord = trainedProfiles[0];
+                if (sampleRecord && sampleRecord.landmarksCoordinates && sampleRecord.landmarksCoordinates[0]) {
+                    const sampleCoordinate = sampleRecord.landmarksCoordinates[0].x;
+                    if (sampleCoordinate > 1) {
+                        throw new Error(`Legacy Data Conflict: The dataset contains pixel values instead of normalized decimals.`);
+                    }
+                }
+
+                const uniqueKeys = [...new Set(trainedProfiles.map(p => p.expressionLabel))];
+                randomizedExpressionsQueue = shuffleArray(uniqueKeys);
+
+                promptText.innerHTML = `Initializing tracking engines...`;
+                await initAIModels();
+                bootWebcam();
+
+            } catch (err) {
+                promptText.innerHTML = `
+                    <span style="color:#d93025; font-weight:bold;">Matrix Connection Halted:</span><br>
+                    <span style="font-size:0.95rem; color:#333; display:inline-block; margin-top:8px; background:#fff5f5; padding:8px; border:1px solid #d93025; border-radius:4px; text-align:left;">
+                        ${err.message}
+                    </span>
+                `;
+                console.error("Critical Runtime Error Details:", err);
             }
         }
-
-        const uniqueKeys = [...new Set(trainedProfiles.map(p => p.expressionLabel))];
-        randomizedExpressionsQueue = shuffleArray(uniqueKeys);
-
-        promptText.innerHTML = `Initializing tracking engines...`;
-        await initAIModels();
-        bootWebcam();
-
-    } catch (err) {
-        // Force the hidden engine crash to print natively on your mobile phone screen
-        promptText.innerHTML = `
-            <span style="color:#d93025; font-weight:bold;">Matrix Connection Halted:</span><br>
-            <span style="font-size:0.95rem; color:#333; display:inline-block; margin-top:8px; background:#fff5f5; padding:8px; border:1px solid #d93025; border-radius:4px; text-align:left;">
-                ${err.message}
-            </span>
-        `;
-        console.error("Critical Runtime Error Details:", err);
-    }
-}
 
         async function initAIModels() {
             const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
@@ -273,120 +269,106 @@ async function initApplication() {
         }
 
         async function executeTrackingLoop() {
-    if (video.paused || video.ended || currentChallengeIndex >= randomizedExpressionsQueue.length) return;
+            if (video.paused || video.ended || currentChallengeIndex >= randomizedExpressionsQueue.length) return;
 
-    const detection = await faceapi.detectSingleFace(video, mobileOptimizedOptions).withFaceLandmarks();
-    const ctx = canvas.getContext('2d');
+            const detection = await faceapi.detectSingleFace(video, mobileOptimizedOptions).withFaceLandmarks();
+            const ctx = canvas.getContext('2d');
 
-    if (detection) {
-        const displaySize = { width: video.offsetWidth, height: video.offsetHeight };
-        faceapi.matchDimensions(canvas, displaySize);
+            if (detection) {
+                const displaySize = { width: video.offsetWidth, height: video.offsetHeight };
+                faceapi.matchDimensions(canvas, displaySize);
 
-        // 1. Scale the raw detection map to match the CSS viewport bounds
-        const resizedResults = faceapi.resizeResults(detection, displaySize);
-        
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        faceapi.draw.drawFaceLandmarks(canvas, resizedResults);
+                const resizedResults = faceapi.resizeResults(detection, displaySize);
+                
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                faceapi.draw.drawFaceLandmarks(canvas, resizedResults);
 
-        const targetGoalLabel = randomizedExpressionsQueue[currentChallengeIndex];
-        
-        // 2. Pass the RESIZED result so coordinates line up perfectly
-        const matchedExpression = evaluateFaceKNN(resizedResults);
+                const targetGoalLabel = randomizedExpressionsQueue[currentChallengeIndex];
+                const matchedExpression = evaluateFaceKNN(resizedResults);
 
-        if (matchedExpression === targetGoalLabel) {
-            matchingFramesCounterCount++;
-            if (matchingFramesCounterCount > 3) scoldBanner.classList.remove('visible');
-            progressBar.style.width = `${Math.min((matchingFramesCounterCount / REQUIRED_MATCHING_FRAMES) * 100, 100)}%`;
+                if (matchedExpression === targetGoalLabel) {
+                    matchingFramesCounterCount++;
+                    if (matchingFramesCounterCount > 3) scoldBanner.classList.remove('visible');
+                    progressBar.style.width = `${Math.min((matchingFramesCounterCount / REQUIRED_MATCHING_FRAMES) * 100, 100)}%`;
 
-            if (matchingFramesCounterCount >= REQUIRED_MATCHING_FRAMES) {
-                currentChallengeIndex++;
-                updateChallengePrompt();
-            }
-        } else {
-            if (matchingFramesCounterCount > 0) {
-                matchingFramesCounterCount = Math.max(0, matchingFramesCounterCount - 3);
-                progressBar.style.width = `${(matchingFramesCounterCount / REQUIRED_MATCHING_FRAMES) * 100}%`;
+                    if (matchingFramesCounterCount >= REQUIRED_MATCHING_FRAMES) {
+                        currentChallengeIndex++;
+                        updateChallengePrompt();
+                    }
+                } else {
+                    if (matchingFramesCounterCount > 0) {
+                        matchingFramesCounterCount = Math.max(0, matchingFramesCounterCount - 3);
+                        progressBar.style.width = `${(matchingFramesCounterCount / REQUIRED_MATCHING_FRAMES) * 100}%`;
+                    }
+                    
+                    const cleanActual = matchedExpression.replace('_', ' ');
+                    const cleanTarget = targetGoalLabel.replace('_', ' ');
+                    scoldBanner.innerText = `⚠️ Detected: "${cleanActual}" (Looking for: "${cleanTarget}")`;
+                    scoldBanner.classList.add('visible');
+                }
+            } else {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
             }
             
-            const cleanActual = matchedExpression.replace('_', ' ');
-            const cleanTarget = targetGoalLabel.replace('_', ' ');
-            scoldBanner.innerText = `⚠️ Detected: "${cleanActual}" (Looking for: "${cleanTarget}")`;
-            scoldBanner.classList.add('visible');
+            setTimeout(() => executeTrackingLoop(), FRAME_INTERVAL_MS);
         }
-    } else {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-    }
-    
-    setTimeout(() => executeTrackingLoop(), FRAME_INTERVAL_MS);
-}
 
         function evaluateFaceKNN(liveDetection) {
-    let closestLabelName = null;
-    let minimumVarianceScore = Infinity;
+            let closestLabelName = null;
+            let minimumVarianceScore = Infinity;
 
-    // Correctly pull the box and positions from the matched frame properties
-    const box = liveDetection.detection.box;
-    const livePoints = liveDetection.landmarks.positions;
+            const box = liveDetection.detection.box;
+            const livePoints = liveDetection.landmarks.positions;
 
-    // Normalize coordinate metrics cleanly 
-    const normalizedLive = livePoints.map(p => ({
-        x: (p.x - box.x) / box.width,
-        y: (p.y - box.y) / box.height
-    }));
+            const normalizedLive = livePoints.map(p => ({
+                x: (p.x - box.x) / box.width,
+                y: (p.y - box.y) / box.height
+            }));
 
-    for (let profile of trainedProfiles) {
-        let cumulativeDistanceVariance = 0;
-        const baselinePoints = profile.landmarksCoordinates;
+            for (let profile of trainedProfiles) {
+                let cumulativeDistanceVariance = 0;
+                const baselinePoints = profile.landmarksCoordinates;
 
-        for (let i = 0; i < 68; i++) {
-            if (!baselinePoints[i] || !normalizedLive[i]) continue;
-            const diffX = baselinePoints[i].x - normalizedLive[i].x;
-            const diffY = baselinePoints[i].y - normalizedLive[i].y;
-            cumulativeDistanceVariance += Math.sqrt(diffX * diffX + diffY * diffY);
-        }
+                for (let i = 0; i < 68; i++) {
+                    if (!baselinePoints[i] || !normalizedLive[i]) continue;
+                    const diffX = baselinePoints[i].x - normalizedLive[i].x;
+                    const diffY = baselinePoints[i].y - normalizedLive[i].y;
+                    cumulativeDistanceVariance += Math.sqrt(diffX * diffX + diffY * diffY);
+                }
 
-        if (cumulativeDistanceVariance < minimumVarianceScore) {
-            minimumVarianceScore = cumulativeDistanceVariance;
-            closestLabelName = profile.expressionLabel;
-        }
-    }
+                if (cumulativeDistanceVariance < minimumVarianceScore) {
+                    minimumVarianceScore = cumulativeDistanceVariance;
+                    closestLabelName = profile.expressionLabel;
+                }
+            }
 
-    // Sweet-spot tolerance threshold for percentage variations
-    const MAX_ALLOWED_DISTANCE_VARIANCE_TOLERANCE = 3.5; 
-    return (minimumVarianceScore < MAX_ALLOWED_DISTANCE_VARIANCE_TOLERANCE) ? closestLabelName : "unknown";
-}
-
-            // Expanded tolerance slightly to 3.2 to make matching easier on phones
+            // Using 3.2 for mobile percentage matching precision balance
             const MAX_ALLOWED_DISTANCE_VARIANCE_TOLERANCE = 3.2; 
             return (minimumVarianceScore < MAX_ALLOWED_DISTANCE_VARIANCE_TOLERANCE) ? closestLabelName : "unknown";
         }
 
-        // Wrap initialization inside a verified DOM lifecycle listener 
-// This prevents mobile browsers from locking up if the CDN script loads out of order
-document.addEventListener("DOMContentLoaded", () => {
-    // 1. Create a failsafe global timeout tracker
-    const failSafeTimeout = setTimeout(() => {
-        const promptText = document.getElementById('prompt-text');
-        if (promptText && promptText.innerHTML.includes("Downloading dataset matrix...")) {
-            promptText.innerHTML = `
-                <span style="color:#d93025; font-weight:bold;">Loader Lifecycle Timeout:</span><br>
-                <span style="font-size:0.95rem; color:#333; display:inline-block; margin-top:8px; background:#fff5f5; padding:8px; border:1px solid #d93025; border-radius:4px; text-align:left;">
-                    The script engine took too long to fire.<br>
-                    • Try hitting refresh on your browser.<br>
-                    • If on a phone, ensure you aren't on strict data-saver mode.
-                </span>
-            `;
-        }
-    }, 8000); // Trigger warning if stuck for 8 seconds
+        document.addEventListener("DOMContentLoaded", () => {
+            const failSafeTimeout = setTimeout(() => {
+                const promptText = document.getElementById('prompt-text');
+                if (promptText && promptText.innerHTML.includes("Downloading dataset matrix...")) {
+                    promptText.innerHTML = `
+                        <span style="color:#d93025; font-weight:bold;">Loader Lifecycle Timeout:</span><br>
+                        <span style="font-size:0.95rem; color:#333; display:inline-block; margin-top:8px; background:#fff5f5; padding:8px; border:1px solid #d93025; border-radius:4px; text-align:left;">
+                            The script engine took too long to fire.<br>
+                            • Try hitting refresh on your browser.<br>
+                            • If on a phone, ensure you aren't on data-saver mode.
+                        </span>
+                    `;
+                }
+            }, 8000);
 
-    // 2. Clear the timeout and execute safely once DOM is verified ready
-    try {
-        clearTimeout(failSafeTimeout);
-        initApplication();
-    } catch (bootstrapError) {
-        console.error("Lifecycle execution failed:", bootstrapError);
-    }
-});
+            try {
+                clearTimeout(failSafeTimeout);
+                initApplication();
+            } catch (bootstrapError) {
+                console.error("Lifecycle execution failed:", bootstrapError);
+            }
+        });
     </script>
 </body>
 </html>
