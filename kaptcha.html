@@ -8,7 +8,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/dist/face-api.js"></script>
     
     <style>
-        /* Pure, maximum-brightness white canvas to act as a face fill light */
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             background: #ffffff; 
@@ -35,7 +34,7 @@
         }
 
         .captcha-header {
-            background: #1a73e8; /* Clean blue branding */
+            background: #1a73e8;
             color: white;
             padding: 18px;
             margin: -32px -32px 24px -32px;
@@ -58,11 +57,19 @@
             border: 1px solid #dcdcdc;
         }
 
-        video {
+        video, #overlay-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
             width: 100%;
             height: 100%;
             object-fit: cover;
             transform: scaleX(-1); /* Mirror view */
+        }
+
+        #overlay-canvas {
+            z-index: 2;
+            pointer-events: none;
         }
 
         .progress-container {
@@ -72,13 +79,12 @@
             height: 16px;
             overflow: hidden;
             margin: 15px 0;
-            box-shadow: inset 0 1px 2px rgba(0,0,0,0.06);
         }
 
         .progress-bar {
             height: 100%;
             width: 0%;
-            background-color: #34a853; /* Success green */
+            background-color: #34a853;
             transition: width 0.1s linear;
         }
 
@@ -94,7 +100,7 @@
             font-size: 1.05rem;
             font-weight: 600;
             color: #ffffff;
-            background-color: #d93025; /* Warning Red */
+            background-color: #d93025;
             padding: 12px;
             border-radius: 4px;
             margin: 12px 0 20px 0;
@@ -103,37 +109,26 @@
             transition: opacity 0.2s ease;
         }
 
-        #scold-banner.visible {
-            opacity: 1;
-        }
-
-        #success-screen {
-            display: none;
-            padding: 50px 10px;
-        }
-
-        .success-icon {
-            color: #34a853;
-            font-size: 5.5rem;
-            margin-bottom: 15px;
-        }
+        #scold-banner.visible { opacity: 1; }
+        #success-screen { display: none; padding: 50px 10px; }
+        .success-icon { color: #34a853; font-size: 5.5rem; margin-bottom: 15px; }
     </style>
 </head>
 <body>
 
     <div id="captcha-container">
-        
         <div class="captcha-header">
             <h2>ExpressionCAPTCHA™</h2>
-            <p>Biometric Verification Portal (Automated Startup)</p>
+            <p>Biometric Verification Portal (Visual Debug Mode)</p>
         </div>
 
         <div id="game-play">
-            <div id="prompt-text">Initializing high-res camera matrix...</div>
+            <div id="prompt-text">Downloading dataset matrix...</div>
             <div id="scold-banner">Analyzing tracking points...</div>
             
             <div class="camera-box">
                 <video id="webcam" autoplay muted playsinline></video>
+                <canvas id="overlay-canvas"></canvas>
             </div>
 
             <label style="font-size:0.9rem; font-weight:700; color:#5f6368; text-transform:uppercase; letter-spacing: 0.75px;">
@@ -149,104 +144,117 @@
             <h3 style="margin:0; color:#202124; font-size:1.8rem;">Verification Confirmed</h3>
             <p style="color:#5f6368; margin-top:10px; font-size:1.1rem;">Forwarding destination terminal request...</p>
         </div>
-
     </div>
 
     <script>
- // =========================================================================
-// CONFIGURATION PARAMETERS
-// =========================================================================
-const SUCCESS_REDIRECT_URL = "https://www.google.com"; 
-const DATASET_FILE_URL = "hd_expression_dataset.json"; 
-// =========================================================================
+        // =========================================================================
+        // CONFIGURATION PARAMETERS
+        // =========================================================================
+        const SUCCESS_REDIRECT_URL = "https://www.google.com"; 
+        const DATASET_FILE_URL = "hd_expression_dataset.json"; 
+        // =========================================================================
 
-const video = document.getElementById('webcam');
-const gameplayDiv = document.getElementById('game-play');
-const successScreen = document.getElementById('success-screen');
-const promptText = document.getElementById('prompt-text');
-const scoldBanner = document.getElementById('scold-banner');
-const progressBar = document.getElementById('hold-progress');
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('overlay-canvas');
+        const gameplayDiv = document.getElementById('game-play');
+        const successScreen = document.getElementById('success-screen');
+        const promptText = document.getElementById('prompt-text');
+        const scoldBanner = document.getElementById('scold-banner');
+        const progressBar = document.getElementById('hold-progress');
 
-let trainedProfiles = [];
-let randomizedExpressionsQueue = [];
-let currentChallengeIndex = 0;
-let mobileOptimizedOptions = null;
+        let trainedProfiles = [];
+        let randomizedExpressionsQueue = [];
+        let currentChallengeIndex = 0;
+        let mobileOptimizedOptions = null;
 
-let matchingFramesCounterCount = 0;
-const TARGET_HOLD_MS = 5000;
-const FRAME_INTERVAL_MS = 100;
-const REQUIRED_MATCHING_FRAMES = TARGET_HOLD_MS / FRAME_INTERVAL_MS;
+        let matchingFramesCounterCount = 0;
+        const TARGET_HOLD_MS = 3000; // Dropped to 3 seconds for less user fatigue
+        const FRAME_INTERVAL_MS = 100;
+        const REQUIRED_MATCHING_FRAMES = TARGET_HOLD_MS / FRAME_INTERVAL_MS;
 
-function shuffleArray(array) {
-    for (let i = array.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
-    }
-    return array;
-}
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
 
-async function initApplication() {
-    gameplayDiv.style.display = 'block';
-    promptText.innerHTML = `Downloading dataset matrix...`;
-    try {
-        const response = await fetch(DATASET_FILE_URL);
-        if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
-        trainedProfiles = await response.json();
+        async function initApplication() {
+            try {
+                const response = await fetch(DATASET_FILE_URL);
+                if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+                trainedProfiles = await response.json();
 
-        const uniqueKeys = [...new Set(trainedProfiles.map(p => p.expressionLabel))];
-        randomizedExpressionsQueue = shuffleArray(uniqueKeys);
+                const uniqueKeys = [...new Set(trainedProfiles.map(p => p.expressionLabel))];
+                randomizedExpressionsQueue = shuffleArray(uniqueKeys);
 
-        promptText.innerHTML = `Initializing tracking engines...`;
-        await initAIModels();
-        bootWebcam();
-    } catch (err) {
-        promptText.innerHTML = `<span style="color:#d93025; font-weight:bold;">Setup Failure:</span><br>${err.message}`;
-    }
-}
+                promptText.innerHTML = `Initializing tracking engines...`;
+                await initAIModels();
+                bootWebcam();
+            } catch (err) {
+                promptText.innerHTML = `<span style="color:#d93025; font-weight:bold;">Setup Failure:</span><br>${err.message}`;
+            }
+        }
 
-async function initAIModels() {
-    const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
-    try {
-        await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
-        await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
-        mobileOptimizedOptions = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });
-    } catch (err) { throw new Error(`Model error: ${err.message}`); }
-}
+        async function initAIModels() {
+            const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
+            try {
+                await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+                await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+                mobileOptimizedOptions = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });
+            } catch (err) { throw new Error(`Model error: ${err.message}`); }
+        }
 
-function bootWebcam() {
-    navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" } })
-    .then(stream => {
-        video.srcObject = stream;
-        video.onloadedmetadata = () => { updateChallengePrompt(); executeTrackingLoop(); };
-    })
-    .catch(err => alert("Camera configuration rejected."));
-}
+        function bootWebcam() {
+            navigator.mediaDevices.getUserMedia({ 
+                video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" } 
+            })
+            .then(stream => {
+                video.srcObject = stream;
+                video.onloadedmetadata = () => { 
+                    updateChallengePrompt(); 
+                    executeTrackingLoop(); 
+                };
+            })
+            .catch(err => alert("Camera configuration rejected."));
+        }
 
-function updateChallengePrompt() {
-    if (currentChallengeIndex < randomizedExpressionsQueue.length) {
-        matchingFramesCounterCount = 0;
-        progressBar.style.width = '0%';
-        scoldBanner.classList.remove('visible');
-        const promptLabel = randomizedExpressionsQueue[currentChallengeIndex].toUpperCase().replace('_', ' ');
-        promptText.innerHTML = `VERIFY IDENTITY:<br><span style="color:#1a73e8; font-size:1.6rem;">HOLD "${promptLabel}" NOW</span>`;
-    } else {
-        gameplayDiv.style.display = 'none';
-        successScreen.style.display = 'block';
-        if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
-        setTimeout(() => { window.location.href = SUCCESS_REDIRECT_URL; }, 400); 
-    }
-}
+        function updateChallengePrompt() {
+            if (currentChallengeIndex < randomizedExpressionsQueue.length) {
+                matchingFramesCounterCount = 0;
+                progressBar.style.width = '0%';
+                scoldBanner.classList.remove('visible');
+                const promptLabel = randomizedExpressionsQueue[currentChallengeIndex].toUpperCase().replace('_', ' ');
+                promptText.innerHTML = `VERIFY IDENTITY:<br><span style="color:#1a73e8; font-size:1.6rem;">HOLD "${promptLabel}" NOW</span>`;
+            } else {
+                gameplayDiv.style.display = 'none';
+                successScreen.style.display = 'block';
+                if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
+                setTimeout(() => { window.location.href = SUCCESS_REDIRECT_URL; }, 400); 
+            }
+        }
 
-function generateRoastMessage(target, actual) {
-    return actual === 'unknown' ? `Hold steady and optimize look angle.` : `Expected "${target.replace('_',' ')}", but detected "${actual.replace('_',' ')}"`;
-}
-
-async function executeTrackingLoop() {
+        async function executeTrackingLoop() {
     if (video.paused || video.ended || currentChallengeIndex >= randomizedExpressionsQueue.length) return;
 
     const detection = await faceapi.detectSingleFace(video, mobileOptimizedOptions).withFaceLandmarks();
+    const ctx = canvas.getContext('2d');
 
     if (detection) {
+        // 1. Establish structural display bounding markers
+        const displaySize = { width: video.offsetWidth, height: video.offsetHeight };
+        
+        // 2. Synchronize dimensions explicitly with the face-api engine
+        faceapi.matchDimensions(canvas, displaySize);
+
+        // 3. Scale raw camera tensors cleanly to match our viewport box layout
+        const resizedResults = faceapi.resizeResults(detection, displaySize);
+        
+        // 4. Wipe old dots cleanly and paint the new wireframe overlay
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        faceapi.draw.drawFaceLandmarks(canvas, resizedResults);
+
         const targetGoalLabel = randomizedExpressionsQueue[currentChallengeIndex];
         const matchedExpression = evaluateFaceKNN(detection);
 
@@ -264,49 +272,56 @@ async function executeTrackingLoop() {
                 matchingFramesCounterCount = Math.max(0, matchingFramesCounterCount - 3);
                 progressBar.style.width = `${(matchingFramesCounterCount / REQUIRED_MATCHING_FRAMES) * 100}%`;
             }
-            scoldBanner.innerText = `⚠️ ${generateRoastMessage(targetGoalLabel, matchedExpression)}`;
+            
+            const cleanActual = matchedExpression.replace('_', ' ');
+            const cleanTarget = targetGoalLabel.replace('_', ' ');
+            scoldBanner.innerText = `⚠️ Detected: "${cleanActual}" (Looking for: "${cleanTarget}")`;
             scoldBanner.classList.add('visible');
         }
+    } else {
+        // If no face is caught, clear old frame outlines smoothly so artifacts don't stick
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
+    
     setTimeout(() => executeTrackingLoop(), FRAME_INTERVAL_MS);
 }
 
-function evaluateFaceKNN(liveDetection) {
-    let closestLabelName = null;
-    let minimumVarianceScore = Infinity;
+        function evaluateFaceKNN(liveDetection) {
+            let closestLabelName = null;
+            let minimumVarianceScore = Infinity;
 
-    const box = liveDetection.detection.box;
-    const livePoints = liveDetection.landmarks.positions;
+            const box = liveDetection.detection.box;
+            const livePoints = liveDetection.landmarks.positions;
 
-    // Normalize live landmarks to percentages inside the local bounding area box
-    const normalizedLive = livePoints.map(p => ({
-        x: (p.x - box.x) / box.width,
-        y: (p.y - box.y) / box.height
-    }));
+            // Normalize coordinate data to prevent portrait scale/aspect distortions
+            const normalizedLive = livePoints.map(p => ({
+                x: (p.x - box.x) / box.width,
+                y: (p.y - box.y) / box.height
+            }));
 
-    for (let profile of trainedProfiles) {
-        let cumulativeDistanceVariance = 0;
-        const baselinePoints = profile.landmarksCoordinates;
+            for (let profile of trainedProfiles) {
+                let cumulativeDistanceVariance = 0;
+                const baselinePoints = profile.landmarksCoordinates;
 
-        for (let i = 0; i < 68; i++) {
-            if (!baselinePoints[i] || !normalizedLive[i]) continue;
-            const diffX = baselinePoints[i].x - normalizedLive[i].x;
-            const diffY = baselinePoints[i].y - normalizedLive[i].y;
-            cumulativeDistanceVariance += Math.sqrt(diffX * diffX + diffY * diffY);
+                for (let i = 0; i < 68; i++) {
+                    if (!baselinePoints[i] || !normalizedLive[i]) continue;
+                    const diffX = baselinePoints[i].x - normalizedLive[i].x;
+                    const diffY = baselinePoints[i].y - normalizedLive[i].y;
+                    cumulativeDistanceVariance += Math.sqrt(diffX * diffX + diffY * diffY);
+                }
+
+                if (cumulativeDistanceVariance < minimumVarianceScore) {
+                    minimumVarianceScore = cumulativeDistanceVariance;
+                    closestLabelName = profile.expressionLabel;
+                }
+            }
+
+            // Expanded tolerance slightly to 3.2 to make matching easier on phones
+            const MAX_ALLOWED_DISTANCE_VARIANCE_TOLERANCE = 3.2; 
+            return (minimumVarianceScore < MAX_ALLOWED_DISTANCE_VARIANCE_TOLERANCE) ? closestLabelName : "unknown";
         }
 
-        if (cumulativeDistanceVariance < minimumVarianceScore) {
-            minimumVarianceScore = cumulativeDistanceVariance;
-            closestLabelName = profile.expressionLabel;
-        }
-    }
-
-    // Normalized variance threshold limit (since measurements are decimals now, 2.5 is the sweet spot)
-    const MAX_ALLOWED_DISTANCE_VARIANCE_TOLERANCE = 2.5; 
-    return (minimumVarianceScore < MAX_ALLOWED_DISTANCE_VARIANCE_TOLERANCE) ? closestLabelName : "unknown";
-}
-
-initApplication();
+        initApplication();
     </script>
 </body>
 </html>
