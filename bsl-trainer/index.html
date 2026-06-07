@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BSL Receptive Skills Trainer</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <h1>BSL Fingerspelling Trainer</h1>
+            <p>Train your receptive skills by decoding the signs.</p>
+        </header>
+
+        <!-- Main Visual Display Zone -->
+        <main class="display-card">
+            <div class="image-wrapper">
+                <img id="sign-viewer" src="assets/letters/placeholder.png" alt="BSL Sign Placeholder">
+            </div>
+            <div id="status-indicator" class="status-idle">Ready</div>
+        </main>
+
+        <!-- Controls Zone -->
+        <section class="controls-panel">
+            <div class="control-group">
+                <label for="difficulty-select">Difficulty:</label>
+                <select id="difficulty-select">
+                    <option value="easy">Easy (3 Letters)</option>
+                    <option value="medium">Medium (5-6 Letters)</option>
+                    <option value="hard">Hard (7+ Letters)</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label for="speed-range">Speed: <span id="speed-val">800</span>ms</label>
+                <input type="range" id="speed-range" min="200" max="1500" step="50" value="800">
+            </div>
+
+            <button id="btn-next" class="btn-primary">Get New Word</button>
+            <button id="btn-replay" class="btn-secondary" disabled>Replay (Space)</button>
+        </section>
+
+        <!-- Interactive Input Zone -->
+        <section class="input-panel">
+            <input type="text" id="user-guess" placeholder="Type what you see..." autocomplete="off" disabled>
+            <button id="btn-submit" class="btn-success" disabled>Check</button>
+        </section>
+
+        <div id="feedback-message" class="feedback-container"></div>
+    </div>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>

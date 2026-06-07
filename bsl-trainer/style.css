@@ -1,0 +1,126 @@
+:root {
+    --bg-color: #f4f7f6;
+    --card-bg: #ffffff;
+    --text-main: #2c3e50;
+    --primary: #3498db;
+    --success: #2ecc71;
+    --error: #e74c3c;
+    --border-radius: 12px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, sans-serif; }
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-main);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+}
+
+.app-container {
+    width: 100%;
+    max-width: 500px;
+    background: var(--card-bg);
+    padding: 30px;
+    border-radius: var(--border-radius);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+}
+
+header { text-align: center; margin-bottom: 25px; }
+header h1 { font-size: 1.6rem; color: #1a252f; margin-bottom: 5px; }
+header p { font-size: 0.9rem; color: #7f8c8d; }
+
+.display-card {
+    background: #f8f9fa;
+    border: 2px solid #e2e8f0;
+    border-radius: var(--border-radius);
+    padding: 20px;
+    text-align: center;
+    margin-bottom: 20px;
+    position: relative;
+}
+
+.image-wrapper {
+    height: 220px; /* Forces stable vertical height during letter swaps */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.image-wrapper img {
+    max-height: 100%;
+    max-width: 100%;
+    object-fit: contain;
+}
+
+#status-indicator {
+    margin-top: 10px;
+    font-size: 0.85rem;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+.status-idle { color: #bdc3c7; }
+.status-playing { color: var(--primary); }
+
+.controls-panel {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+.control-group {
+    grid-column: span 1;
+    display: flex;
+    flex-direction: column;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+.control-group label { margin-bottom: 4px; }
+.control-group select, .control-group input {
+    padding: 8px;
+    border-radius: 6px;
+    border: 1px solid #cbd5e1;
+}
+
+button {
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary { background: var(--primary); color: white; grid-column: span 1; }
+.btn-secondary { background: #95a5a6; color: white; grid-column: span 1; }
+
+.input-panel {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+#user-guess {
+    flex: 1;
+    padding: 12px;
+    border: 2px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 1.1rem;
+    text-transform: uppercase;
+    text-align: center;
+}
+#user-guess:focus { border-color: var(--primary); outline: none; }
+.btn-success { background: var(--success); color: white; padding: 0 25px; }
+
+.feedback-container {
+    text-align: center;
+    font-weight: bold;
+    min-height: 24px;
+    padding: 8px;
+    border-radius: 6px;
+}
+.correct { background: #e8f8f0; color: var(--success); }
+.incorrect { background: #fdedec; color: var(--error); }
