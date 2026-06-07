@@ -151,7 +151,7 @@
         // CONFIGURATION PARAMETERS
         // =========================================================================
         const SUCCESS_REDIRECT_URL = "https://www.google.com"; 
-        const DATASET_FILE_URL = "normalized_expression_dataset.json"; 
+        const DATASET_FILE_URL = "hd_expression_dataset.json"; 
         // =========================================================================
 
         const video = document.getElementById('webcam');
@@ -180,22 +180,59 @@
             return array;
         }
 
-        async function initApplication() {
-            try {
-                const response = await fetch(DATASET_FILE_URL);
-                if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
-                trainedProfiles = await response.json();
+        // Background Asset Loader Loop with Strict Format Interrogation
+async function initApplication() {
+    gameplayDiv.style.display = 'block';
+    promptText.innerHTML = `Downloading dataset matrix...`;
+    
+    try {
+        // Clear cache tracking by appending a dynamic execution timestamp query
+        const cacheBusterUrl = `${DATASET_FILE_URL}?t=${new Date().getTime()}`;
+        const response = await fetch(cacheBusterUrl);
+        
+        if (!response.ok) {
+            throw new Error(`Server responded with HTTP code ${response.status}. Verify the file isn't missing.`);
+        }
 
-                const uniqueKeys = [...new Set(trainedProfiles.map(p => p.expressionLabel))];
-                randomizedExpressionsQueue = shuffleArray(uniqueKeys);
+        const rawTextData = await response.text();
+        
+        try {
+            trainedProfiles = JSON.parse(rawTextData);
+        } catch (jsonErr) {
+            throw new Error(`JSON Formatting Syntax Error: ${jsonErr.message}. Ensure your exported file isn't corrupted.`);
+        }
 
-                promptText.innerHTML = `Initializing tracking engines...`;
-                await initAIModels();
-                bootWebcam();
-            } catch (err) {
-                promptText.innerHTML = `<span style="color:#d93025; font-weight:bold;">Setup Failure:</span><br>${err.message}`;
+        if (!Array.isArray(trainedProfiles) || trainedProfiles.length === 0) {
+            throw new Error("Dataset found, but the internal array is empty. Re-run trainer.html to populate vectors.");
+        }
+
+        // Structural verification: Check if data is pixel-based or normalized percentages
+        const sampleRecord = trainedProfiles[0];
+        if (sampleRecord && sampleRecord.landmarksCoordinates && sampleRecord.landmarksCoordinates[0]) {
+            const sampleCoordinate = sampleRecord.landmarksCoordinates[0].x;
+            if (sampleCoordinate > 1) {
+                throw new Error(`Legacy Data Conflict: The dataset contains pixel values (e.g. ${Math.round(sampleCoordinate)}px) instead of normalized decimals (e.g. 0.45). You must record new profiles using the updated tracker template.`);
             }
         }
+
+        const uniqueKeys = [...new Set(trainedProfiles.map(p => p.expressionLabel))];
+        randomizedExpressionsQueue = shuffleArray(uniqueKeys);
+
+        promptText.innerHTML = `Initializing tracking engines...`;
+        await initAIModels();
+        bootWebcam();
+
+    } catch (err) {
+        // Force the hidden engine crash to print natively on your mobile phone screen
+        promptText.innerHTML = `
+            <span style="color:#d93025; font-weight:bold;">Matrix Connection Halted:</span><br>
+            <span style="font-size:0.95rem; color:#333; display:inline-block; margin-top:8px; background:#fff5f5; padding:8px; border:1px solid #d93025; border-radius:4px; text-align:left;">
+                ${err.message}
+            </span>
+        `;
+        console.error("Critical Runtime Error Details:", err);
+    }
+}
 
         async function initAIModels() {
             const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
