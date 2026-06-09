@@ -22,7 +22,7 @@ body {
     justify-content: center;
     align-items: center;
     min-height: 100vh;
-    padding: 20px;
+    padding: 15px;
 }
 
 .hidden { display: none !important; }
@@ -32,7 +32,28 @@ body {
     transform: scaleX(-1) !important;
 }
 
-/* Configuration Segment UI Container Styles */
+/* Portrait Safety Navigation Layout */
+.navigation-row {
+    width: 100%;
+    display: flex;
+    justify-content: flex-start;
+    margin-bottom: 15px;
+}
+.btn-back {
+    background: #e2e8f0;
+    color: #475569;
+    padding: 8px 14px;
+    font-size: 0.85rem;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+}
+.btn-back:hover {
+    background: #cbd5e1;
+}
+
+/* Portrait Configuration UI Segment Style blocks */
 .config-panel {
     background: #f8fafc;
     border: 1px solid #e2e8f0;
@@ -74,18 +95,17 @@ body {
     box-shadow: 0 2px 4px rgba(0,0,0,0.08);
 }
 
-/* Force clean unified layout widths across modes */
-#hub-container, #login-container, #main-app-container, #revision-container {
+/* Unified Layout Sizing Parameters across components */
+.app-container {
     width: 100%;
     max-width: 500px;
     background: var(--card-bg);
-    padding: 30px;
+    padding: 25px;
     border-radius: var(--border-radius);
     box-shadow: 0 10px 25px rgba(0,0,0,0.05);
 }
 
 header { 
-    position: relative;
     text-align: center; 
     margin-bottom: 25px; 
 }
@@ -100,17 +120,16 @@ header p {
 }
 
 /* Action button variations */
-.hub-actions { display: flex; flex-direction: column; gap: 15px; margin-top: 5px; }
+.hub-actions { display: flex; flex-direction: column; gap: 12px; }
 .btn-primary-large { background: var(--primary); color: white; padding: 18px; border-radius: 10px; font-size: 1.1rem; font-weight: bold; border: none; cursor: pointer; }
 .btn-success-large { background: var(--success); color: white; padding: 18px; border-radius: 10px; font-size: 1.1rem; font-weight: bold; border: none; cursor: pointer; }
-.btn-back { position: absolute; left: 0; top: 0; background: #e2e8f0; color: #475569; padding: 6px 12px; font-size: 0.8rem; border-radius: 6px; border: none; cursor: pointer; }
 
 /* Mode Selection Tab Bars */
 .mode-tabs { display: flex; gap: 5px; margin-bottom: 20px; background: #f1f5f9; padding: 4px; border-radius: 8px; }
 .tab-btn { flex: 1; border: none; padding: 8px; font-size: 0.85rem; font-weight: bold; background: none; border-radius: 6px; cursor: pointer; color: #64748b; }
 .tab-btn.active { background: white; color: var(--text-main); box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
 
-/* Revision Study Matrix */
+/* Revision Study Matrix Layouts */
 .help-text { font-size: 0.8rem; color: #94a3b8; text-align: center; margin-bottom: 10px; }
 .grid-layout { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; max-height: 180px; overflow-y: auto; padding: 5px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 15px; }
 .grid-cell { padding: 8px 4px; border: 1px solid #cbd5e1; background: white; border-radius: 6px; font-weight: bold; font-size: 0.9rem; text-align: center; cursor: pointer; }
@@ -126,12 +145,19 @@ header p {
 
 /* Primary Core Application Components */
 .display-card { background: #f8f9fa; border: 2px solid #e2e8f0; border-radius: var(--border-radius); padding: 20px; text-align: center; margin-bottom: 20px; position: relative; }
-.image-wrapper { height: 220px; display: flex; justify-content: center; align-items: center; }
-.image-wrapper img { max-height: 100%; max-width: 100%; object-fit: contain; transition: transform 0.1s ease; }
+.image-wrapper { height: 220px; display: flex; justify-content: center; align-items: center; background: transparent; overflow: hidden; }
 
-#status-indicator { margin-top: 10px; font-size: 0.85rem; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
-.status-idle { color: #bdc3c7; }
-.status-playing { color: var(--primary); }
+/* Soft Blending Image Dissolve Transition Rules */
+.image-wrapper img { 
+    max-height: 100%; 
+    max-width: 100%; 
+    object-fit: contain; 
+    opacity: 1;
+    transition: opacity 0.08s ease-in-out, transform 0.1s ease; 
+}
+.image-wrapper img.fade-out {
+    opacity: 0;
+}
 
 .controls-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
 .control-group { grid-column: span 1; display: flex; flex-direction: column; font-size: 0.85rem; font-weight: 600; }
@@ -143,11 +169,34 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-primary { background: var(--primary); color: white; grid-column: span 1; }
 .btn-secondary { background: #95a5a6; color: white; grid-column: span 1; }
 
-.input-panel { display: flex; gap: 10px; margin-bottom: 15px; }
-#user-guess, #username-input { flex: 1; padding: 12px; border: 2px solid #cbd5e1; border-radius: 8px; font-size: 1.1rem; text-align: center; }
+/* Vertical Stacked Panel For Portrait Aspect Layout Optimization */
+.stacked-input-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+.stacked-input-panel input {
+    width: 100%;
+    padding: 14px;
+    border: 2px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 1.1rem;
+    text-align: center;
+}
+.stacked-input-panel button {
+    width: 100%;
+    padding: 14px;
+    font-size: 1rem;
+}
+
 #user-guess { text-transform: uppercase; }
 #user-guess:focus, #username-input:focus { border-color: var(--primary); outline: none; }
-.btn-success { background: var(--success); color: white; padding: 0 25px; }
+.btn-success { background: var(--success); color: white; }
+
+#status-indicator { margin-top: 10px; font-size: 0.85rem; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
+.status-idle { color: #bdc3c7; }
+.status-playing { color: var(--primary); }
 
 .feedback-container { text-align: center; font-weight: bold; min-height: 24px; padding: 8px; border-radius: 6px; }
 .correct { background: #e8f8f0; color: var(--success); }
