@@ -16,7 +16,8 @@ let state = {
     // Core expansion parameters
     lastGeneratedWord: "",
     flashCorrectAnswer: "",
-    currentRevisionTab: "letters" // 'letters' or 'numbers'
+    currentRevisionTab: "letters",
+    handedness: "right" // 'right' or 'left'
 };
 
 // DOM References - Launcher Navigation Hub
@@ -72,13 +73,31 @@ const mistakesModal = document.getElementById('mistakes-modal');
 const btnCloseModal = document.getElementById('btn-close-modal');
 const modalBodyList = document.getElementById('modal-body-list');
 
-// --- 0. Launcher Router Mappings ---
+// --- 0. Launcher Router Mappings & Preference Extraction ---
+function updateImageMirrorPreference() {
+    // Collect selected radio input value
+    const selectedRadio = document.querySelector('input[name="handedness"]:checked');
+    state.handedness = selectedRadio ? selectedRadio.value : "right";
+
+    // Toggle mirror class hooks on active viewport viewing elements
+    const targetImages = [signViewer, revisionViewerImg, flashTestImg];
+    targetImages.forEach(img => {
+        if (state.handedness === 'left') {
+            img.classList.add('left-handed-mirror');
+        } else {
+            img.classList.remove('left-handed-mirror');
+        }
+    });
+}
+
 btnGotoRevision.addEventListener('click', () => {
+    updateImageMirrorPreference();
     hubContainer.classList.add('hidden');
     revisionContainer.classList.remove('hidden');
     switchRevisionTab('letters');
 });
 btnGotoTrainer.addEventListener('click', () => {
+    updateImageMirrorPreference();
     hubContainer.classList.add('hidden');
     loginContainer.classList.remove('hidden');
 });
@@ -161,7 +180,6 @@ function initiateFlashCardTest() {
     flashTestFeedback.textContent = "";
     flashTestFeedback.className = "feedback-container";
 
-    // Dynamic 50/50 selection between random character or random integer asset
     const useLetters = Math.random() > 0.5;
     let pool = [];
     let assetFolder = "";
@@ -179,7 +197,6 @@ function initiateFlashCardTest() {
 
     flashTestImg.src = `${assetFolder}${correctChar.toLowerCase()}.png`;
 
-    // Extract three random false distractors
     let distractors = pool.filter(c => c !== correctChar);
     distractors.sort(() => 0.5 - Math.random());
     let choices = [correctChar, distractors[0], distractors[1], distractors[2]];
@@ -196,7 +213,6 @@ function initiateFlashCardTest() {
 }
 
 function evaluateFlashChoice(selected, element) {
-    // Disable alternative multiple choice buttons during assessment click
     const buttons = flashOptionsGrid.querySelectorAll('.btn-option');
     buttons.forEach(b => b.disabled = true);
 
@@ -239,7 +255,6 @@ function ensureUserSchemaExists(user) {
             hard: { correct: 0, attempts: 0, totalReplays: 0, mistakes: {} }
         };
     }
-    // Backward compatibility safety sweep for historical CSV rows or missing schema keys
     ['easy', 'medium', 'hard'].forEach(cat => {
         if (!state.scores[user][cat].mistakes) {
             state.scores[user][cat].mistakes = {};
@@ -260,7 +275,6 @@ function renderScoreboard() {
     ['easy', 'medium', 'hard'].forEach(cat => {
         const row = document.createElement('tr');
         
-        // Sum total aggregated count of unique typos inside category
         let distinctMistakeCount = 0;
         if (uData[cat].mistakes) {
             distinctMistakeCount = Object.values(uData[cat].mistakes).reduce((a, b) => a + b, 0);
@@ -278,7 +292,6 @@ function renderScoreboard() {
         metricsTbody.appendChild(row);
     });
 
-    // Add immediate listeners to the modal triggers injected above
     metricsTbody.querySelectorAll('.btn-review-mistakes').forEach(btn => {
         btn.addEventListener('click', (e) => {
             openMistakesBreakdownModal(e.target.getAttribute('data-cat'));
@@ -300,7 +313,6 @@ function openMistakesBreakdownModal(category) {
     if (items.length === 0) {
         modalBodyList.innerHTML = `<div class="no-mistakes-msg">No entries logged for the ${category} category yet!</div>`;
     } else {
-        // Sort highest concentrations of spelling errors down to the lowest
         items.sort((a, b) => b[1] - a[1]);
         items.forEach(([word, count]) => {
             const row = document.createElement('div');
@@ -339,7 +351,6 @@ function startNewTurn() {
     
     state.currentCategory = difficultySelect.value;
     
-    // Core Engine Rule: Enforce zero repetition of identical matching targets back-to-back
     let wordCandidate = getRandomWord(state.currentCategory).toUpperCase();
     while (wordCandidate === state.lastGeneratedWord) {
         wordCandidate = getRandomWord(state.currentCategory).toUpperCase();
@@ -399,17 +410,14 @@ function playFingerspelling(word) {
 
         const currentLetter = letters[timelineIndex].toLowerCase();
         
-        // Dynamic Rule Check: Inject a short visual separation frame between characters
         if (timelineIndex > 0) {
-            // Flash a very small pure white placeholder card between letters
             signViewer.src = `assets/letters/placeholder.png`;
             
-            // Advance the frame view immediately on the following tick loop window
             state.playbackTimeout = setTimeout(() => {
                 signViewer.src = `assets/letters/${currentLetter}.png`;
                 timelineIndex++;
                 state.playbackTimeout = setTimeout(nextFrame, state.speed);
-            }, Math.min(150, state.speed / 4)); // Scales smoothly with layout speed values
+            }, Math.min(150, state.speed / 4));
         } else {
             signViewer.src = `assets/letters/${currentLetter}.png`;
             timelineIndex++;
@@ -431,7 +439,6 @@ function checkAnswer() {
         userStats.correct++;
         showFeedback(`Correct! It was ${state.currentWord} (${state.currentWordReplays} replays)`, 'correct');
     } else {
-        // Increment mistake entry maps inside category records smoothly
         if (!userStats.mistakes[state.currentWord]) {
             userStats.mistakes[state.currentWord] = 0;
         }
@@ -483,7 +490,6 @@ function exportScoresToCSV() {
     
     for (const [user, categories] of Object.entries(state.scores)) {
         for (const [cat, data] of Object.entries(categories)) {
-            // Securely encode deep objects using sanitized replacements to protect structure rows
             const base64Mistakes = btoa(JSON.stringify(data.mistakes || {}));
             csvRows.push(`${user},${cat},${data.correct},${data.attempts},${data.totalReplays},${base64Mistakes}`);
         }
