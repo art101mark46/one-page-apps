@@ -18,15 +18,14 @@ let state = {
     flashCorrectAnswer: "",
     currentRevisionTab: "letters",
     handedness: "right",
-    
-    // Mobile Comfort parameters
-    keyboardDelay: 400 // Time in ms to let the user process the sign before popping the keyboard
+    theme: "light"
 };
 
 // DOM References - Launcher Navigation Hub
 const hubContainer = document.getElementById('hub-container');
 const btnGotoRevision = document.getElementById('btn-goto-revision');
 const btnGotoTrainer = document.getElementById('btn-goto-trainer');
+const btnThemeToggle = document.getElementById('btn-theme-toggle');
 
 // DOM References - Revision Reference Module
 const revisionContainer = document.getElementById('revision-container');
@@ -76,7 +75,29 @@ const mistakesModal = document.getElementById('mistakes-modal');
 const btnCloseModal = document.getElementById('btn-close-modal');
 const modalBodyList = document.getElementById('modal-body-list');
 
-// --- 0. Launcher Router Mappings & Preference Extraction ---
+// --- 0. Launcher Preferences & Theme Engine Initializer ---
+function initTheme() {
+    const savedTheme = localStorage.getItem('bsl_suite_theme') || 'light';
+    setTheme(savedTheme);
+}
+
+function setTheme(themeName) {
+    state.theme = themeName;
+    document.documentElement.setAttribute('data-theme', themeName);
+    localStorage.setItem('bsl_suite_theme', themeName);
+    
+    if (themeName === 'dark') {
+        btnThemeToggle.textContent = "☀️ Light Mode";
+    } else {
+        btnThemeToggle.textContent = "🌙 Dark Mode";
+    }
+}
+
+btnThemeToggle.addEventListener('click', () => {
+    const nextTheme = state.theme === 'light' ? 'dark' : 'light';
+    setTheme(nextTheme);
+});
+
 function updateImageMirrorPreference() {
     const selectedRadio = document.querySelector('input[name="handedness"]:checked');
     state.handedness = selectedRadio ? selectedRadio.value : "right";
@@ -248,7 +269,6 @@ function initUserProfile() {
     renderScoreboard();
 }
 
-// Ensure category structures match expected state bindings
 function ensureUserSchemaExists(user) {
     if (!state.scores[user]) {
         state.scores[user] = {
@@ -385,8 +405,7 @@ async function determineAndPlayWord(word) {
             signViewer.src = signGifPath;
             state.playbackTimeout = setTimeout(() => {
                 toggleUIState(false);
-                // Introduce mobile processing cushion delay before jumping focus
-                setTimeout(() => { userGuess.focus(); }, state.keyboardDelay);
+                // Explicitly removed programmatic focus! User manual input initialization.
             }, 2500);
         } else {
             playFingerspelling(word);
@@ -410,15 +429,7 @@ function playFingerspelling(word) {
                 signViewer.src = `assets/letters/placeholder.png`;
                 signViewer.classList.remove('fade-out');
                 toggleUIState(false);
-                
-                // CUSHION DELAY: Gives your eyes a moment to settle before prompting the keyboard
-                setTimeout(() => {
-                    // Only drop focus if the user hasn't already clicked elsewhere or moved on
-                    if (!state.isPlaying) {
-                        userGuess.focus();
-                    }
-                }, state.keyboardDelay);
-                
+                // Programmatic input .focus() triggers fully blocked to optimize mobile viewing comfort
             }, 80);
             return;
         }
@@ -575,3 +586,6 @@ function importScoresFromCSV(event) {
     };
     reader.readAsText(file);
 }
+
+// Fire preference loading configurations
+initTheme();
