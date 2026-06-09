@@ -15,13 +15,20 @@
         </header>
 
         <div class="config-panel">
-            <span class="config-label">Signing Perspective:</span>
-            <div class="hand-toggle-container">
-                <input type="radio" id="hand-right" name="handedness" value="right" checked>
-                <label for="hand-right" class="hand-label">Right-Handed</label>
-                
-                <input type="radio" id="hand-left" name="handedness" value="left">
-                <label for="hand-left" class="hand-label">Left-Handed (Flipped)</label>
+            <div class="config-row">
+                <span class="config-label">Theme Mode:</span>
+                <button id="btn-theme-toggle" class="btn-theme">🌙 Dark Mode</button>
+            </div>
+            
+            <div class="config-row" style="margin-top: 15px;">
+                <span class="config-label">Signing Perspective:</span>
+                <div class="hand-toggle-container">
+                    <input type="radio" id="hand-right" name="handedness" value="right" checked>
+                    <label for="hand-right" class="hand-label">Right-Handed</label>
+                    
+                    <input type="radio" id="hand-left" name="handedness" value="left">
+                    <label for="hand-left" class="hand-label">Left-Handed</label>
+                </div>
             </div>
         </div>
 
