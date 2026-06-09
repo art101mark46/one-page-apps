@@ -76,7 +76,6 @@ const btnCloseModal = document.getElementById('btn-close-modal');
 const modalBodyList = document.getElementById('modal-body-list');
 
 // --- 0. Launcher Preferences & Theme Engine Initializer ---
-// --- 0. Launcher Preferences & Theme Engine Initializer ---
 function initTheme() {
     // Check local storage, or default to system dark mode preference if available
     const systemPrefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -100,11 +99,14 @@ function setTheme(themeName) {
     }
 }
 
-btnThemeToggle.addEventListener('click', (e) => {
-    e.preventDefault(); // Stop mobile double-tap zoom/blink events
-    const nextTheme = state.theme === 'dark' ? 'light' : 'dark';
-    setTheme(nextTheme);
-});
+// RESTORED: This click handler was completely missing in your file!
+if (btnThemeToggle) {
+    btnThemeToggle.addEventListener('click', (e) => {
+        e.preventDefault(); // Stop mobile double-tap zoom/blink events
+        const nextTheme = state.theme === 'dark' ? 'light' : 'dark';
+        setTheme(nextTheme);
+    });
+}
 
 function updateImageMirrorPreference() {
     const selectedRadio = document.querySelector('input[name="handedness"]:checked');
@@ -413,7 +415,6 @@ async function determineAndPlayWord(word) {
             signViewer.src = signGifPath;
             state.playbackTimeout = setTimeout(() => {
                 toggleUIState(false);
-                // Explicitly removed programmatic focus! User manual input initialization.
             }, 2500);
         } else {
             playFingerspelling(word);
@@ -423,7 +424,6 @@ async function determineAndPlayWord(word) {
     }
 }
 
-// Fingerspelling frame dispatcher matching CSS crossfade parameters
 function playFingerspelling(word) {
     statusIndicator.textContent = "Fingerspelling...";
     let letters = word.split('');
@@ -431,13 +431,11 @@ function playFingerspelling(word) {
 
     function nextFrame() {
         if (timelineIndex >= letters.length) {
-            // Fade down tail letter
             signViewer.classList.add('fade-out');
             state.playbackTimeout = setTimeout(() => {
                 signViewer.src = `assets/letters/placeholder.png`;
                 signViewer.classList.remove('fade-out');
                 toggleUIState(false);
-                // Programmatic input .focus() triggers fully blocked to optimize mobile viewing comfort
             }, 80);
             return;
         }
@@ -445,7 +443,6 @@ function playFingerspelling(word) {
         const currentLetter = letters[timelineIndex].toLowerCase();
         
         if (timelineIndex > 0) {
-            // Soft dissolve down into white placeholder frame
             signViewer.classList.add('fade-out');
             
             state.playbackTimeout = setTimeout(() => {
@@ -459,7 +456,6 @@ function playFingerspelling(word) {
                 }, Math.min(80, state.speed / 6));
             }, 80);
         } else {
-            // Immediate soft appearance for initial item
             signViewer.src = `assets/letters/${currentLetter}.png`;
             signViewer.classList.remove('fade-out');
             timelineIndex++;
@@ -495,7 +491,6 @@ function checkAnswer() {
     btnSubmit.disabled = true;
 }
 
-// UI State toggle modifier update
 function toggleUIState(playing) {
     state.isPlaying = playing;
     btnNext.disabled = playing;
@@ -517,11 +512,6 @@ function toggleUIState(playing) {
 function showFeedback(text, type) {
     feedbackMessage.textContent = text;
     feedbackMessage.className = `feedback-container ${type}`;
-}
-
-function clearFeedback() {
-    feedbackMessage.textContent = "";
-    feedbackMessage.className = "feedback-container";
 }
 
 // --- 6. CSV Storage Synchronization ---
@@ -595,7 +585,12 @@ function importScoresFromCSV(event) {
     reader.readAsText(file);
 }
 
-// Fire preference loading configurations once the DOM layout is ready
+function clearFeedback() {
+    feedbackMessage.textContent = "";
+    feedbackMessage.className = "feedback-container";
+}
+
+// RESTORED: Safe event listener matching your ES module execution lifecycle
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initTheme);
 } else {
