@@ -32,8 +32,10 @@
     </div>
 
     <div id="revision-container" class="app-container hidden">
+        <div class="navigation-row">
+            <button id="btn-revision-back" class="btn-back">⬅ Return to Hub</button>
+        </div>
         <header>
-            <button id="btn-revision-back" class="btn-back">⬅ Hub</button>
             <h1>BSL Reference & Revision</h1>
             <p>Select a mode below to study individual handshapes.</p>
         </header>
@@ -69,20 +71,24 @@
     </div>
 
     <div id="login-container" class="app-container hidden">
+        <div class="navigation-row">
+            <button id="btn-login-back" class="btn-back">⬅ Return to Hub</button>
+        </div>
         <header>
-            <button id="btn-login-back" class="btn-back">⬅ Hub</button>
             <h1>BSL Trainer Setup</h1>
             <p>Enter your username to track your long-term metrics.</p>
         </header>
-        <div class="input-panel">
+        <div class="stacked-input-panel">
             <input type="text" id="username-input" placeholder="e.g., Alex" autocomplete="off">
             <button id="btn-login" class="btn-success">Start Training</button>
         </div>
     </div>
 
     <div id="main-app-container" class="app-container hidden">
-        <header>
+        <div class="navigation-row">
             <button id="btn-logout" class="btn-back">⬅ Exit Session</button>
+        </div>
+        <header>
             <h1>BSL Fingerspelling Trainer</h1>
             <p>Welcome back, <span id="display-username" style="font-weight: bold; color: var(--primary);">User</span>!</p>
         </header>
@@ -113,7 +119,7 @@
             <button id="btn-replay" class="btn-secondary" disabled>Replay (Space)</button>
         </section>
 
-        <section class="input-panel">
+        <section class="stacked-input-panel">
             <input type="text" id="user-guess" placeholder="Type what you see..." autocomplete="off" disabled>
             <button id="btn-submit" class="btn-success" disabled>Check</button>
         </section>
