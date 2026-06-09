@@ -17,7 +17,10 @@ let state = {
     lastGeneratedWord: "",
     flashCorrectAnswer: "",
     currentRevisionTab: "letters",
-    handedness: "right"
+    handedness: "right",
+    
+    // Mobile Comfort parameters
+    keyboardDelay: 400 // Time in ms to let the user process the sign before popping the keyboard
 };
 
 // DOM References - Launcher Navigation Hub
@@ -245,6 +248,7 @@ function initUserProfile() {
     renderScoreboard();
 }
 
+// Ensure category structures match expected state bindings
 function ensureUserSchemaExists(user) {
     if (!state.scores[user]) {
         state.scores[user] = {
@@ -381,7 +385,8 @@ async function determineAndPlayWord(word) {
             signViewer.src = signGifPath;
             state.playbackTimeout = setTimeout(() => {
                 toggleUIState(false);
-                userGuess.focus();
+                // Introduce mobile processing cushion delay before jumping focus
+                setTimeout(() => { userGuess.focus(); }, state.keyboardDelay);
             }, 2500);
         } else {
             playFingerspelling(word);
@@ -405,7 +410,15 @@ function playFingerspelling(word) {
                 signViewer.src = `assets/letters/placeholder.png`;
                 signViewer.classList.remove('fade-out');
                 toggleUIState(false);
-                userGuess.focus();
+                
+                // CUSHION DELAY: Gives your eyes a moment to settle before prompting the keyboard
+                setTimeout(() => {
+                    // Only drop focus if the user hasn't already clicked elsewhere or moved on
+                    if (!state.isPlaying) {
+                        userGuess.focus();
+                    }
+                }, state.keyboardDelay);
+                
             }, 80);
             return;
         }
@@ -418,7 +431,6 @@ function playFingerspelling(word) {
             
             state.playbackTimeout = setTimeout(() => {
                 signViewer.src = `assets/letters/placeholder.png`;
-                // Brief pause inside placeholder frame, then soft dissolve up to the new target character
                 signViewer.classList.remove('fade-out');
                 
                 state.playbackTimeout = setTimeout(() => {
@@ -426,9 +438,9 @@ function playFingerspelling(word) {
                     timelineIndex++;
                     state.playbackTimeout = setTimeout(nextFrame, state.speed);
                 }, Math.min(80, state.speed / 6));
-            }, 80); // Corresponds with CSS transition ease window
+            }, 80);
         } else {
-            // Immediate soft appearance for the absolute initial letter
+            // Immediate soft appearance for initial item
             signViewer.src = `assets/letters/${currentLetter}.png`;
             signViewer.classList.remove('fade-out');
             timelineIndex++;
@@ -539,7 +551,7 @@ function importScoresFromCSV(event) {
                 state.scores[user] = {
                     easy: { correct: 0, attempts: 0, totalReplays: 0, mistakes: {} },
                     medium: { correct: 0, attempts: 0, totalReplays: 0, mistakes: {} },
-                    hard: { correct: 0, attempts: 0, totalReplays: 0, mistakes: {} }
+                    hard: { correct: 0, attempts: 0, totalReplays: 0, mistakes: {} },
                 };
             }
             
