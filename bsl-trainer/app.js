@@ -99,7 +99,6 @@ function setTheme(themeName) {
     }
 }
 
-// RESTORED: This click handler was completely missing in your file!
 if (btnThemeToggle) {
     btnThemeToggle.addEventListener('click', (e) => {
         e.preventDefault(); // Stop mobile double-tap zoom/blink events
@@ -210,6 +209,11 @@ function generateReferenceGrid(mode) {
     });
 }
 
+// --- 2. Unscored Recognition Flash Test Engine ---
+if (btnNextFlash) {
+    btnNextFlash.addEventListener('click', initiateFlashCardTest);
+}
+
 function initiateFlashCardTest() {
     flashTestFeedback.textContent = "";
     flashTestFeedback.className = "feedback-container";
@@ -228,45 +232,6 @@ function initiateFlashCardTest() {
             '11', '12', '13', '14', '15', '16', '17', '18', '19',
             '20', '30', '40', '50', '60', '70', '80', '90'
         ];
-        assetFolder = 'assets/numbers/';
-    }
-
-    const correctChar = pool[Math.floor(Math.random() * pool.length)];
-    state.flashCorrectAnswer = correctChar;
-
-    flashTestImg.src = `${assetFolder}${correctChar.toLowerCase()}.png`;
-
-    let distractors = pool.filter(c => c !== correctChar);
-    distractors.sort(() => 0.5 - Math.random());
-    let choices = [correctChar, distractors[0], distractors[1], distractors[2]];
-    choices.sort(() => 0.5 - Math.random());
-
-    flashOptionsGrid.innerHTML = "";
-    choices.forEach(choice => {
-        const btn = document.createElement('button');
-        btn.className = 'btn-option';
-        btn.textContent = choice;
-        btn.addEventListener('click', () => evaluateFlashChoice(choice, btn));
-        flashOptionsGrid.appendChild(btn);
-    });
-}
-
-// --- 2. Unscored Recognition Flash Test Engine ---
-btnNextFlash.addEventListener('click', initiateFlashCardTest);
-
-function initiateFlashCardTest() {
-    flashTestFeedback.textContent = "";
-    flashTestFeedback.className = "feedback-container";
-
-    const useLetters = Math.random() > 0.5;
-    let pool = [];
-    let assetFolder = "";
-
-    if (useLetters) {
-        pool = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-        assetFolder = 'assets/letters/';
-    } else {
-        pool = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10'];
         assetFolder = 'assets/numbers/';
     }
 
@@ -325,6 +290,7 @@ function initUserProfile() {
     renderScoreboard();
 }
 
+// Ensure category structures match existing profile models smoothly
 function ensureUserSchemaExists(user) {
     if (!state.scores[user]) {
         state.scores[user] = {
@@ -636,7 +602,7 @@ function clearFeedback() {
     feedbackMessage.className = "feedback-container";
 }
 
-// RESTORED: Safe event listener matching your ES module execution lifecycle
+// Safe event listener matching your ES module execution lifecycle
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initTheme);
 } else {
