@@ -76,8 +76,12 @@ const btnCloseModal = document.getElementById('btn-close-modal');
 const modalBodyList = document.getElementById('modal-body-list');
 
 // --- 0. Launcher Preferences & Theme Engine Initializer ---
+// --- 0. Launcher Preferences & Theme Engine Initializer ---
 function initTheme() {
-    const savedTheme = localStorage.getItem('bsl_suite_theme') || 'light';
+    // Check local storage, or default to system dark mode preference if available
+    const systemPrefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const savedTheme = localStorage.getItem('bsl_suite_theme') || (systemPrefersDark ? 'dark' : 'light');
+    
     setTheme(savedTheme);
 }
 
@@ -86,15 +90,19 @@ function setTheme(themeName) {
     document.documentElement.setAttribute('data-theme', themeName);
     localStorage.setItem('bsl_suite_theme', themeName);
     
-    if (themeName === 'dark') {
-        btnThemeToggle.textContent = "☀️ Light Mode";
-    } else {
-        btnThemeToggle.textContent = "🌙 Dark Mode";
+    // Safely update button text if the element exists in the DOM
+    if (btnThemeToggle) {
+        if (themeName === 'dark') {
+            btnThemeToggle.textContent = "☀️ Light Mode";
+        } else {
+            btnThemeToggle.textContent = "🌙 Dark Mode";
+        }
     }
 }
 
-btnThemeToggle.addEventListener('click', () => {
-    const nextTheme = state.theme === 'light' ? 'dark' : 'light';
+btnThemeToggle.addEventListener('click', (e) => {
+    e.preventDefault(); // Stop mobile double-tap zoom/blink events
+    const nextTheme = state.theme === 'dark' ? 'light' : 'dark';
     setTheme(nextTheme);
 });
 
@@ -587,5 +595,9 @@ function importScoresFromCSV(event) {
     reader.readAsText(file);
 }
 
-// Fire preference loading configurations
-initTheme();
+// Fire preference loading configurations once the DOM layout is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initTheme);
+} else {
+    initTheme();
+}
