@@ -20,6 +20,19 @@
     --table-header-bg: #f8f9fa;
 }
 
+.grid-layout { 
+    display: grid; 
+    grid-template-columns: repeat(6, 1fr); 
+    gap: 6px; 
+    max-height: 230px; /* Bumped from 180px for better density */
+    overflow-y: auto; 
+    padding: 5px; 
+    background: var(--grid-bg); 
+    border: 1px solid var(--config-panel-border); 
+    border-radius: 8px; 
+    margin-bottom: 15px; 
+}
+
 /* Dark Palette Overrides */
 [data-theme="dark"] {
     --bg-color: #121824;
