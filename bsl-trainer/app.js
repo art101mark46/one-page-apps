@@ -185,7 +185,12 @@ function generateReferenceGrid(mode) {
     if (mode === 'letters') {
         items = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
     } else {
-        items = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10'];
+        // Expanded to include 11-19 and tens up to 90
+        items = [
+            '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10',
+            '11', '12', '13', '14', '15', '16', '17', '18', '19',
+            '20', '30', '40', '50', '60', '70', '80', '90'
+        ];
     }
 
     items.forEach(item => {
@@ -202,6 +207,47 @@ function generateReferenceGrid(mode) {
             }
         });
         revisionGrid.appendChild(cell);
+    });
+}
+
+function initiateFlashCardTest() {
+    flashTestFeedback.textContent = "";
+    flashTestFeedback.className = "feedback-container";
+
+    const useLetters = Math.random() > 0.5;
+    let pool = [];
+    let assetFolder = "";
+
+    if (useLetters) {
+        pool = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+        assetFolder = 'assets/letters/';
+    } else {
+        // Expanded flash test pool to use all new assets
+        pool = [
+            '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10',
+            '11', '12', '13', '14', '15', '16', '17', '18', '19',
+            '20', '30', '40', '50', '60', '70', '80', '90'
+        ];
+        assetFolder = 'assets/numbers/';
+    }
+
+    const correctChar = pool[Math.floor(Math.random() * pool.length)];
+    state.flashCorrectAnswer = correctChar;
+
+    flashTestImg.src = `${assetFolder}${correctChar.toLowerCase()}.png`;
+
+    let distractors = pool.filter(c => c !== correctChar);
+    distractors.sort(() => 0.5 - Math.random());
+    let choices = [correctChar, distractors[0], distractors[1], distractors[2]];
+    choices.sort(() => 0.5 - Math.random());
+
+    flashOptionsGrid.innerHTML = "";
+    choices.forEach(choice => {
+        const btn = document.createElement('button');
+        btn.className = 'btn-option';
+        btn.textContent = choice;
+        btn.addEventListener('click', () => evaluateFlashChoice(choice, btn));
+        flashOptionsGrid.appendChild(btn);
     });
 }
 
