@@ -7,10 +7,60 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="login-container">
+
+    <div id="hub-container" class="app-container">
         <header>
+            <h1>BSL Learning Suite</h1>
+            <p>Select your training or reference pathway below.</p>
+        </header>
+        <div class="hub-actions">
+            <button id="btn-goto-revision" class="btn-primary-large">📖 Revision & Quick Test</button>
+            <button id="btn-goto-trainer" class="btn-success-large">🎯 Interactive Trainer</button>
+        </div>
+    </div>
+
+    <div id="revision-container" class="app-container hidden">
+        <header>
+            <button id="btn-revision-back" class="btn-back">⬅ Hub</button>
+            <h1>BSL Reference & Revision</h1>
+            <p>Select a mode below to study individual handshapes.</p>
+        </header>
+
+        <div class="mode-tabs">
+            <button id="tab-letters" class="tab-btn active">Letters</button>
+            <button id="tab-numbers" class="tab-btn">Numbers</button>
+            <button id="tab-test" class="tab-btn">Quick Flash Test</button>
+        </div>
+
+        <div id="chart-view" class="revision-content">
+            <p class="help-text">Tap any asset to load its visual indicator.</p>
+            <div id="revision-grid" class="grid-layout"></div>
+            <div class="revision-viewer-card">
+                <div class="image-wrapper">
+                    <img id="revision-viewer-img" src="assets/letters/placeholder.png" alt="BSL Asset View">
+                </div>
+                <div id="revision-viewer-label" class="viewer-label">- None Selected -</div>
+            </div>
+        </div>
+
+        <div id="test-view" class="revision-content hidden">
+            <div class="display-card">
+                <div class="image-wrapper">
+                    <img id="flash-test-img" src="assets/letters/placeholder.png" alt="BSL Flash Sign">
+                </div>
+                <div id="flash-test-feedback" class="feedback-container"></div>
+            </div>
+            <p class="help-text">Identify the correct character value below:</p>
+            <div id="flash-options-grid" class="options-grid"></div>
+            <button id="btn-next-flash" class="btn-primary" style="width:100%; margin-top:15px;">Next Random Sign</button>
+        </div>
+    </div>
+
+    <div id="login-container" class="app-container hidden">
+        <header>
+            <button id="btn-login-back" class="btn-back">⬅ Hub</button>
             <h1>BSL Trainer Setup</h1>
-            <p>Enter your username to track your fingerspelling metrics.</p>
+            <p>Enter your username to track your long-term metrics.</p>
         </header>
         <div class="input-panel">
             <input type="text" id="username-input" placeholder="e.g., Alex" autocomplete="off">
@@ -18,8 +68,9 @@
         </div>
     </div>
 
-    <div id="main-app-container" class="hidden">
+    <div id="main-app-container" class="app-container hidden">
         <header>
+            <button id="btn-logout" class="btn-back">⬅ Exit Session</button>
             <h1>BSL Fingerspelling Trainer</h1>
             <p>Welcome back, <span id="display-username" style="font-weight: bold; color: var(--primary);">User</span>!</p>
         </header>
@@ -68,6 +119,7 @@
                         <th>Correct</th>
                         <th>Attempts</th>
                         <th>Total Replays</th>
+                        <th>Mistakes Log</th>
                     </tr>
                 </thead>
                 <tbody id="metrics-tbody">
@@ -75,11 +127,22 @@
             </table>
 
             <div class="csv-actions">
-                <button id="btn-export" class="btn-dash">📥 Export Scores (CSV)</button>
-                <label for="csv-import" class="btn-dash-label">📤 Import Scores (CSV)</label>
+                <button id="btn-export" class="btn-dash">📥 Export (CSV)</button>
+                <label for="csv-import" class="btn-dash-label">📤 Import (CSV)</label>
                 <input type="file" id="csv-import" accept=".csv" style="display: none;">
             </div>
         </section>
+    </div>
+
+    <div id="mistakes-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Mistakes Breakdown</h2>
+                <button id="btn-close-modal" class="btn-close">&times;</button>
+            </div>
+            <div id="modal-body-list" class="modal-body">
+                </div>
+        </div>
     </div>
 
     <script type="module" src="app.js"></script>
