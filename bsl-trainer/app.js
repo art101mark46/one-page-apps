@@ -17,7 +17,7 @@ let state = {
     lastGeneratedWord: "",
     flashCorrectAnswer: "",
     currentRevisionTab: "letters",
-    handedness: "right" // 'right' or 'left'
+    handedness: "right"
 };
 
 // DOM References - Launcher Navigation Hub
@@ -75,11 +75,9 @@ const modalBodyList = document.getElementById('modal-body-list');
 
 // --- 0. Launcher Router Mappings & Preference Extraction ---
 function updateImageMirrorPreference() {
-    // Collect selected radio input value
     const selectedRadio = document.querySelector('input[name="handedness"]:checked');
     state.handedness = selectedRadio ? selectedRadio.value : "right";
 
-    // Toggle mirror class hooks on active viewport viewing elements
     const targetImages = [signViewer, revisionViewerImg, flashTestImg];
     targetImages.forEach(img => {
         if (state.handedness === 'left') {
@@ -393,6 +391,7 @@ async function determineAndPlayWord(word) {
     }
 }
 
+// Fingerspelling frame dispatcher matching CSS crossfade parameters
 function playFingerspelling(word) {
     statusIndicator.textContent = "Fingerspelling...";
     let letters = word.split('');
@@ -400,26 +399,38 @@ function playFingerspelling(word) {
 
     function nextFrame() {
         if (timelineIndex >= letters.length) {
+            // Fade down tail letter
+            signViewer.classList.add('fade-out');
             state.playbackTimeout = setTimeout(() => {
                 signViewer.src = `assets/letters/placeholder.png`;
+                signViewer.classList.remove('fade-out');
                 toggleUIState(false);
                 userGuess.focus();
-            }, state.speed);
+            }, 80);
             return;
         }
 
         const currentLetter = letters[timelineIndex].toLowerCase();
         
         if (timelineIndex > 0) {
-            signViewer.src = `assets/letters/placeholder.png`;
+            // Soft dissolve down into white placeholder frame
+            signViewer.classList.add('fade-out');
             
             state.playbackTimeout = setTimeout(() => {
-                signViewer.src = `assets/letters/${currentLetter}.png`;
-                timelineIndex++;
-                state.playbackTimeout = setTimeout(nextFrame, state.speed);
-            }, Math.min(150, state.speed / 4));
+                signViewer.src = `assets/letters/placeholder.png`;
+                // Brief pause inside placeholder frame, then soft dissolve up to the new target character
+                signViewer.classList.remove('fade-out');
+                
+                state.playbackTimeout = setTimeout(() => {
+                    signViewer.src = `assets/letters/${currentLetter}.png`;
+                    timelineIndex++;
+                    state.playbackTimeout = setTimeout(nextFrame, state.speed);
+                }, Math.min(80, state.speed / 6));
+            }, 80); // Corresponds with CSS transition ease window
         } else {
+            // Immediate soft appearance for the absolute initial letter
             signViewer.src = `assets/letters/${currentLetter}.png`;
+            signViewer.classList.remove('fade-out');
             timelineIndex++;
             state.playbackTimeout = setTimeout(nextFrame, state.speed);
         }
@@ -453,6 +464,7 @@ function checkAnswer() {
     btnSubmit.disabled = true;
 }
 
+// UI State toggle modifier update
 function toggleUIState(playing) {
     state.isPlaying = playing;
     btnNext.disabled = playing;
