@@ -1,7 +1,7 @@
 // app.js
 import { getRandomWord } from './dictionary.js';
 
-// State Management
+// State Management Profile Engine
 let state = {
     username: "",
     currentWord: "",
@@ -11,17 +11,47 @@ let state = {
     playbackTimeout: null,
     speed: 800,
     assetsPath: 'assets/letters/',
-    scores: {} 
+    scores: {},
+    
+    // Core expansion parameters
+    lastGeneratedWord: "",
+    flashCorrectAnswer: "",
+    currentRevisionTab: "letters" // 'letters' or 'numbers'
 };
 
-// DOM References - Authentication
+// DOM References - Launcher Navigation Hub
+const hubContainer = document.getElementById('hub-container');
+const btnGotoRevision = document.getElementById('btn-goto-revision');
+const btnGotoTrainer = document.getElementById('btn-goto-trainer');
+
+// DOM References - Revision Reference Module
+const revisionContainer = document.getElementById('revision-container');
+const btnRevisionBack = document.getElementById('btn-revision-back');
+const tabLetters = document.getElementById('tab-letters');
+const tabNumbers = document.getElementById('tab-numbers');
+const tabTest = document.getElementById('tab-test');
+const chartView = document.getElementById('chart-view');
+const testView = document.getElementById('test-view');
+const revisionGrid = document.getElementById('revision-grid');
+const revisionViewerImg = document.getElementById('revision-viewer-img');
+const revisionViewerLabel = document.getElementById('revision-viewer-label');
+
+// DOM References - Quick Flash Test
+const flashTestImg = document.getElementById('flash-test-img');
+const flashTestFeedback = document.getElementById('flash-test-feedback');
+const flashOptionsGrid = document.getElementById('flash-options-grid');
+const btnNextFlash = document.getElementById('btn-next-flash');
+
+// DOM References - Trainer Authentication
 const loginContainer = document.getElementById('login-container');
+const btnLoginBack = document.getElementById('btn-login-back');
 const mainAppContainer = document.getElementById('main-app-container');
 const usernameInput = document.getElementById('username-input');
 const btnLogin = document.getElementById('btn-login');
 const displayUsername = document.getElementById('display-username');
+const btnLogout = document.getElementById('btn-logout');
 
-// DOM References - Core App
+// DOM References - Core System Trainer
 const signViewer = document.getElementById('sign-viewer');
 const statusIndicator = document.getElementById('status-indicator');
 const speedRange = document.getElementById('speed-range');
@@ -37,7 +67,149 @@ const btnSubmit = document.getElementById('btn-submit');
 const btnExport = document.getElementById('btn-export');
 const csvImportInput = document.getElementById('csv-import');
 
-// --- Profile Initialization Tracking ---
+// DOM References - Mistake Modal Components
+const mistakesModal = document.getElementById('mistakes-modal');
+const btnCloseModal = document.getElementById('btn-close-modal');
+const modalBodyList = document.getElementById('modal-body-list');
+
+// --- 0. Launcher Router Mappings ---
+btnGotoRevision.addEventListener('click', () => {
+    hubContainer.classList.add('hidden');
+    revisionContainer.classList.remove('hidden');
+    switchRevisionTab('letters');
+});
+btnGotoTrainer.addEventListener('click', () => {
+    hubContainer.classList.add('hidden');
+    loginContainer.classList.remove('hidden');
+});
+btnRevisionBack.addEventListener('click', () => {
+    revisionContainer.classList.add('hidden');
+    hubContainer.classList.remove('hidden');
+});
+btnLoginBack.addEventListener('click', () => {
+    loginContainer.classList.add('hidden');
+    hubContainer.classList.remove('hidden');
+});
+btnLogout.addEventListener('click', () => {
+    mainAppContainer.classList.add('hidden');
+    hubContainer.classList.remove('hidden');
+    state.username = "";
+});
+
+// --- 1. Revision Mode Matrix Generation ---
+tabLetters.addEventListener('click', () => switchRevisionTab('letters'));
+tabNumbers.addEventListener('click', () => switchRevisionTab('numbers'));
+tabTest.addEventListener('click', () => switchRevisionTab('test'));
+
+function switchRevisionTab(tabName) {
+    state.currentRevisionTab = tabName;
+    tabLetters.classList.remove('active');
+    tabNumbers.classList.remove('active');
+    tabTest.classList.remove('active');
+
+    if (tabName === 'letters') {
+        tabLetters.classList.add('active');
+        chartView.classList.remove('hidden');
+        testView.classList.add('hidden');
+        generateReferenceGrid('letters');
+    } else if (tabName === 'numbers') {
+        tabNumbers.classList.add('active');
+        chartView.classList.remove('hidden');
+        testView.classList.add('hidden');
+        generateReferenceGrid('numbers');
+    } else if (tabName === 'test') {
+        tabTest.classList.add('active');
+        chartView.classList.add('hidden');
+        testView.classList.remove('hidden');
+        initiateFlashCardTest();
+    }
+}
+
+function generateReferenceGrid(mode) {
+    revisionGrid.innerHTML = "";
+    revisionViewerImg.src = "assets/letters/placeholder.png";
+    revisionViewerLabel.textContent = "- None Selected -";
+
+    let items = [];
+    if (mode === 'letters') {
+        items = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+    } else {
+        items = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10'];
+    }
+
+    items.forEach(item => {
+        const cell = document.createElement('div');
+        cell.className = 'grid-cell';
+        cell.textContent = item;
+        cell.addEventListener('click', () => {
+            if (mode === 'letters') {
+                revisionViewerImg.src = `assets/letters/${item.toLowerCase()}.png`;
+                revisionViewerLabel.textContent = `Letter: ${item}`;
+            } else {
+                revisionViewerImg.src = `assets/numbers/${item}.png`;
+                revisionViewerLabel.textContent = `Number: ${item}`;
+            }
+        });
+        revisionGrid.appendChild(cell);
+    });
+}
+
+// --- 2. Unscored Recognition Flash Test Engine ---
+btnNextFlash.addEventListener('click', initiateFlashCardTest);
+
+function initiateFlashCardTest() {
+    flashTestFeedback.textContent = "";
+    flashTestFeedback.className = "feedback-container";
+
+    // Dynamic 50/50 selection between random character or random integer asset
+    const useLetters = Math.random() > 0.5;
+    let pool = [];
+    let assetFolder = "";
+
+    if (useLetters) {
+        pool = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+        assetFolder = 'assets/letters/';
+    } else {
+        pool = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10'];
+        assetFolder = 'assets/numbers/';
+    }
+
+    const correctChar = pool[Math.floor(Math.random() * pool.length)];
+    state.flashCorrectAnswer = correctChar;
+
+    flashTestImg.src = `${assetFolder}${correctChar.toLowerCase()}.png`;
+
+    // Extract three random false distractors
+    let distractors = pool.filter(c => c !== correctChar);
+    distractors.sort(() => 0.5 - Math.random());
+    let choices = [correctChar, distractors[0], distractors[1], distractors[2]];
+    choices.sort(() => 0.5 - Math.random());
+
+    flashOptionsGrid.innerHTML = "";
+    choices.forEach(choice => {
+        const btn = document.createElement('button');
+        btn.className = 'btn-option';
+        btn.textContent = choice;
+        btn.addEventListener('click', () => evaluateFlashChoice(choice, btn));
+        flashOptionsGrid.appendChild(btn);
+    });
+}
+
+function evaluateFlashChoice(selected, element) {
+    // Disable alternative multiple choice buttons during assessment click
+    const buttons = flashOptionsGrid.querySelectorAll('.btn-option');
+    buttons.forEach(b => b.disabled = true);
+
+    if (selected === state.flashCorrectAnswer) {
+        flashTestFeedback.textContent = "Correct Selection!";
+        flashTestFeedback.className = "feedback-container correct";
+    } else {
+        flashTestFeedback.textContent = `Wrong! That asset indicates: ${state.flashCorrectAnswer}`;
+        flashTestFeedback.className = "feedback-container incorrect";
+    }
+}
+
+// --- 3. User Identity Profile Operations ---
 btnLogin.addEventListener('click', initUserProfile);
 usernameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') initUserProfile(); });
 
@@ -48,13 +220,11 @@ function initUserProfile() {
     state.username = rawName;
     displayUsername.textContent = state.username;
     
-    // Fetch system historical database
     const localData = localStorage.getItem('bsl_trainer_scores');
     state.scores = localData ? JSON.parse(localData) : {};
     
     ensureUserSchemaExists(state.username);
     
-    // UI Screen Swap
     loginContainer.classList.add('hidden');
     mainAppContainer.classList.remove('hidden');
     
@@ -64,11 +234,17 @@ function initUserProfile() {
 function ensureUserSchemaExists(user) {
     if (!state.scores[user]) {
         state.scores[user] = {
-            easy: { correct: 0, attempts: 0, totalReplays: 0 },
-            medium: { correct: 0, attempts: 0, totalReplays: 0 },
-            hard: { correct: 0, attempts: 0, totalReplays: 0 }
+            easy: { correct: 0, attempts: 0, totalReplays: 0, mistakes: {} },
+            medium: { correct: 0, attempts: 0, totalReplays: 0, mistakes: {} },
+            hard: { correct: 0, attempts: 0, totalReplays: 0, mistakes: {} }
         };
     }
+    // Backward compatibility safety sweep for historical CSV rows or missing schema keys
+    ['easy', 'medium', 'hard'].forEach(cat => {
+        if (!state.scores[user][cat].mistakes) {
+            state.scores[user][cat].mistakes = {};
+        }
+    });
 }
 
 function saveScoresToDisk() {
@@ -80,29 +256,66 @@ function renderScoreboard() {
     if (!state.username || !state.scores[state.username]) return;
     const uData = state.scores[state.username];
 
-    metricsTbody.innerHTML = `
-        <tr>
-            <td><strong>Easy</strong></td>
-            <td>${uData.easy.correct}</td>
-            <td>${uData.easy.attempts}</td>
-            <td>${uData.easy.totalReplays}</td>
-        </tr>
-        <tr>
-            <td><strong>Medium</strong></td>
-            <td>${uData.medium.correct}</td>
-            <td>${uData.medium.attempts}</td>
-            <td>${uData.medium.totalReplays}</td>
-        </tr>
-        <tr>
-            <td><strong>Hard</strong></td>
-            <td>${uData.hard.correct}</td>
-            <td>${uData.hard.attempts}</td>
-            <td>${uData.hard.totalReplays}</td>
-        </tr>
-    `;
+    metricsTbody.innerHTML = "";
+    ['easy', 'medium', 'hard'].forEach(cat => {
+        const row = document.createElement('tr');
+        
+        // Sum total aggregated count of unique typos inside category
+        let distinctMistakeCount = 0;
+        if (uData[cat].mistakes) {
+            distinctMistakeCount = Object.values(uData[cat].mistakes).reduce((a, b) => a + b, 0);
+        }
+
+        row.innerHTML = `
+            <td><strong style="text-transform: capitalize;">${cat}</strong></td>
+            <td>${uData[cat].correct}</td>
+            <td>${uData[cat].attempts}</td>
+            <td>${uData[cat].totalReplays}</td>
+            <td>
+                <button class="btn-review-mistakes" data-cat="${cat}">🔎 View (${distinctMistakeCount})</button>
+            </td>
+        `;
+        metricsTbody.appendChild(row);
+    });
+
+    // Add immediate listeners to the modal triggers injected above
+    metricsTbody.querySelectorAll('.btn-review-mistakes').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            openMistakesBreakdownModal(e.target.getAttribute('data-cat'));
+        });
+    });
 }
 
-// --- Playback Controller Framework ---
+// --- 4. Mistakes Diagnostics Popup Subsystem ---
+btnCloseModal.addEventListener('click', () => mistakesModal.classList.add('hidden'));
+window.addEventListener('click', (e) => { if (e.target === mistakesModal) mistakesModal.classList.add('hidden'); });
+
+function openMistakesBreakdownModal(category) {
+    modalBodyList.innerHTML = "";
+    const uData = state.scores[state.username];
+    const categoryMistakes = uData[category].mistakes || {};
+
+    const items = Object.entries(categoryMistakes);
+
+    if (items.length === 0) {
+        modalBodyList.innerHTML = `<div class="no-mistakes-msg">No entries logged for the ${category} category yet!</div>`;
+    } else {
+        // Sort highest concentrations of spelling errors down to the lowest
+        items.sort((a, b) => b[1] - a[1]);
+        items.forEach(([word, count]) => {
+            const row = document.createElement('div');
+            row.className = 'mistake-row';
+            row.innerHTML = `
+                <span><strong>${word}</strong></span>
+                <span class="mistake-count">${count} Failures</span>
+            `;
+            modalBodyList.appendChild(row);
+        });
+    }
+    mistakesModal.classList.remove('hidden');
+}
+
+// --- 5. Playback Controller Engine & Loop Framework ---
 speedRange.addEventListener('input', (e) => {
     state.speed = parseInt(e.target.value);
     speedVal.textContent = state.speed;
@@ -125,7 +338,15 @@ function startNewTurn() {
     userGuess.value = "";
     
     state.currentCategory = difficultySelect.value;
-    state.currentWord = getRandomWord(state.currentCategory).toUpperCase();
+    
+    // Core Engine Rule: Enforce zero repetition of identical matching targets back-to-back
+    let wordCandidate = getRandomWord(state.currentCategory).toUpperCase();
+    while (wordCandidate === state.lastGeneratedWord) {
+        wordCandidate = getRandomWord(state.currentCategory).toUpperCase();
+    }
+    
+    state.currentWord = wordCandidate;
+    state.lastGeneratedWord = wordCandidate;
     state.currentWordReplays = 0; 
     
     determineAndPlayWord(state.currentWord);
@@ -169,7 +390,7 @@ function playFingerspelling(word) {
     function nextFrame() {
         if (timelineIndex >= letters.length) {
             state.playbackTimeout = setTimeout(() => {
-                signViewer.src = `${state.assetsPath}placeholder.png`;
+                signViewer.src = `assets/letters/placeholder.png`;
                 toggleUIState(false);
                 userGuess.focus();
             }, state.speed);
@@ -178,12 +399,19 @@ function playFingerspelling(word) {
 
         const currentLetter = letters[timelineIndex].toLowerCase();
         
-        if (timelineIndex > 0 && letters[timelineIndex] === letters[timelineIndex - 1]) {
-            signViewer.src = `${state.assetsPath}placeholder.png`;
-            timelineIndex++;
-            state.playbackTimeout = setTimeout(nextFrame, Math.min(200, state.speed / 2));
+        // Dynamic Rule Check: Inject a short visual separation frame between characters
+        if (timelineIndex > 0) {
+            // Flash a very small pure white placeholder card between letters
+            signViewer.src = `assets/letters/placeholder.png`;
+            
+            // Advance the frame view immediately on the following tick loop window
+            state.playbackTimeout = setTimeout(() => {
+                signViewer.src = `assets/letters/${currentLetter}.png`;
+                timelineIndex++;
+                state.playbackTimeout = setTimeout(nextFrame, state.speed);
+            }, Math.min(150, state.speed / 4)); // Scales smoothly with layout speed values
         } else {
-            signViewer.src = `${state.assetsPath}${currentLetter}.png`;
+            signViewer.src = `assets/letters/${currentLetter}.png`;
             timelineIndex++;
             state.playbackTimeout = setTimeout(nextFrame, state.speed);
         }
@@ -203,6 +431,12 @@ function checkAnswer() {
         userStats.correct++;
         showFeedback(`Correct! It was ${state.currentWord} (${state.currentWordReplays} replays)`, 'correct');
     } else {
+        // Increment mistake entry maps inside category records smoothly
+        if (!userStats.mistakes[state.currentWord]) {
+            userStats.mistakes[state.currentWord] = 0;
+        }
+        userStats.mistakes[state.currentWord]++;
+        
         showFeedback(`Not quite! It was actually ${state.currentWord}.`, 'incorrect');
     }
 
@@ -240,16 +474,18 @@ function clearFeedback() {
     feedbackMessage.className = "feedback-container";
 }
 
-// --- CSV Portability Operations ---
+// --- 6. CSV Storage Synchronization ---
 btnExport.addEventListener('click', exportScoresToCSV);
 csvImportInput.addEventListener('change', importScoresFromCSV);
 
 function exportScoresToCSV() {
-    let csvRows = ['Username,Category,Correct,Attempts,TotalReplays'];
+    let csvRows = ['Username,Category,Correct,Attempts,TotalReplays,MistakesJSONString'];
     
     for (const [user, categories] of Object.entries(state.scores)) {
         for (const [cat, data] of Object.entries(categories)) {
-            csvRows.push(`${user},${cat},${data.correct},${data.attempts},${data.totalReplays}`);
+            // Securely encode deep objects using sanitized replacements to protect structure rows
+            const base64Mistakes = btoa(JSON.stringify(data.mistakes || {}));
+            csvRows.push(`${user},${cat},${data.correct},${data.attempts},${data.totalReplays},${base64Mistakes}`);
         }
     }
     
@@ -258,7 +494,7 @@ function exportScoresToCSV() {
     const downloadAnchor = document.createElement("a");
     
     downloadAnchor.setAttribute("href", encodedUri);
-    downloadAnchor.setAttribute("download", `bsl_trainer_scores_${state.username}.csv`);
+    downloadAnchor.setAttribute("download", `bsl_suite_scores_${state.username}.csv`);
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     document.body.removeChild(downloadAnchor);
@@ -279,27 +515,33 @@ function importScoresFromCSV(event) {
             const line = lines[i].trim();
             if (!line) continue;
             
-            const [user, category, correct, attempts, totalReplays] = line.split(',');
+            const [user, category, correct, attempts, totalReplays, base64Mistakes] = line.split(',');
             
             if (!state.scores[user]) {
                 state.scores[user] = {
-                    easy: { correct: 0, attempts: 0, totalReplays: 0 },
-                    medium: { correct: 0, attempts: 0, totalReplays: 0 },
-                    hard: { correct: 0, attempts: 0, totalReplays: 0 }
+                    easy: { correct: 0, attempts: 0, totalReplays: 0, mistakes: {} },
+                    medium: { correct: 0, attempts: 0, totalReplays: 0, mistakes: {} },
+                    hard: { correct: 0, attempts: 0, totalReplays: 0, mistakes: {} }
                 };
             }
             
             if (state.scores[user][category]) {
+                let parsedMistakes = {};
+                try {
+                    if (base64Mistakes) parsedMistakes = JSON.parse(atob(base64Mistakes));
+                } catch(err) { parsedMistakes = {}; }
+
                 state.scores[user][category] = {
                     correct: parseInt(correct) || 0,
                     attempts: parseInt(attempts) || 0,
-                    totalReplays: parseInt(totalReplays) || 0
+                    totalReplays: parseInt(totalReplays) || 0,
+                    mistakes: parsedMistakes
                 };
             }
         }
         
         saveScoresToDisk();
-        alert("Scores successfully imported!");
+        alert("Data metrics synced successfully!");
     };
     reader.readAsText(file);
 }
