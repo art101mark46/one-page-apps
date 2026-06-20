@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kids' Climbing Tracker</title>
+    <title>Climbing Tracker</title>
     <style>
         :root {
             --primary-color: #2563eb;
@@ -32,7 +32,7 @@
             background-color: var(--bg-color);
             color: var(--text-color);
             margin: 0;
-            padding: 20px;
+            padding: 15px;
             transition: background-color 0.3s, color 0.3s;
         }
 
@@ -40,7 +40,7 @@
             max-width: 1200px;
             margin: 0 auto;
             background: var(--card-bg);
-            padding: 30px;
+            padding: 20px;
             border-radius: 12px;
             box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
             transition: background-color 0.3s;
@@ -51,15 +51,16 @@
             justify-content: space-between;
             align-items: center;
             border-bottom: 2px solid var(--border-color);
-            padding-bottom: 20px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-            gap: 15px;
+            padding-bottom: 15px;
+            margin-bottom: 15px;
         }
 
         h1 {
             margin: 0;
-            font-size: 1.8rem;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
         .controls-bar {
@@ -67,22 +68,22 @@
             justify-content: space-between;
             align-items: center;
             flex-wrap: wrap;
-            gap: 15px;
-            margin-bottom: 20px;
+            gap: 12px;
+            margin-bottom: 15px;
         }
 
         .btn-group {
             display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
+            gap: 8px;
             align-items: center;
+            position: relative;
         }
 
-        button, .file-label {
+        button, .dropdown-item-label {
             background-color: var(--primary-color);
             color: white;
             border: none;
-            padding: 8px 16px;
+            padding: 8px 14px;
             border-radius: 6px;
             cursor: pointer;
             font-weight: 500;
@@ -90,32 +91,89 @@
             transition: background-color 0.2s;
             display: inline-flex;
             align-items: center;
+            gap: 4px;
         }
 
-        button:hover, .file-label:hover {
+        button:hover, .dropdown-item-label:hover {
             background-color: var(--primary-hover);
         }
 
-        button.secondary { background-color: #64748b; }
-        button.secondary:hover { background-color: #475569; }
-        
-        button.theme-toggle { background-color: #e2e8f0; color: #1e293b; }
-        [data-theme="dark"] button.theme-toggle { background-color: #334155; color: #f8fafc; }
+        button.theme-toggle {
+            background-color: transparent;
+            color: var(--text-color);
+            font-size: 1.2rem;
+            padding: 6px;
+            border-radius: 50%;
+        }
+        button.theme-toggle:hover {
+            background-color: var(--header-bg);
+        }
 
         button.danger {
             background-color: #ef4444;
-            padding: 4px 8px;
-            font-size: 0.8rem;
+            padding: 2px 5px;
+            font-size: 0.65rem;
+            line-height: 1;
+            border-radius: 4px;
+            min-width: 16px;
+            height: 16px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
         }
         button.danger:hover { background-color: #dc2626; }
+
+        /* Dropdown Styling */
+        .dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        .dropdown-menu {
+            display: none;
+            position: absolute;
+            right: 0;
+            top: 100%;
+            background-color: var(--card-bg);
+            min-width: 120px;
+            box-shadow: 0px 8px 16px 0px rgb(0 0 0 / 0.15);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            z-index: 10;
+            margin-top: 4px;
+        }
+
+        .dropdown:hover .dropdown-menu, 
+        .dropdown:focus-within .dropdown-menu {
+            display: block;
+        }
+
+        .dropdown-item {
+            color: var(--text-color);
+            padding: 10px 14px;
+            text-decoration: none;
+            display: block;
+            font-size: 0.9rem;
+            cursor: pointer;
+            text-align: left;
+            background: none;
+            border: none;
+            width: 100%;
+            box-sizing: border-box;
+            font-weight: 500;
+        }
+        .dropdown-item:hover {
+            background-color: var(--header-bg);
+        }
 
         input[type="file"] { display: none; }
 
         .checkbox-container {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
             font-weight: 500;
+            font-size: 0.9rem;
             cursor: pointer;
             user-select: none;
         }
@@ -135,8 +193,8 @@
 
         th, td {
             border: 1px solid var(--border-color);
-            padding: 10px;
-            min-width: 90px;
+            padding: 8px;
+            min-width: 85px;
             color: var(--text-color);
         }
 
@@ -162,10 +220,16 @@
             border: none;
             color: var(--text-muted);
             cursor: pointer;
-            font-size: 0.8rem;
-            padding: 2px 5px;
+            font-size: 0.75rem;
+            padding: 2px 4px;
         }
         .delete-child-btn:hover { color: #ef4444; }
+
+        .climb-cell {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
 
         input[type="text"] {
             width: 100%;
@@ -189,7 +253,7 @@
         .hidden { display: none !important; }
 
         .footer-controls {
-            margin-top: 20px;
+            margin-top: 15px;
             display: flex;
             justify-content: space-between;
         }
@@ -199,20 +263,29 @@
 
 <div class="container">
     <header>
-        <h1>🧗 Kids' Climbing Tracker</h1>
-        <div class="btn-group">
-            <button class="theme-toggle" id="themeBtn" onclick="toggleTheme()">🌙 Dark Mode</button>
-            <label class="file-label" for="importFile">📥 Import</label>
-            <input type="file" id="importFile" accept=".json" onchange="importData(event)">
-            <button class="secondary" onclick="exportData()">📤 Export</button>
-        </div>
+        <h1>🧗 Climbing Tracker</h1>
+        <button class="theme-toggle" id="themeBtn" onclick="toggleTheme()" title="Toggle Dark/Light Mode">🌙</button>
     </header>
 
     <div class="controls-bar">
-        <button onclick="addChild()">+ Add Child</button>
+        <div class="btn-group">
+            <button onclick="addChild()">+ Add Child</button>
+            
+            <div class="dropdown">
+                <button type="button">Data ▾</button>
+                <div class="dropdown-menu">
+                    <label class="dropdown-item" style="margin: 0;">
+                        📥 Import
+                        <input type="file" id="importFile" accept=".json" onchange="importData(event)">
+                    </label>
+                    <button class="dropdown-item" onclick="exportData()">📤 Export</button>
+                </div>
+            </div>
+        </div>
+
         <label class="checkbox-container">
             <input type="checkbox" id="toggleMoneyCheckbox" checked onchange="toggleMoneyColumn()">
-            Show Money/Earning Column
+            Show Earnings
         </label>
     </div>
 
@@ -220,12 +293,12 @@
         <table id="trackerTable">
             <thead>
                 <tr id="headerRow1">
-                    <th rowspan="2" style="min-width: 150px;">Climb Name / #</th>
+                    <th rowspan="2" style="min-width: 160px;">Climb Name / #</th>
                 </tr>
                 <tr id="headerRow2"></tr>
             </thead>
             <tbody id="tableBody"></tbody>
-            <tfoot>
+            <tfoot id="tableFooter">
                 <tr id="totalRow" class="total-row"></tr>
             </tfoot>
         </table>
@@ -249,19 +322,19 @@
     };
 
     // Load Local Storage
-    if (localStorage.getItem('climbingTrackerState_v2')) {
+    if (localStorage.getItem('climbingTrackerState_v4')) {
         try {
-            state = JSON.parse(localStorage.getItem('climbingTrackerState_v2'));
+            state = JSON.parse(localStorage.getItem('climbingTrackerState_v4'));
         } catch (e) { console.error(e); }
     }
 
     function saveState() {
-        localStorage.setItem('climbingTrackerState_v2', JSON.stringify(state));
+        localStorage.setItem('climbingTrackerState_v4', JSON.stringify(state));
     }
 
     function applyTheme() {
         document.documentElement.setAttribute('data-theme', state.theme);
-        document.getElementById('themeBtn').innerHTML = state.theme === 'dark' ? '☀️ Light Mode' : '🌙 Dark Mode';
+        document.getElementById('themeBtn').innerHTML = state.theme === 'dark' ? '☀️' : '🌙';
     }
 
     function toggleTheme() {
@@ -281,20 +354,28 @@
         const headerRow2 = document.getElementById('headerRow2');
         const tableBody = document.getElementById('tableBody');
         const totalRow = document.getElementById('totalRow');
+        const tableFooter = document.getElementById('tableFooter');
 
         document.getElementById('toggleMoneyCheckbox').checked = state.showMoney;
 
-        // Reset elements
-        headerRow1.innerHTML = '<th rowspan="2" style="min-width: 150px;">Climb Name / #</th>';
+        // Manage Entire Footer Visibility based on Earnings Toggling
+        if (state.showMoney) {
+            tableFooter.style.display = "table-footer-group";
+        } else {
+            tableFooter.style.display = "none";
+        }
+
+        // Reset dynamic headers and rows
+        headerRow1.innerHTML = '<th rowspan="2" style="min-width: 160px;">Climb Name / #</th>';
         headerRow2.innerHTML = '';
         tableBody.innerHTML = '';
         totalRow.innerHTML = '<td style="text-align: right;">Total Earned:</td>';
 
         const moneyTotals = {};
 
-        // Build Table Headers
+        // Build Headers
         state.children.forEach((child, childIdx) => {
-            moneyTotals[child] = 0; // Initialize totals tracker
+            moneyTotals[child] = 0;
 
             const th = document.createElement('th');
             th.colSpan = state.showMoney ? 2 : 1;
@@ -327,28 +408,37 @@
             }
         });
 
-        // Add blank padding corner for table action cell
-        headerRow1.insertAdjacentHTML('beforeend', '<th rowspan="2" style="width:40px; background:transparent; border:none;"></th>');
-
-        // Build Table Body Rows
+        // Build Rows
         state.climbs.forEach((climb, climbIdx) => {
             const tr = document.createElement('tr');
 
-            // Climb Identifier
+            // Climb Title Box with Left-aligned Delete Row button
             const idTd = document.createElement('td');
+            const cellWrapper = document.createElement('div');
+            cellWrapper.className = 'climb-cell';
+
+            const delRowBtn = document.createElement('button');
+            delRowBtn.innerHTML = '✕';
+            delRowBtn.className = 'danger';
+            delRowBtn.title = "Delete Row";
+            delRowBtn.onclick = () => deleteRow(climbIdx);
+            cellWrapper.appendChild(delRowBtn);
+
             const idInput = document.createElement('input');
             idInput.type = 'text';
             idInput.className = 'climb-name-input';
             idInput.value = climb.name;
             idInput.onchange = (e) => { state.climbs[climbIdx].name = e.target.value; saveState(); };
-            idTd.appendChild(idInput);
+            cellWrapper.appendChild(idInput);
+            
+            idTd.appendChild(cellWrapper);
             tr.appendChild(idTd);
 
-            // Child Data Columns
+            // Child Entries
             state.children.forEach(child => {
                 if (!climb.data[child]) climb.data[child] = { grade: '', earn: '' };
 
-                // Grade input
+                // Grade box
                 const tdGrade = document.createElement('td');
                 const inputGrade = document.createElement('input');
                 inputGrade.type = 'text';
@@ -357,7 +447,7 @@
                 tdGrade.appendChild(inputGrade);
                 tr.appendChild(tdGrade);
 
-                // Earn input
+                // Earned box
                 if (state.showMoney) {
                     const tdEarn = document.createElement('td');
                     const inputEarn = document.createElement('input');
@@ -366,12 +456,11 @@
                     inputEarn.onchange = (e) => { 
                         state.climbs[climbIdx].data[child].earn = e.target.value; 
                         saveState(); 
-                        renderTable(); // Re-render to calculate live totals
+                        renderTable(); 
                     };
                     tdEarn.appendChild(inputEarn);
                     tr.appendChild(tdEarn);
 
-                    // Parse earnings safely for total summation
                     const cleanNum = parseFloat(climb.data[child].earn.replace(/[^0-9.]/g, ''));
                     if (!isNaN(cleanNum)) {
                         moneyTotals[child] += cleanNum;
@@ -379,39 +468,21 @@
                 }
             });
 
-            // Action Cell (Delete Row)
-            const actionTd = document.createElement('td');
-            actionTd.style.border = 'none';
-            actionTd.style.backgroundColor = 'transparent';
-            const delRowBtn = document.createElement('button');
-            delRowBtn.innerHTML = '✕';
-            delRowBtn.className = 'danger';
-            delRowBtn.onclick = () => deleteRow(climbIdx);
-            actionTd.appendChild(delRowBtn);
-            tr.appendChild(actionTd);
-
             tableBody.appendChild(tr);
         });
 
-        // Build Dynamic Footer Totals Row
-        state.children.forEach(child => {
-            if (state.showMoney) {
+        // Build Live Footer
+        if (state.showMoney) {
+            state.children.forEach(child => {
                 const totalGradeCell = document.createElement('td');
                 totalGradeCell.style.backgroundColor = 'var(--header-bg)'; 
                 totalRow.appendChild(totalGradeCell);
 
                 const totalEarnCell = document.createElement('td');
-                // Format to 2 decimal places cleanly
                 totalEarnCell.textContent = moneyTotals[child] > 0 ? moneyTotals[child].toFixed(2) : '0.00';
                 totalRow.appendChild(totalEarnCell);
-            } else {
-                const blankCell = document.createElement('td');
-                blankCell.textContent = '-';
-                totalRow.appendChild(blankCell);
-            }
-        });
-        // Extra trailing blank item for action column layout consistency
-        totalRow.insertAdjacentHTML('beforeend', '<td style="border:none; background:transparent;"></td>');
+            });
+        }
     }
 
     function addChild() {
@@ -474,7 +545,6 @@
                 const imported = JSON.parse(evt.target.result);
                 if (imported.children && imported.climbs) {
                     state = imported;
-                    // Ensure structural variables from newer versions exist
                     if (state.theme === undefined) state.theme = "light";
                     if (state.showMoney === undefined) state.showMoney = true;
                     saveState();
@@ -487,7 +557,7 @@
         reader.readAsText(e.target.files[0]);
     }
 
-    // App Initialization
+    // App Initialize
     applyTheme();
     renderTable();
 </script>
