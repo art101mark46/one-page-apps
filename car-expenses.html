@@ -1,0 +1,1283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Car & EV Expenses Tracker</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-color: #f1f5f9;
+            --card-bg: #ffffff;
+            --text-color: #0f172a;
+            --text-muted: #64748b;
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --border-color: #e2e8f0;
+            --danger: #ef4444;
+            --success: #16a34a;
+            --ev-color: #059669;
+            --input-bg: #f8fafc;
+            --header-bg: #ffffff;
+            --banner-bg: #0f172a;
+            --banner-text: #ffffff;
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-color: #f8fafc;
+            --text-muted: #94a3b8;
+            --primary: #3b82f6;
+            --primary-hover: #60a5fa;
+            --border-color: #334155;
+            --input-bg: #0f172a;
+            --header-bg: #1e293b;
+            --banner-bg: #020617;
+            --banner-text: #f8fafc;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            padding-bottom: 3rem;
+            font-size: 16px;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        header {
+            background: var(--header-bg);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            border-bottom: 1px solid var(--border-color);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            transition: background-color 0.3s, border-color 0.3s;
+        }
+
+        .header-top {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            padding: 0.75rem 1rem 0.25rem 1rem;
+        }
+
+        .header-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+
+        .btn-theme-toggle {
+            position: absolute;
+            right: 1rem;
+            background: none;
+            border: none;
+            font-size: 1.25rem;
+            cursor: pointer;
+            padding: 0.25rem;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .tabs {
+            display: flex;
+            width: 100%;
+        }
+
+        .tab-btn {
+            flex: 1;
+            background: none;
+            border: none;
+            padding: 1rem 0.5rem;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            color: var(--text-muted);
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .tab-btn.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+            background: rgba(0, 0, 0, 0.02);
+        }
+        
+        [data-theme="dark"] .tab-btn.active {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 1rem;
+        }
+
+        .view-section {
+            display: none;
+        }
+
+        .view-section.active {
+            display: block;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.25rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+            margin-bottom: 1.5rem;
+            transition: background-color 0.3s, border-color 0.3s;
+        }
+
+        .card h2 {
+            margin-bottom: 1.25rem;
+            font-size: 1.1rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-bottom: 0.35rem;
+            color: var(--text-color);
+            opacity: 0.85;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 1rem;
+            background: var(--input-bg);
+            color: var(--text-color);
+            height: 48px;
+            transition: background-color 0.3s, border-color 0.3s, color 0.3s;
+        }
+
+        .form-group input[type="range"] {
+            padding: 0;
+            height: auto;
+            background: transparent;
+            border: none;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .slider-label-wrap {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            font-weight: bold;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+
+        .conditional-fields {
+            display: none;
+            border-left: 3px solid var(--ev-color);
+            padding-left: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .conditional-fields.visible {
+            display: block;
+        }
+
+        button.btn-submit {
+            width: 100%;
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.85rem;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            height: 48px;
+            margin-top: 0.5rem;
+        }
+
+        .summary-banner {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            background: var(--banner-bg);
+            color: var(--banner-text);
+            padding: 1rem 0.5rem;
+            border-radius: 12px;
+            margin-bottom: 1.5rem;
+            text-align: center;
+            transition: background-color 0.3s;
+        }
+
+        .summary-item {
+            border-right: 1px solid var(--border-color);
+        }
+
+        .summary-item:last-child {
+            border-right: none;
+        }
+
+        .summary-item .label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+        }
+
+        .summary-item .val {
+            font-size: 1.15rem;
+            font-weight: 700;
+            margin-top: 0.25rem;
+        }
+
+        .section-header-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+
+        .section-header-bar h2 {
+            font-size: 1.2rem;
+            font-weight: 700;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 0.5rem;
+            position: relative;
+        }
+
+        .btn-utility {
+            background: var(--card-bg);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 0.4rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .btn-toggle-view {
+            background: var(--banner-bg);
+            color: var(--banner-text);
+        }
+
+        /* DROPDOWN MENU CONFIGS */
+        .dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        .dropdown-menu {
+            display: none;
+            position: absolute;
+            right: 0;
+            top: 100%;
+            background-color: var(--card-bg);
+            min-width: 130px;
+            box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.15);
+            z-index: 10;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            overflow: hidden;
+            margin-top: 2px;
+        }
+
+        .dropdown-menu button, .dropdown-menu label {
+            display: block;
+            width: 100%;
+            padding: 0.6rem 0.75rem;
+            background: none;
+            border: none;
+            color: var(--text-color);
+            text-align: left;
+            font-size: 0.85rem;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        .dropdown-menu button:hover, .dropdown-menu label:hover {
+            background-color: var(--input-bg);
+        }
+
+        .dropdown:hover .dropdown-menu {
+            display: block;
+        }
+
+        .entry-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .entry-item {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 1rem;
+            position: relative;
+        }
+
+        .entry-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+            border-bottom: 1px dashed var(--border-color);
+            padding-bottom: 0.5rem;
+        }
+
+        .entry-date {
+            font-weight: 700;
+        }
+
+        .entry-cost {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--success);
+        }
+
+        .entry-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            padding-bottom: 0.5rem;
+        }
+
+        .entry-detail-pair span {
+            color: var(--text-muted);
+        }
+
+        .entry-detail-pair strong {
+            color: var(--text-color);
+        }
+
+        .entry-footer-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.75rem;
+            border-top: 1px solid var(--border-color);
+            padding-top: 0.5rem;
+            margin-top: 0.25rem;
+        }
+
+        .btn-action-text {
+            background: none;
+            border: none;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            padding: 0.25rem 0.5rem;
+        }
+
+        .btn-edit-text {
+            color: var(--primary);
+        }
+
+        .btn-delete-text {
+            color: var(--danger);
+        }
+
+        .chart-toggle-container {
+            display: none;
+            width: 100%;
+            height: 280px;
+        }
+
+        .chart-toggle-container.active {
+            display: block;
+        }
+
+        .entry-list.hidden {
+            display: none;
+        }
+        
+        .hidden-file-input {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            border: 0;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="header-top">
+        <div class="header-title">Vehicle Expenses</div>
+        <button class="btn-theme-toggle" onclick="toggleTheme()" aria-label="Toggle Dark Mode">🌓</button>
+    </div>
+    <div class="tabs">
+        <button class="tab-btn active" id="tab-fuel" onclick="switchTab('fuel')">Fuel Log (ICE)</button>
+        <button class="tab-btn" id="tab-ev" onclick="switchTab('ev')">EV Log</button>
+        <button class="tab-btn" id="tab-maint" onclick="switchTab('maintenance')">Maintenance</button>
+    </div>
+</header>
+
+<div class="container">
+
+    <!-- FUEL VIEW -->
+    <div id="fuel-view" class="view-section active">
+        <div class="summary-banner">
+            <div class="summary-item">
+                <div class="label">Total Cost</div>
+                <div class="val" id="sum-fuel-cost">£0.00</div>
+            </div>
+            <div class="summary-item">
+                <div class="label">Total Litres</div>
+                <div class="val" id="sum-fuel-litres">0.00L</div>
+            </div>
+            <div class="summary-item">
+                <div class="label">Total Miles</div>
+                <div class="val" id="sum-fuel-miles">0.0 mi</div>
+            </div>
+        </div>
+
+        <div class="card" id="fuel-form-card">
+            <h2 id="fuel-form-title">Add Fuel Entry</h2>
+            <form id="fuel-form" onsubmit="addFuelEntry(event)">
+                <input type="hidden" id="fuel-edit-idx" value="">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Date</label>
+                        <input type="date" id="fuel-date" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Litres</label>
+                        <input type="number" step="0.01" inputmode="decimal" id="fuel-litres" oninput="calcFuelForm()">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>PPL (pence)</label>
+                        <input type="number" step="0.1" inputmode="decimal" id="fuel-ppl" required oninput="calcFuelForm()">
+                    </div>
+                    <div class="form-group">
+                        <label>Total Cost (£)</label>
+                        <input type="number" step="0.01" inputmode="decimal" id="fuel-cost" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Trip Mileage</label>
+                        <input type="number" step="0.1" inputmode="decimal" id="fuel-mileage">
+                    </div>
+                    <div class="form-group">
+                        <label>Brand</label>
+                        <input type="text" id="fuel-brand" placeholder="e.g. Jet">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Location</label>
+                    <input type="text" id="fuel-location" placeholder="e.g. Hebburn">
+                </div>
+                <button type="submit" class="btn-submit" id="fuel-submit-btn">Save Fuel Entry</button>
+            </form>
+        </div>
+
+        <div class="section-header-bar">
+            <h2>History</h2>
+            <div class="header-actions">
+                <button class="btn-utility btn-toggle-view" onclick="toggleDisplayMode('fuel')">📈 View Chart</button>
+                <div class="dropdown">
+                    <button class="btn-utility">Data ▾</button>
+                    <div class="dropdown-menu">
+                        <button onclick="exportFuelToCSV()">Export CSV</button>
+                        <label for="import-fuel-input">Import CSV</label>
+                    </div>
+                </div>
+                <input type="file" id="import-fuel-input" class="hidden-file-input" accept=".csv" onchange="importFuelCSV(event)">
+            </div>
+        </div>
+        
+        <div class="card chart-toggle-container" id="fuel-chart-wrap">
+            <canvas id="fuelCostChart"></canvas>
+        </div>
+        <div class="entry-list" id="fuel-list"></div>
+    </div>
+
+    <!-- EV LOG VIEW -->
+    <div id="ev-view" class="view-section">
+        <div class="summary-banner" id="ev-banner-accent" style="background: var(--ev-color); color: white;">
+            <div class="summary-item">
+                <div class="label" style="color: rgba(255,255,255,0.8);">Total EV Cost</div>
+                <div class="val" id="sum-ev-cost">£0.00</div>
+            </div>
+            <div class="summary-item">
+                <div class="label" style="color: rgba(255,255,255,0.8);">Total Energy</div>
+                <div class="val" id="sum-ev-kwh">0.00 kWh</div>
+            </div>
+            <div class="summary-item">
+                <div class="label" style="color: rgba(255,255,255,0.8);">Total Miles</div>
+                <div class="val" id="sum-ev-miles">0.0 mi</div>
+            </div>
+        </div>
+
+        <div class="card" id="ev-form-card">
+            <h2 id="ev-form-title">Add EV Charge Entry</h2>
+            <form id="ev-form" onsubmit="addEvEntry(event)">
+                <input type="hidden" id="ev-edit-idx" value="">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Date</label>
+                        <input type="date" id="ev-date" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Total Energy (kWh)</label>
+                        <input type="number" step="0.01" inputmode="decimal" id="ev-kwh" required oninput="calcEvForm()">
+                    </div>
+                </div>
+
+                <!-- SLIDER FOR CHARGING TARIFF DISTRIBUTIONS -->
+                <div class="form-group">
+                    <label>Charge Window Split</label>
+                    <input type="range" id="ev-split-slider" min="0" max="100" value="0" step="5" oninput="handleSliderChange()">
+                    <div class="slider-label-wrap">
+                        <span id="label-day-pct">100% Day Rate</span>
+                        <span id="label-night-pct">0% Night Rate</span>
+                    </div>
+                </div>
+
+                <!-- MAIN BASELINE / DAYTIME FIELDS -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label id="rate-main-label">Price per kWh (Day)</label>
+                        <input type="number" step="0.1" inputmode="decimal" id="ev-ppkwh" required oninput="calcEvForm()">
+                    </div>
+                    <div class="form-group">
+                        <label>Total Cost (£)</label>
+                        <input type="number" step="0.01" inputmode="decimal" id="ev-cost" required>
+                    </div>
+                </div>
+
+                <!-- INVISIBLE CONDITIONAL FIELDS UNTIL SPLIT SLIDER DETECTS SELECTION -->
+                <div class="conditional-fields" id="ev-night-fields">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Price per kWh (Night)</label>
+                            <input type="number" step="0.1" inputmode="decimal" id="ev-ppkwh-night" value="7.5" oninput="calcEvForm()">
+                        </div>
+                        <div class="form-group">
+                            <label>Calculated Night Cost</label>
+                            <input type="text" id="ev-cost-night-calc" readonly style="color: var(--text-muted); font-weight: bold;">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Charge Time (mins)</label>
+                        <input type="number" step="1" inputmode="numeric" id="ev-time" placeholder="e.g. 45">
+                    </div>
+                    <div class="form-group">
+                        <label>Miles Run Since Last</label>
+                        <input type="number" step="0.1" inputmode="decimal" id="ev-mileage" placeholder="Trip distance">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Charging Location / Provider</label>
+                    <input type="text" id="ev-location" placeholder="e.g. Home, Moto Services, Work">
+                </div>
+                <button type="submit" class="btn-submit" id="ev-submit-btn" style="background: var(--ev-color); color: white;">Save EV Entry</button>
+            </form>
+        </div>
+
+        <div class="section-header-bar">
+            <h2>History</h2>
+            <div class="header-actions">
+                <button class="btn-utility btn-toggle-view" onclick="toggleDisplayMode('ev')">📈 View Chart</button>
+                <div class="dropdown">
+                    <button class="btn-utility">Data ▾</button>
+                    <div class="dropdown-menu">
+                        <button onclick="exportEvToCSV()">Export CSV</button>
+                        <label for="import-ev-input">Import CSV</label>
+                    </div>
+                </div>
+                <input type="file" id="import-ev-input" class="hidden-file-input" accept=".csv" onchange="importEvCSV(event)">
+            </div>
+        </div>
+
+        <div class="card chart-toggle-container" id="ev-chart-wrap">
+            <canvas id="evCostChart"></canvas>
+        </div>
+        <div class="entry-list" id="ev-list"></div>
+    </div>
+
+    <!-- MAINTENANCE VIEW -->
+    <div id="maintenance-view" class="view-section">
+        <div class="summary-banner" style="grid-template-columns: 1fr;">
+            <div class="summary-item">
+                <div class="label">Total Repairs/Maint</div>
+                <div class="val" id="sum-maint-cost">£0.00</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Add Maintenance</h2>
+            <form id="maint-form" onsubmit="addMaintEntry(event)">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>When</label>
+                        <input type="date" id="maint-date" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Cost inc. VAT (£)</label>
+                        <input type="number" step="0.01" inputmode="decimal" id="maint-cost" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>What (Service Details)</label>
+                    <input type="text" id="maint-what" required placeholder="e.g. Two Front Tyres">
+                </div>
+                <div class="form-group">
+                    <label>Where (Garage)</label>
+                    <input type="text" id="maint-where" required placeholder="e.g. Tyrespot">
+                </div>
+                <button type="submit" class="btn-submit">Save Maintenance Record</button>
+            </form>
+        </div>
+
+        <div class="section-header-bar">
+            <h2>History</h2>
+            <div class="dropdown">
+                <button class="btn-utility">Data ▾</button>
+                <div class="dropdown-menu">
+                    <button onclick="exportMaintToCSV()">Export CSV</button>
+                    <label for="import-maint-input">Import CSV</label>
+                </div>
+            </div>
+            <input type="file" id="import-maint-input" class="hidden-file-input" accept=".csv" onchange="importMaintCSV(event)">
+        </div>
+        <div class="entry-list" id="maint-list"></div>
+    </div>
+</div>
+
+<script>
+    // Theme logic
+    const currentTheme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    document.documentElement.setAttribute('data-theme', currentTheme);
+
+    function toggleTheme() {
+        const theme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem('theme', theme);
+        if(displayModes.fuel === 'chart') buildFuelChart();
+        if(displayModes.ev === 'chart') buildEvChart();
+    }
+
+    let fuelData = JSON.parse(localStorage.getItem('fuelData')) || [
+        { date: '2022-07-15', litres: 49.01, cost: 96.01, ppl: 195.9, brand: 'Jet', mileage: 536, location: 'Hebburn' },
+        { date: '2022-07-24', litres: 28.22, cost: 55.01, ppl: 194.9, brand: 'Jet', mileage: 309.8, location: 'Hebburn' }
+    ];
+
+    let evData = JSON.parse(localStorage.getItem('evData')) || [
+        { date: '2026-06-18', kwh: 45.0, cost: 3.38, ppkwh: 7.5, nightPct: 100, ppkwhNight: 7.5, time: 240, mileage: 180.0, location: 'Home (Night Podpoint)' },
+        { date: '2026-06-19', kwh: 32.5, cost: 22.42, ppkwh: 69.0, nightPct: 0, ppkwhNight: 0, time: 35, mileage: 130.0, location: 'Ionity Services' }
+    ];
+
+    let maintData = JSON.parse(localStorage.getItem('maintData')) || [
+        { date: '2022-07-29', what: 'Replace Injector #1, DPF regen', where: 'Diesel Solutions, Peterlee', cost: 438.00 }
+    ];
+
+    let fuelChartInstance = null;
+    let evChartInstance = null;
+    let displayModes = { fuel: 'list', ev: 'list' };
+
+    function setDefaultDates() {
+        const today = new Date().toISOString().split('T')[0];
+        if(!document.getElementById('fuel-edit-idx').value) document.getElementById('fuel-date').value = today;
+        if(!document.getElementById('ev-edit-idx').value) document.getElementById('ev-date').value = today;
+        document.getElementById('maint-date').value = today;
+    }
+
+    function switchTab(tab) {
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.view-section').forEach(view => view.classList.remove('active'));
+        
+        if (tab === 'fuel') {
+            document.getElementById('tab-fuel').classList.add('active');
+            document.getElementById('fuel-view').classList.add('active');
+        } else if (tab === 'ev') {
+            document.getElementById('tab-ev').classList.add('active');
+            document.getElementById('ev-view').classList.add('active');
+        } else {
+            document.getElementById('tab-maint').classList.add('active');
+            document.getElementById('maintenance-view').classList.add('active');
+        }
+        window.scrollTo(0,0);
+    }
+
+    function calcFuelForm() {
+        const litres = parseFloat(document.getElementById('fuel-litres').value);
+        const ppl = parseFloat(document.getElementById('fuel-ppl').value);
+        if (!isNaN(litres) && !isNaN(ppl)) {
+            document.getElementById('fuel-cost').value = ((litres * ppl) / 100).toFixed(2);
+        }
+    }
+
+    function handleSliderChange() {
+        const nightPct = parseInt(document.getElementById('ev-split-slider').value);
+        const dayPct = 100 - nightPct;
+
+        document.getElementById('label-day-pct').innerText = `${dayPct}% Day Rate`;
+        document.getElementById('label-night-pct').innerText = `${nightPct}% Night Rate`;
+
+        const nightBlock = document.getElementById('ev-night-fields');
+        const mainRateLabel = document.getElementById('rate-main-label');
+
+        if (nightPct > 0) {
+            nightBlock.classList.add('visible');
+            mainRateLabel.innerText = "Price per kWh (Day)";
+        } else {
+            nightBlock.classList.remove('visible');
+            mainRateLabel.innerText = "Price per kWh";
+        }
+        calcEvForm();
+    }
+
+    function calcEvForm() {
+        const kwh = parseFloat(document.getElementById('ev-kwh').value);
+        const ppkwhDay = parseFloat(document.getElementById('ev-ppkwh').value);
+        const nightPct = parseInt(document.getElementById('ev-split-slider').value);
+        const ppkwhNight = parseFloat(document.getElementById('ev-ppkwh-night').value);
+
+        if (!isNaN(kwh)) {
+            let totalCost = 0;
+            if (nightPct > 0 && !isNaN(ppkwhNight)) {
+                const nightKwh = kwh * (nightPct / 100);
+                const dayKwh = kwh * ((100 - nightPct) / 100);
+                
+                const nightCost = (nightKwh * ppkwhNight) / 100;
+                const dayCost = !isNaN(ppkwhDay) ? (dayKwh * ppkwhDay) / 100 : 0;
+                
+                document.getElementById('ev-cost-night-calc').value = `£${nightCost.toFixed(2)}`;
+                totalCost = dayCost + nightCost;
+            } else if (!isNaN(ppkwhDay)) {
+                totalCost = (kwh * ppkwhDay) / 100;
+            }
+            if(totalCost > 0) {
+                document.getElementById('ev-cost').value = totalCost.toFixed(2);
+            }
+        }
+    }
+
+    function saveToStorage() {
+        localStorage.setItem('fuelData', JSON.stringify(fuelData));
+        localStorage.setItem('evData', JSON.stringify(evData));
+        localStorage.setItem('maintData', JSON.stringify(maintData));
+    }
+
+    function toggleDisplayMode(type) {
+        const listEl = document.getElementById(`${type}-list`);
+        const chartWrapEl = document.getElementById(`${type}-chart-wrap`);
+        const btn = document.querySelector(`#${type}-view .btn-toggle-view`);
+
+        if (displayModes[type] === 'list') {
+            displayModes[type] = 'chart';
+            listEl.classList.add('hidden');
+            chartWrapEl.classList.add('active');
+            btn.innerText = '📋 View List';
+            if (type === 'fuel') buildFuelChart();
+            if (type === 'ev') buildEvChart();
+        } else {
+            displayModes[type] = 'list';
+            listEl.classList.remove('hidden');
+            chartWrapEl.classList.remove('active');
+            btn.innerText = '📈 View Chart';
+        }
+    }
+
+    function renderFuel() {
+        const listContainer = document.getElementById('fuel-list');
+        listContainer.innerHTML = '';
+        let totalLitres = 0, totalCost = 0, totalMiles = 0;
+
+        fuelData.sort((a,b) => new Date(b.date) - new Date(a.date));
+
+        fuelData.forEach((entry, idx) => {
+            const litresVal = entry.litres ? parseFloat(entry.litres) : null;
+            const costVal = parseFloat(entry.cost);
+            const pplVal = parseFloat(entry.ppl);
+            const mileageVal = entry.mileage ? parseFloat(entry.mileage) : null;
+
+            totalCost += costVal;
+            if (litresVal) totalLitres += litresVal;
+            if (mileageVal) totalMiles += mileageVal;
+
+            const mpg = (mileageVal && litresVal) ? (mileageVal / (litresVal / 4.55)) : null;
+            const cpm = (mileageVal && costVal) ? (costVal / mileageVal) : null;
+
+            const item = document.createElement('div');
+            item.className = 'entry-item';
+            item.innerHTML = `
+                <div class="entry-header">
+                    <span class="entry-date">${entry.date}</span>
+                    <span class="entry-cost">£${costVal.toFixed(2)}</span>
+                </div>
+                <div class="entry-details">
+                    <div class="entry-detail-pair"><span>Litres:</span> <strong>${litresVal ? litresVal.toFixed(2) : '—'}</strong></div>
+                    <div class="entry-detail-pair"><span>Per Litre:</span> <strong>${pplVal ? pplVal.toFixed(1)+'p' : '—'}</strong></div>
+                    <div class="entry-detail-pair"><span>Cost/Mile:</span> <strong>${cpm ? '£'+cpm.toFixed(2) : '—'}</strong></div>
+                    <div class="entry-detail-pair"><span>MPG:</span> <strong>${mpg ? mpg.toFixed(2) : 'NaN'}</strong></div>
+                    <div class="entry-detail-pair"><span>Miles:</span> <strong>${mileageVal || '—'}</strong></div>
+                    <div class="entry-detail-pair" style="grid-column: span 2;"><span>Station:</span> <strong>${entry.brand || ''} ${entry.location || ''}</strong></div>
+                </div>
+                <div class="entry-footer-actions">
+                    <button class="btn-action-text btn-edit-text" onclick="editFuel('${entry.date}', ${idx})">Edit</button>
+                    <button class="btn-action-text btn-delete-text" onclick="deleteFuel(${idx})">Delete</button>
+                </div>
+            `;
+            listContainer.appendChild(item);
+        });
+
+        document.getElementById('sum-fuel-cost').innerText = `£${totalCost.toFixed(2)}`;
+        document.getElementById('sum-fuel-litres').innerText = `${totalLitres.toFixed(2)}L`;
+        document.getElementById('sum-fuel-miles').innerText = `${totalMiles.toFixed(1)} mi`;
+    }
+
+    function renderEv() {
+        const listContainer = document.getElementById('ev-list');
+        listContainer.innerHTML = '';
+        let totalKwh = 0, totalCost = 0, totalMiles = 0;
+
+        evData.sort((a,b) => new Date(b.date) - new Date(a.date));
+
+        evData.forEach((entry, idx) => {
+            const kwhVal = parseFloat(entry.kwh);
+            const costVal = parseFloat(entry.cost);
+            const mileageVal = entry.mileage ? parseFloat(entry.mileage) : null;
+
+            totalCost += costVal;
+            totalKwh += kwhVal;
+            if (mileageVal) totalMiles += mileageVal;
+
+            const cpm = (mileageVal && costVal) ? (costVal / mileageVal) : null;
+            const efficiency = (mileageVal && kwhVal) ? (mileageVal / kwhVal) : null;
+            const nightSplitStr = entry.nightPct > 0 ? ` (${entry.nightPct}% Night Split)` : '';
+
+            const item = document.createElement('div');
+            item.className = 'entry-item';
+            item.innerHTML = `
+                <div class="entry-header">
+                    <span class="entry-date">${entry.date}</span>
+                    <span class="entry-cost" style="color: var(--ev-color);">£${costVal.toFixed(2)}</span>
+                </div>
+                <div class="entry-details">
+                    <div class="entry-detail-pair"><span>Energy:</span> <strong>${kwhVal.toFixed(2)} kWh</strong></div>
+                    <div class="entry-detail-pair"><span>Rate details:</span> <strong>${entry.ppkwh}p${nightSplitStr}</strong></div>
+                    <div class="entry-detail-pair"><span>Cost/Mile:</span> <strong>${cpm ? '£'+cpm.toFixed(2) : '—'}</strong></div>
+                    <div class="entry-detail-pair"><span>Efficiency:</span> <strong>${efficiency ? efficiency.toFixed(1)+' m/kWh' : '—'}</strong></div>
+                    <div class="entry-detail-pair"><span>Miles Run:</span> <strong>${mileageVal || '—'}</strong></div>
+                    <div class="entry-detail-pair" style="grid-column: span 2;"><span>Location:</span> <strong>${entry.location || '—'}</strong></div>
+                </div>
+                <div class="entry-footer-actions">
+                    <button class="btn-action-text btn-edit-text" onclick="editEv('${entry.date}', ${idx})">Edit</button>
+                    <button class="btn-action-text btn-delete-text" onclick="deleteEv(${idx})">Delete</button>
+                </div>
+            `;
+            listContainer.appendChild(item);
+        });
+
+        document.getElementById('sum-ev-cost').innerText = `£${totalCost.toFixed(2)}`;
+        document.getElementById('sum-ev-kwh').innerText = `${totalKwh.toFixed(2)} kWh`;
+        document.getElementById('sum-ev-miles').innerText = `${totalMiles.toFixed(1)} mi`;
+    }
+
+    function renderMaint() {
+        const listContainer = document.getElementById('maint-list');
+        listContainer.innerHTML = '';
+        let totalCost = 0;
+
+        maintData.sort((a,b) => new Date(b.date) - new Date(a.date));
+
+        maintData.forEach((entry, idx) => {
+            const costVal = parseFloat(entry.cost);
+            totalCost += costVal;
+
+            const item = document.createElement('div');
+            item.className = 'entry-item';
+            item.innerHTML = `
+                <div class="entry-header">
+                    <span class="entry-date">${entry.date}</span>
+                    <span class="entry-cost">£${costVal.toFixed(2)}</span>
+                </div>
+                <div style="font-size: 0.9rem; margin-bottom: 0.25rem;"><strong>${entry.what}</strong></div>
+                <div style="font-size: 0.85rem; color: var(--text-muted);">📍 ${entry.where}</div>
+                <div class="entry-footer-actions">
+                    <button class="btn-action-text btn-delete-text" onclick="deleteMaint(${idx})">Delete</button>
+                </div>
+            `;
+            listContainer.appendChild(item);
+        });
+
+        document.getElementById('sum-maint-cost').innerText = `£${totalCost.toFixed(2)}`;
+    }
+
+    function editFuel(dateString, sortedIdx) {
+        // Safe mapping lookup matching exact timestamp configurations
+        const originalEntry = fuelData[sortedIdx];
+        if(!originalEntry) return;
+
+        document.getElementById('fuel-edit-idx').value = sortedIdx;
+        document.getElementById('fuel-date').value = originalEntry.date;
+        document.getElementById('fuel-litres').value = originalEntry.litres || '';
+        document.getElementById('fuel-ppl').value = originalEntry.ppl;
+        document.getElementById('fuel-cost').value = originalEntry.cost;
+        document.getElementById('fuel-brand').value = originalEntry.brand || '';
+        document.getElementById('fuel-mileage').value = originalEntry.mileage || '';
+        document.getElementById('fuel-location').value = originalEntry.location || '';
+        
+        document.getElementById('fuel-form-title').innerText = "⚡ Edit Fuel Entry";
+        document.getElementById('fuel-submit-btn').innerText = "Update Fuel Entry";
+        document.getElementById('fuel-form-card').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function editEv(dateString, sortedIdx) {
+        const originalEntry = evData[sortedIdx];
+        if(!originalEntry) return;
+
+        document.getElementById('ev-edit-idx').value = sortedIdx;
+        document.getElementById('ev-date').value = originalEntry.date;
+        document.getElementById('ev-kwh').value = originalEntry.kwh;
+        document.getElementById('ev-split-slider').value = originalEntry.nightPct || 0;
+        document.getElementById('ev-ppkwh').value = originalEntry.ppkwh;
+        document.getElementById('ev-cost').value = originalEntry.cost;
+        document.getElementById('ev-ppkwh-night').value = originalEntry.ppkwhNight || 7.5;
+        document.getElementById('ev-time').value = originalEntry.time || '';
+        document.getElementById('ev-mileage').value = originalEntry.mileage || '';
+        document.getElementById('ev-location').value = originalEntry.location || '';
+        
+        handleSliderChange();
+        document.getElementById('ev-form-title').innerText = "⚡ Edit EV Entry";
+        document.getElementById('ev-submit-btn').innerText = "Update EV Entry";
+        document.getElementById('ev-form-card').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function buildFuelChart() {
+        const ctx = document.getElementById('fuelCostChart').getContext('2d');
+        const chronData = [...fuelData].sort((a,b) => new Date(a.date) - new Date(b.date));
+        const labels = [], cpmData = [];
+
+        chronData.forEach(e => {
+            if (e.mileage && e.mileage > 0) {
+                labels.push(e.date);
+                cpmData.push((e.cost / e.mileage));
+            }
+        });
+
+        if (fuelChartInstance) fuelChartInstance.destroy();
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        
+        fuelChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{ label: 'ICE Cost Per Mile (£)', data: cpmData, borderColor: '#2563eb', tension: 0.15, fill: false }]
+            },
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false,
+                scales: {
+                    x: { grid: { color: isDark ? '#334155' : '#e2e8f0' }, ticks: { color: isDark ? '#94a3b8' : '#64748b' } },
+                    y: { grid: { color: isDark ? '#334155' : '#e2e8f0' }, ticks: { color: isDark ? '#94a3b8' : '#64748b' } }
+                },
+                plugins: { legend: { labels: { color: isDark ? '#f8fafc' : '#0f172a' } } }
+            }
+        });
+    }
+
+    function buildEvChart() {
+        const ctx = document.getElementById('evCostChart').getContext('2d');
+        const chronData = [...evData].sort((a,b) => new Date(a.date) - new Date(b.date));
+        const labels = [], cpmData = [];
+
+        chronData.forEach(e => {
+            if (e.mileage && e.mileage > 0) {
+                labels.push(e.date);
+                cpmData.push((e.cost / e.mileage));
+            }
+        });
+
+        if (evChartInstance) evChartInstance.destroy();
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+
+        evChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{ label: 'EV Cost Per Mile (£)', data: cpmData, borderColor: '#059669', tension: 0.15, fill: false }]
+            },
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false,
+                scales: {
+                    x: { grid: { color: isDark ? '#334155' : '#e2e8f0' }, ticks: { color: isDark ? '#94a3b8' : '#64748b' } },
+                    y: { grid: { color: isDark ? '#334155' : '#e2e8f0' }, ticks: { color: isDark ? '#94a3b8' : '#64748b' } }
+                },
+                plugins: { legend: { labels: { color: isDark ? '#f8fafc' : '#0f172a' } } }
+            }
+        });
+    }
+
+    function addFuelEntry(e) {
+        e.preventDefault();
+        const editIdxStr = document.getElementById('fuel-edit-idx').value;
+        const entry = {
+            date: document.getElementById('fuel-date').value,
+            litres: document.getElementById('fuel-litres').value ? parseFloat(document.getElementById('fuel-litres').value) : null,
+            cost: parseFloat(document.getElementById('fuel-cost').value),
+            ppl: parseFloat(document.getElementById('fuel-ppl').value),
+            brand: document.getElementById('fuel-brand').value,
+            mileage: document.getElementById('fuel-mileage').value ? parseFloat(document.getElementById('fuel-mileage').value) : null,
+            location: document.getElementById('fuel-location').value
+        };
+
+        if(editIdxStr !== "") {
+            fuelData[parseInt(editIdxStr)] = entry;
+            document.getElementById('fuel-edit-idx').value = "";
+            document.getElementById('fuel-form-title').innerText = "Add Fuel Entry";
+            document.getElementById('fuel-submit-btn').innerText = "Save Fuel Entry";
+        } else {
+            fuelData.push(entry);
+        }
+
+        saveToStorage();
+        renderFuel();
+        if(displayModes.fuel === 'chart') buildFuelChart();
+        document.getElementById('fuel-form').reset();
+        setDefaultDates();
+    }
+
+    function addEvEntry(e) {
+        e.preventDefault();
+        const editIdxStr = document.getElementById('ev-edit-idx').value;
+        const entry = {
+            date: document.getElementById('ev-date').value,
+            kwh: parseFloat(document.getElementById('ev-kwh').value),
+            cost: parseFloat(document.getElementById('ev-cost').value),
+            ppkwh: parseFloat(document.getElementById('ev-ppkwh').value) || 0,
+            nightPct: parseInt(document.getElementById('ev-split-slider').value),
+            ppkwhNight: parseFloat(document.getElementById('ev-ppkwh-night').value) || 0,
+            time: document.getElementById('ev-time').value ? parseInt(document.getElementById('ev-time').value) : null,
+            mileage: document.getElementById('ev-mileage').value ? parseFloat(document.getElementById('ev-mileage').value) : null,
+            location: document.getElementById('ev-location').value
+        };
+
+        if(editIdxStr !== "") {
+            evData[parseInt(editIdxStr)] = entry;
+            document.getElementById('ev-edit-idx').value = "";
+            document.getElementById('ev-form-title').innerText = "Add EV Charge Entry";
+            document.getElementById('ev-submit-btn').innerText = "Save EV Entry";
+        } else {
+            evData.push(entry);
+        }
+
+        saveToStorage();
+        renderEv();
+        if(displayModes.ev === 'chart') buildEvChart();
+        document.getElementById('ev-form').reset();
+        document.getElementById('ev-split-slider').value = 0;
+        handleSliderChange();
+        setDefaultDates();
+    }
+
+    function addMaintEntry(e) {
+        e.preventDefault();
+        const entry = {
+            date: document.getElementById('maint-date').value,
+            what: document.getElementById('maint-what').value,
+            where: document.getElementById('maint-where').value,
+            cost: parseFloat(document.getElementById('maint-cost').value)
+        };
+        maintData.push(entry);
+        saveToStorage();
+        renderMaint();
+        document.getElementById('maint-form').reset();
+        setDefaultDates();
+    }
+
+    function deleteFuel(idx) {
+        if(confirm("Delete this entry?")) {
+            fuelData.splice(idx, 1);
+            saveToStorage();
+            renderFuel();
+            if(displayModes.fuel === 'chart') buildFuelChart();
+        }
+    }
+
+    function deleteEv(idx) {
+        if(confirm("Delete this entry?")) {
+            evData.splice(idx, 1);
+            saveToStorage();
+            renderEv();
+            if(displayModes.ev === 'chart') buildEvChart();
+        }
+    }
+
+    function deleteMaint(idx) {
+        if(confirm("Delete this record?")) {
+            maintData.splice(idx, 1);
+            saveToStorage();
+            renderMaint();
+        }
+    }
+
+    function exportFuelToCSV() {
+        let csvContent = "data:text/csv;charset=utf-8,Date,Litres,Cost,PPL,Brand,Mileage,Location\r\n";
+        fuelData.forEach(e => {
+            csvContent += [e.date, e.litres||'', e.cost, e.ppl, `"${e.brand||''}"`, e.mileage||'', `"${e.location||''}"`].join(",") + "\r\n";
+        });
+        downloadCSV(csvContent, "ICE_Fuel_Log.csv");
+    }
+
+    function exportEvToCSV() {
+        let csvContent = "data:text/csv;charset=utf-8,Date,kWh,Cost,PricePerkWh,NightPct,PricePerkWhNight,ChargeTimeMins,MilesDriven,Location\r\n";
+        evData.forEach(e => {
+            csvContent += [e.date, e.kwh, e.cost, e.ppkwh, e.nightPct, e.ppkwhNight, e.time||'', e.mileage||'', `"${e.location||''}"`].join(",") + "\r\n";
+        });
+        downloadCSV(csvContent, "EV_Charge_Log.csv");
+    }
+
+    function exportMaintToCSV() {
+        let csvContent = "data:text/csv;charset=utf-8,What,Where,Cost,When\r\n";
+        maintData.forEach(e => {
+            csvContent += [`"${e.what}"`, `"${e.where}"`, e.cost, e.date].join(",") + "\r\n";
+        });
+        downloadCSV(csvContent, "Maintenance_Log.csv");
+    }
+
+    function downloadCSV(content, filename) {
+        const encodedUri = encodeURI(content);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", filename);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    // CSV PARSING UTILITIES
+    function importFuelCSV(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const rows = e.target.result.split('\n').map(r => r.trim()).filter(r => r.length > 0);
+            if(rows.length <= 1) return;
+            // Detect headers and map indices cleanly
+            fuelData = rows.slice(1).map(row => {
+                const c = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+                return {
+                    date: c[0],
+                    litres: c[1] ? parseFloat(c[1]) : null,
+                    cost: parseFloat(c[2]),
+                    ppl: parseFloat(c[3]),
+                    brand: c[4] ? c[4].replace(/"/g, '') : '',
+                    mileage: c[5] ? parseFloat(c[5]) : null,
+                    location: c[6] ? c[6].replace(/"/g, '') : ''
+                };
+            });
+            saveToStorage();
+            renderFuel();
+            alert("Fuel data loaded successfully!");
+        };
+        reader.readAsText(file);
+    }
+
+    function importEvCSV(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const rows = e.target.result.split('\n').map(r => r.trim()).filter(r => r.length > 0);
+            if(rows.length <= 1) return;
+            evData = rows.slice(1).map(row => {
+                const c = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+                return {
+                    date: c[0],
+                    kwh: parseFloat(c[1]),
+                    cost: parseFloat(c[2]),
+                    ppkwh: parseFloat(c[3]) || 0,
+                    nightPct: parseInt(c[4]) || 0,
+                    ppkwhNight: parseFloat(c[5]) || 0,
+                    time: c[6] ? parseInt(c[6]) : null,
+                    mileage: c[7] ? parseFloat(c[7]) : null,
+                    location: c[8] ? c[8].replace(/"/g, '') : ''
+                };
+            });
+            saveToStorage();
+            renderEv();
+            alert("EV data loaded successfully!");
+        };
+        reader.readAsText(file);
+    }
+
+    function importMaintCSV(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const rows = e.target.result.split('\n').map(r => r.trim()).filter(r => r.length > 0);
+            if(rows.length <= 1) return;
+            maintData = rows.slice(1).map(row => {
+                const c = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+                return {
+                    what: c[0] ? c[0].replace(/"/g, '') : '',
+                    where: c[1] ? c[1].replace(/"/g, '') : '',
+                    cost: parseFloat(c[2]),
+                    date: c[3]
+                };
+            });
+            saveToStorage();
+            renderMaint();
+            alert("Maintenance history loaded successfully!");
+        };
+        reader.readAsText(file);
+    }
+
+    setDefaultDates();
+    renderFuel();
+    renderEv();
+    renderMaint();
+</script>
+
+</body>
+</html>
