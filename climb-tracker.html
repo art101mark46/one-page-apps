@@ -11,7 +11,20 @@
             --bg-color: #f8fafc;
             --card-bg: #ffffff;
             --text-color: #1e293b;
+            --text-muted: #64748b;
             --border-color: #cbd5e1;
+            --header-bg: #f1f5f9;
+            --input-focus: #eff6ff;
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-color: #f8fafc;
+            --text-muted: #94a3b8;
+            --border-color: #334155;
+            --header-bg: #1e293b;
+            --input-focus: #1e293b;
         }
 
         body {
@@ -20,6 +33,7 @@
             color: var(--text-color);
             margin: 0;
             padding: 20px;
+            transition: background-color 0.3s, color 0.3s;
         }
 
         .container {
@@ -28,7 +42,8 @@
             background: var(--card-bg);
             padding: 30px;
             border-radius: 12px;
-            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            transition: background-color 0.3s;
         }
 
         header {
@@ -45,13 +60,22 @@
         h1 {
             margin: 0;
             font-size: 1.8rem;
-            color: #0f172a;
+        }
+
+        .controls-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 20px;
         }
 
         .btn-group {
             display: flex;
             gap: 10px;
             flex-wrap: wrap;
+            align-items: center;
         }
 
         button, .file-label {
@@ -72,29 +96,32 @@
             background-color: var(--primary-hover);
         }
 
-        button.secondary {
-            background-color: #64748b;
-        }
-        button.secondary:hover {
-            background-color: #475569;
-        }
+        button.secondary { background-color: #64748b; }
+        button.secondary:hover { background-color: #475569; }
+        
+        button.theme-toggle { background-color: #e2e8f0; color: #1e293b; }
+        [data-theme="dark"] button.theme-toggle { background-color: #334155; color: #f8fafc; }
 
         button.danger {
             background-color: #ef4444;
             padding: 4px 8px;
             font-size: 0.8rem;
         }
-        button.danger:hover {
-            background-color: #dc2626;
-        }
+        button.danger:hover { background-color: #dc2626; }
 
-        input[type="file"] {
-            display: none;
+        input[type="file"] { display: none; }
+
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            user-select: none;
         }
 
         .table-container {
             overflow-x: auto;
-            margin-top: 20px;
             border: 1px solid var(--border-color);
             border-radius: 8px;
         }
@@ -103,24 +130,29 @@
             width: 100%;
             border-collapse: collapse;
             text-align: left;
-            background: white;
+            background: var(--card-bg);
         }
 
         th, td {
             border: 1px solid var(--border-color);
             padding: 10px;
-            min-width: 100px;
+            min-width: 90px;
+            color: var(--text-color);
         }
 
         th {
-            background-color: #f1f5f9;
+            background-color: var(--header-bg);
             font-weight: 600;
             text-align: center;
         }
 
-        .child-header {
-            position: relative;
+        .total-row td {
+            font-weight: bold;
+            background-color: var(--header-bg);
+            text-align: center;
         }
+
+        .child-header { position: relative; }
 
         .delete-child-btn {
             position: absolute;
@@ -128,14 +160,12 @@
             right: 2px;
             background: none;
             border: none;
-            color: #94a3b8;
+            color: var(--text-muted);
             cursor: pointer;
             font-size: 0.8rem;
             padding: 2px 5px;
         }
-        .delete-child-btn:hover {
-            color: #ef4444;
-        }
+        .delete-child-btn:hover { color: #ef4444; }
 
         input[type="text"] {
             width: 100%;
@@ -145,18 +175,18 @@
             border-radius: 4px;
             font-size: 0.9rem;
             text-align: center;
+            background: transparent;
+            color: var(--text-color);
         }
 
         input[type="text"]:focus {
             border-color: var(--primary-color);
             outline: none;
-            background-color: #eff6ff;
+            background-color: var(--input-focus);
         }
 
-        .climb-name-input {
-            text-align: left !important;
-            font-weight: 500;
-        }
+        .climb-name-input { text-align: left !important; font-weight: 500; }
+        .hidden { display: none !important; }
 
         .footer-controls {
             margin-top: 20px;
@@ -169,26 +199,35 @@
 
 <div class="container">
     <header>
-        <h1>🧗 Climbing Wall Tracker</h1>
+        <h1>🧗 Kids' Climbing Tracker</h1>
         <div class="btn-group">
-            <button onclick="addChild()">+ Add Child</button>
-            <label class="file-label" for="importFile">📥 Import Data</label>
+            <button class="theme-toggle" id="themeBtn" onclick="toggleTheme()">🌙 Dark Mode</button>
+            <label class="file-label" for="importFile">📥 Import</label>
             <input type="file" id="importFile" accept=".json" onchange="importData(event)">
-            <button class="secondary" onclick="exportData()">📤 Export Data</button>
+            <button class="secondary" onclick="exportData()">📤 Export</button>
         </div>
     </header>
+
+    <div class="controls-bar">
+        <button onclick="addChild()">+ Add Child</button>
+        <label class="checkbox-container">
+            <input type="checkbox" id="toggleMoneyCheckbox" checked onchange="toggleMoneyColumn()">
+            Show Money/Earning Column
+        </label>
+    </div>
 
     <div class="table-container">
         <table id="trackerTable">
             <thead>
                 <tr id="headerRow1">
                     <th rowspan="2" style="min-width: 150px;">Climb Name / #</th>
-                    </tr>
-                <tr id="headerRow2">
-                    </tr>
+                </tr>
+                <tr id="headerRow2"></tr>
             </thead>
-            <tbody id="tableBody">
-                </tbody>
+            <tbody id="tableBody"></tbody>
+            <tfoot>
+                <tr id="totalRow" class="total-row"></tr>
+            </tfoot>
         </table>
     </div>
 
@@ -198,42 +237,67 @@
 </div>
 
 <script>
-    // Initial state template if no local storage or import exists
+    // App State
     let state = {
+        theme: "light",
+        showMoney: true,
         children: ["Child 1", "Child 2"],
         climbs: [
-            { name: "Climb 1", data: { "Child 1": { grade: "", earn: "" }, "Child 2": { grade: "", earn: "" } } },
-            { name: "Climb 2", data: { "Child 1": { grade: "", earn: "" }, "Child 2": { grade: "", earn: "" } } }
+            { name: "Climb 1", data: { "Child 1": { grade: "V1", earn: "2.00" }, "Child 2": { grade: "V2", earn: "3.50" } } },
+            { name: "Climb 2", data: { "Child 1": { grade: "V2", earn: "3.00" }, "Child 2": { grade: "V1", earn: "2.00" } } }
         ]
     };
 
-    // Load data from LocalStorage on page load
-    if (localStorage.getItem('climbingTrackerState')) {
+    // Load Local Storage
+    if (localStorage.getItem('climbingTrackerState_v2')) {
         try {
-            state = JSON.parse(localStorage.getItem('climbingTrackerState'));
-        } catch (e) {
-            console.error("Error parsing local storage state", e);
-        }
+            state = JSON.parse(localStorage.getItem('climbingTrackerState_v2'));
+        } catch (e) { console.error(e); }
     }
 
     function saveState() {
-        localStorage.setItem('climbingTrackerState', JSON.stringify(state));
+        localStorage.setItem('climbingTrackerState_v2', JSON.stringify(state));
+    }
+
+    function applyTheme() {
+        document.documentElement.setAttribute('data-theme', state.theme);
+        document.getElementById('themeBtn').innerHTML = state.theme === 'dark' ? '☀️ Light Mode' : '🌙 Dark Mode';
+    }
+
+    function toggleTheme() {
+        state.theme = state.theme === 'dark' ? 'light' : 'dark';
+        applyTheme();
+        saveState();
+    }
+
+    function toggleMoneyColumn() {
+        state.showMoney = document.getElementById('toggleMoneyCheckbox').checked;
+        saveState();
+        renderTable();
     }
 
     function renderTable() {
         const headerRow1 = document.getElementById('headerRow1');
         const headerRow2 = document.getElementById('headerRow2');
         const tableBody = document.getElementById('tableBody');
+        const totalRow = document.getElementById('totalRow');
 
-        // Reset Headers (Keep the first column)
+        document.getElementById('toggleMoneyCheckbox').checked = state.showMoney;
+
+        // Reset elements
         headerRow1.innerHTML = '<th rowspan="2" style="min-width: 150px;">Climb Name / #</th>';
         headerRow2.innerHTML = '';
+        tableBody.innerHTML = '';
+        totalRow.innerHTML = '<td style="text-align: right;">Total Earned:</td>';
 
-        // Build Child Headers
+        const moneyTotals = {};
+
+        // Build Table Headers
         state.children.forEach((child, childIdx) => {
-            // Main Header
+            moneyTotals[child] = 0; // Initialize totals tracker
+
             const th = document.createElement('th');
-            th.colSpan = 2;
+            th.colSpan = state.showMoney ? 2 : 1;
             th.className = 'child-header';
             
             const nameInput = document.createElement('input');
@@ -243,77 +307,79 @@
             nameInput.onchange = (e) => renameChild(childIdx, e.target.value);
             th.appendChild(nameInput);
 
-            // Delete button for children
             const delBtn = document.createElement('button');
             delBtn.innerHTML = '✕';
             delBtn.className = 'delete-child-btn';
-            delBtn.title = `Delete ${child}`;
             delBtn.onclick = () => deleteChild(childIdx);
             th.appendChild(delBtn);
 
             headerRow1.appendChild(th);
 
-            // Sub Headers
+            // Subheaders
             const thGrade = document.createElement('th');
             thGrade.textContent = 'Grade';
-            const thEarn = document.createElement('th');
-            thEarn.textContent = 'Earn (£/$)';
-            
             headerRow2.appendChild(thGrade);
-            headerRow2.appendChild(thEarn);
+
+            if (state.showMoney) {
+                const thEarn = document.createElement('th');
+                thEarn.textContent = 'Earned';
+                headerRow2.appendChild(thEarn);
+            }
         });
 
-        // Build Rows
-        tableBody.innerHTML = '';
+        // Add blank padding corner for table action cell
+        headerRow1.insertAdjacentHTML('beforeend', '<th rowspan="2" style="width:40px; background:transparent; border:none;"></th>');
+
+        // Build Table Body Rows
         state.climbs.forEach((climb, climbIdx) => {
             const tr = document.createElement('tr');
 
-            // Climb Identifier Cell
+            // Climb Identifier
             const idTd = document.createElement('td');
             const idInput = document.createElement('input');
             idInput.type = 'text';
             idInput.className = 'climb-name-input';
             idInput.value = climb.name;
-            idInput.onchange = (e) => {
-                state.climbs[climbIdx].name = e.target.value;
-                saveState();
-            };
+            idInput.onchange = (e) => { state.climbs[climbIdx].name = e.target.value; saveState(); };
             idTd.appendChild(idInput);
             tr.appendChild(idTd);
 
-            // Child Grade & Earn Cells
+            // Child Data Columns
             state.children.forEach(child => {
-                if (!climb.data[child]) {
-                    climb.data[child] = { grade: '', earn: '' };
-                }
+                if (!climb.data[child]) climb.data[child] = { grade: '', earn: '' };
 
-                // Grade Input
+                // Grade input
                 const tdGrade = document.createElement('td');
                 const inputGrade = document.createElement('input');
                 inputGrade.type = 'text';
                 inputGrade.value = climb.data[child].grade || '';
-                inputGrade.onchange = (e) => {
-                    state.climbs[climbIdx].data[child].grade = e.target.value;
-                    saveState();
-                };
+                inputGrade.onchange = (e) => { state.climbs[climbIdx].data[child].grade = e.target.value; saveState(); };
                 tdGrade.appendChild(inputGrade);
                 tr.appendChild(tdGrade);
 
-                // Earn Input
-                const tdEarn = document.createElement('td');
-                const inputEarn = document.createElement('input');
-                inputEarn.type = 'text';
-                inputEarn.value = climb.data[child].earn || '';
-                inputEarn.onchange = (e) => {
-                    state.climbs[climbIdx].data[child].earn = e.target.value;
-                    saveState();
-                };
-                tdEarn.appendChild(inputEarn);
-                tr.appendChild(tdEarn);
+                // Earn input
+                if (state.showMoney) {
+                    const tdEarn = document.createElement('td');
+                    const inputEarn = document.createElement('input');
+                    inputEarn.type = 'text';
+                    inputEarn.value = climb.data[child].earn || '';
+                    inputEarn.onchange = (e) => { 
+                        state.climbs[climbIdx].data[child].earn = e.target.value; 
+                        saveState(); 
+                        renderTable(); // Re-render to calculate live totals
+                    };
+                    tdEarn.appendChild(inputEarn);
+                    tr.appendChild(tdEarn);
+
+                    // Parse earnings safely for total summation
+                    const cleanNum = parseFloat(climb.data[child].earn.replace(/[^0-9.]/g, ''));
+                    if (!isNaN(cleanNum)) {
+                        moneyTotals[child] += cleanNum;
+                    }
+                }
             });
 
-            // Optional: Quick Delete Row action on hover/right-side could go here, 
-            // but keeping it minimal for text-entry focus. Let's add a small delete cell.
+            // Action Cell (Delete Row)
             const actionTd = document.createElement('td');
             actionTd.style.border = 'none';
             actionTd.style.backgroundColor = 'transparent';
@@ -326,100 +392,103 @@
 
             tableBody.appendChild(tr);
         });
+
+        // Build Dynamic Footer Totals Row
+        state.children.forEach(child => {
+            if (state.showMoney) {
+                const totalGradeCell = document.createElement('td');
+                totalGradeCell.style.backgroundColor = 'var(--header-bg)'; 
+                totalRow.appendChild(totalGradeCell);
+
+                const totalEarnCell = document.createElement('td');
+                // Format to 2 decimal places cleanly
+                totalEarnCell.textContent = moneyTotals[child] > 0 ? moneyTotals[child].toFixed(2) : '0.00';
+                totalRow.appendChild(totalEarnCell);
+            } else {
+                const blankCell = document.createElement('td');
+                blankCell.textContent = '-';
+                totalRow.appendChild(blankCell);
+            }
+        });
+        // Extra trailing blank item for action column layout consistency
+        totalRow.insertAdjacentHTML('beforeend', '<td style="border:none; background:transparent;"></td>');
     }
 
     function addChild() {
-        const newChildName = `Child ${state.children.length + 1}`;
-        state.children.push(newChildName);
-        state.climbs.forEach(climb => {
-            climb.data[newChildName] = { grade: '', earn: '' };
+        const name = `Child ${state.children.length + 1}`;
+        state.children.push(name);
+        state.climbs.forEach(c => c.data[name] = { grade: '', earn: '' });
+        saveState();
+        renderTable();
+    }
+
+    function renameChild(idx, newName) {
+        const old = state.children[idx];
+        if (!newName.trim() || state.children.includes(newName)) { renderTable(); return; }
+        state.children[idx] = newName;
+        state.climbs.forEach(c => {
+            if (c.data[old]) { c.data[newName] = c.data[old]; delete c.data[old]; }
         });
         saveState();
         renderTable();
     }
 
-    function renameChild(index, newName) {
-        const oldName = state.children[index];
-        if (!newName.trim() || state.children.includes(newName)) {
-            renderTable(); // Reset if blank or duplicate
-            return;
-        }
-        state.children[index] = newName;
-        state.climbs.forEach(climb => {
-            if (climb.data[oldName]) {
-                climb.data[newName] = climb.data[oldName];
-                delete climb.data[oldName];
-            }
-        });
-        saveState();
-        renderTable();
-    }
-
-    function deleteChild(index) {
-        if (confirm(`Are you sure you want to remove ${state.children[index]} and all their tracked records?`)) {
-            const childName = state.children[index];
-            state.children.splice(index, 1);
-            state.climbs.forEach(climb => {
-                delete climb.data[childName];
-            });
+    function deleteChild(idx) {
+        if (confirm(`Remove ${state.children[idx]}?`)) {
+            const name = state.children[idx];
+            state.children.splice(idx, 1);
+            state.climbs.forEach(c => delete c.data[name]);
             saveState();
             renderTable();
         }
     }
 
     function addClimbRow() {
-        const nextNum = state.climbs.length + 1;
-        const newClimb = {
-            name: `Climb ${nextNum}`,
-            data: {}
-        };
-        state.children.forEach(child => {
-            newClimb.data[child] = { grade: '', earn: '' };
-        });
+        const newClimb = { name: `Climb ${state.climbs.length + 1}`, data: {} };
+        state.children.forEach(ch => newClimb.data[ch] = { grade: '', earn: '' });
         state.climbs.push(newClimb);
         saveState();
         renderTable();
     }
 
-    function deleteRow(index) {
-        state.climbs.splice(index, 1);
+    function deleteRow(idx) {
+        state.climbs.splice(idx, 1);
         saveState();
         renderTable();
     }
 
-    // Export Functionality
     function exportData() {
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state, null, 2));
-        const downloadAnchor = document.createElement('a');
-        downloadAnchor.setAttribute("href", dataStr);
-        downloadAnchor.setAttribute("download", `climbing_tracker_${new Date().toISOString().slice(0,10)}.json`);
-        document.body.appendChild(downloadAnchor);
-        downloadAnchor.click();
-        downloadAnchor.remove();
+        const a = document.createElement('a');
+        a.setAttribute("href", dataStr);
+        a.setAttribute("download", `climbing_tracker_${new Date().toISOString().slice(0,10)}.json`);
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
     }
 
-    // Import Functionality
-    function importData(event) {
-        const fileReader = new FileReader();
-        fileReader.onload = function(e) {
+    function importData(e) {
+        const reader = new FileReader();
+        reader.onload = function(evt) {
             try {
-                const importedState = JSON.parse(e.target.result);
-                if (importedState.children && importedState.climbs) {
-                    state = importedState;
+                const imported = JSON.parse(evt.target.result);
+                if (imported.children && imported.climbs) {
+                    state = imported;
+                    // Ensure structural variables from newer versions exist
+                    if (state.theme === undefined) state.theme = "light";
+                    if (state.showMoney === undefined) state.showMoney = true;
                     saveState();
+                    applyTheme();
                     renderTable();
-                    alert("Data imported successfully!");
-                } else {
-                    alert("Invalid file format.");
-                }
-            } catch (err) {
-                alert("Error parsing file.");
-            }
+                    alert("Import successful!");
+                } else { alert("Invalid structure."); }
+            } catch (err) { alert("Error reading file."); }
         };
-        fileReader.readAsText(event.target.files[0]);
+        reader.readAsText(e.target.files[0]);
     }
 
-    // Initial Render
+    // App Initialization
+    applyTheme();
     renderTable();
 </script>
 
