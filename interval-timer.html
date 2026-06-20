@@ -52,6 +52,7 @@
         }
         .btn-icon:hover { color: #333; }
         .btn-fullscreen { right: 5px; }
+        .btn-theme { right: 49px; font-size: 20px; }
         .btn-mute { left: 5px; font-size: 20px; }
 
         /* Stack Styles */
@@ -131,12 +132,36 @@
         .sets-display { font-size: 16px; color: #666; margin-bottom: 20px; }
         .work-mode { color: #28a745; } .rest-mode { color: #ffc107; } .finished-mode { color: #007BFF; }
         #completion-options { display: none; margin-top: 20px; border-top: 1px solid #eee; padding-top: 10px; }
+
+        /* --- DARK MODE PROPERTIES --- */
+        body.dark-mode { background-color: #121212; color: #ffffff; }
+        body.dark-mode .container { background: #1e1e1e; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        body.dark-mode h2, body.dark-mode label { color: #ffffff; }
+        body.dark-mode input, body.dark-mode textarea { background-color: #2d2d2d; color: #ffffff; border-color: #444; }
+        body.dark-mode .hint, body.dark-mode .stats-bar, body.dark-mode .sets-display { color: #aaa; }
+        body.dark-mode .stats-bar { border-bottom-color: #333; }
+        body.dark-mode .stats-highlight { color: #4da3ff; }
+        body.dark-mode .exercise-stack { background: #252525; border-color: #333; }
+        body.dark-mode .pos-prev, body.dark-mode .pos-next, body.dark-mode .pos-hidden-top, body.dark-mode .pos-hidden-bot { color: #666; }
+        body.dark-mode .timer-display { color: #ffffff; }
+        body.dark-mode .progress-bar-bg { background: #333; }
+        body.dark-mode .btn-icon:hover { color: #fff; }
+        body.dark-mode .btn-color-pause { background-color: #ffca28; color: #121212; }
+        body.dark-mode .btn-color-pause:hover { background-color: #ffb300; }
+        body.dark-mode #completion-options { border-top-color: #333; }
+        body.dark-mode.pulsing { animation: pulse-red-dark 1s infinite; }
+        @keyframes pulse-red-dark {
+            0% { background-color: #121212; }
+            50% { background-color: #4c1c1c; }
+            100% { background-color: #121212; }
+        }
     </style>
 </head>
 <body>
 
     <div class="container">
         <button class="btn-icon btn-mute" id="btn-mute" onclick="toggleMute()" title="Mute Sound">🔊</button>
+        <button class="btn-icon btn-theme" id="btn-theme" onclick="toggleTheme()" title="Toggle Theme">🌙</button>
         <button class="btn-icon btn-fullscreen" onclick="safeToggleFullScreen()" title="Full Screen">⤢</button>
 
         <div id="setup-screen">
@@ -211,6 +236,7 @@
                 localStorage.setItem('workDuration', document.getElementById('workDuration').value);
                 localStorage.setItem('restDuration', document.getElementById('restDuration').value);
                 localStorage.setItem('exerciseNames', document.getElementById('exerciseNames').value);
+                localStorage.setItem('darkMode', document.body.classList.contains('dark-mode'));
             } catch(e) {}
         }
 
@@ -220,11 +246,23 @@
                 if(localStorage.getItem('workDuration')) document.getElementById('workDuration').value = localStorage.getItem('workDuration');
                 if(localStorage.getItem('restDuration')) document.getElementById('restDuration').value = localStorage.getItem('restDuration');
                 if(localStorage.getItem('exerciseNames')) document.getElementById('exerciseNames').value = localStorage.getItem('exerciseNames');
+                if(localStorage.getItem('darkMode') === 'true') {
+                    document.body.classList.add('dark-mode');
+                    document.getElementById('btn-theme').innerText = "☀️";
+                }
             } catch(e) {}
         }
         
         // Load settings immediately
         loadSettings();
+
+        // --- THEME SYSTEM ---
+        function toggleTheme() {
+            document.body.classList.toggle('dark-mode');
+            const isDark = document.body.classList.contains('dark-mode');
+            document.getElementById('btn-theme').innerText = isDark ? "☀️" : "🌙";
+            saveSettings();
+        }
 
         // --- CSV PROGRAMME EXPORT / IMPORT SYSTEM ---
         function saveProgrammeCSV() {
