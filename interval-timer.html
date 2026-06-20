@@ -2,641 +2,656 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>High-Res Expression Dataset Studio</title>
-    
-    <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/dist/face-api.js"></script>
-    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Interval Timer Pro</title>
     <style>
-        /* Pure, maximum-brightness white canvas to act as a face fill light */
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #ffffff;
-            color: #000000;
+            background-color: #f4f4f4;
             display: flex;
-            flex-direction: column;
+            justify-content: center;
             align-items: center;
-            justify-content: flex-start;
-            min-height: 100vh;
+            height: 100vh;
             margin: 0;
-            padding: 20px;
-            transition: background 0.3s ease, color 0.3s ease;
+            transition: background-color 0.2s ease;
+            overflow: hidden; 
         }
 
-        /* Floating Theme Toggle Styling */
-        .theme-toggle {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: #f1f3f4;
-            color: #333;
-            border: 1px solid #ccc;
-            padding: 8px 14px;
-            border-radius: 20px;
-            cursor: pointer;
-            font-size: 0.9rem;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            width: auto;
-            z-index: 1000;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-            transition: background 0.2s, color 0.2s;
+        @keyframes pulse-red {
+            0% { background-color: #f4f4f4; }
+            50% { background-color: #ffd1d1; }
+            100% { background-color: #f4f4f4; }
         }
-        .theme-toggle:hover {
-            opacity: 0.9;
-            background: #e8eaed;
-        }
+        .pulsing { animation: pulse-red 1s infinite; }
 
-        h1 { color: #1a73e8; margin-bottom: 5px; transition: color 0.3s; }
-        p { color: #5f6368; margin-top: 0; margin-bottom: 25px; transition: color 0.3s; }
-
-        #main-studio {
-            display: flex;
-            gap: 25px;
-            max-width: 1400px;
-            width: 100%;
-        }
-
-        .left-column {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-            flex: 3;
-        }
-
-        .right-column {
-            flex: 1;
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 15px;
-            border: 1px solid #e0e0e0;
-            display: flex;
-            flex-direction: column;
-            max-height: 640px;
-            transition: background 0.3s, border-color 0.3s;
-        }
-
-        .import-box {
-            background: #ffffff;
-            padding: 15px;
-            border-radius: 12px;
-            border: 2px dashed #1a73e8;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 15px;
-            width: 100%;
-            box-sizing: border-box;
-            transition: background 0.3s;
-        }
-
-        #trainer-container {
-            background: #ffffff;
-            padding: 25px;
-            border-radius: 15px;
-            border: 1px solid #e0e0e0;
-            box-shadow: 0 4px 24px rgba(0,0,0,0.05);
-            display: flex;
-            flex-direction: column;
-            gap: 25px;
-            transition: background 0.3s, border-color 0.3s, box-shadow 0.3s;
-        }
-
-        .view-panel {
+        .container {
             position: relative;
-            width: 100%;
-            aspect-ratio: 16 / 9;
-            background: #000;
-            border-radius: 8px;
-            overflow: hidden;
-            border: 3px solid #dcdcdc;
-            transition: border-color 0.3s;
-        }
-
-        video, #overlay-canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            transform: scaleX(-1); /* Mirror view */
-        }
-
-        #overlay-canvas {
-            z-index: 2;
-            pointer-events: none;
-        }
-
-        /* Giant visual countdown text overlay centered above video layer */
-        #countdown-overlay {
-            display: none;
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(255, 255, 255, 0.4);
-            z-index: 10;
-            align-items: center;
-            justify-content: center;
-            font-size: 6rem;
-            font-weight: bold;
-            color: #1a73e8;
-            text-shadow: 0 0 20px rgba(255,255,255,0.8);
-            pointer-events: none;
-            transition: background 0.3s, color 0.3s;
-        }
-
-        .interactive-footer {
-            display: flex;
-            gap: 20px;
-            align-items: flex-start;
-        }
-
-        .control-panel {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-
-        .input-group {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        label { font-weight: bold; color: #1a73e8; font-size: 0.95rem; transition: color 0.3s;}
-
-        input[type="text"] {
-            padding: 12px;
-            border-radius: 6px;
-            border: 1px solid #cccccc;
-            background: #ffffff;
-            color: #000;
-            font-size: 1rem;
-            transition: background 0.3s, color 0.3s, border-color 0.3s;
-        }
-
-        input[type="text"]::placeholder {
-            color: #aaa;
-        }
-
-        .btn-stack {
-            display: flex;
-            gap: 10px;
-        }
-
-        button {
-            flex: 1;
-            padding: 14px;
-            border: none;
-            border-radius: 6px;
-            font-size: 1rem;
-            font-weight: bold;
-            cursor: pointer;
-            transition: opacity 0.2s;
-        }
-
-        button:hover { opacity: 0.9; }
-        button:disabled { background: #e0e0e0; color: #999; cursor: not-allowed; }
-
-        #snap-btn { background: #d93025; color: white; }
-        #export-btn { background: #34a853; color: white; }
-
-        #log-box {
-            flex: 1;
-            background: #f1f3f4;
-            padding: 12px;
-            border-radius: 6px;
-            font-family: monospace;
-            font-size: 0.85rem;
-            height: 110px;
-            overflow-y: auto;
-            color: #333;
-            border: 1px solid #e0e0e0;
-            transition: background 0.3s, color 0.3s, border-color 0.3s;
-        }
-
-        .dataset-header {
-            margin-top: 0;
-            color: #1a73e8;
-            font-size: 1.2rem;
-            border-bottom: 1px solid #e0e0e0;
-            padding-bottom: 10px;
-            transition: color 0.3s, border-color 0.3s;
-        }
-
-        .entry-list {
-            overflow-y: auto;
-            flex: 1;
-            list-style: none;
-            padding: 0;
-            margin: 0;
-        }
-
-        .entry-item {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background: #ffffff;
-            padding: 10px 12px;
-            border-radius: 6px;
-            margin-bottom: 8px;
-            font-size: 0.9rem;
-            border-left: 4px solid #d93025;
-            border-top: 1px solid #e0e0e0;
-            border-right: 1px solid #e0e0e0;
-            border-bottom: 1px solid #e0e0e0;
-            cursor: pointer;
-            transition: background 0.3s, border-color 0.3s, color 0.3s;
-        }
-
-        .entry-item:hover { background: #f8f9fa; border-left-color: #1a73e8; }
-        .entry-meta { color: #5f6368; font-size: 0.75rem; text-align: right; transition: color 0.3s; }
-
-        #preview-modal {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; width: 100vw; height: 100vh;
-            background: rgba(255,255,255,0.95);
-            z-index: 100;
-            align-items: center;
-            justify-content: center;
-            transition: background 0.3s;
-        }
-
-        .modal-content {
-            background: #ffffff;
-            padding: 20px;
-            border-radius: 12px;
-            border: 2px solid #1a73e8;
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
             text-align: center;
-            position: relative;
-            max-width: 900px;
-            width: 95%;
-            box-shadow: 0 4px 24px rgba(0,0,0,0.1);
-            transition: background 0.3s, border-color 0.3s;
+            width: 90%;
+            max-width: 340px;
+            max-height: 90vh;
+            overflow-y: auto; 
+            -webkit-overflow-scrolling: touch; 
         }
 
-        .modal-close {
+        /* Top Corner Buttons */
+        .btn-icon {
             position: absolute;
-            top: 10px; right: 15px; font-size: 1.7rem; cursor: pointer; color: #5f6368;
-            transition: color 0.3s;
+            top: 5px; 
+            width: 44px; height: 44px; 
+            padding: 0; margin: 0;
+            background: transparent; color: #ccc; 
+            font-size: 24px; line-height: 44px;
+            cursor: pointer; border: none; outline: none; 
+            -webkit-tap-highlight-color: transparent;
+            z-index: 100;
+        }
+        .btn-icon:hover { color: #333; }
+        .btn-fullscreen { right: 5px; }
+        .btn-mute { left: 5px; font-size: 20px; }
+
+        /* Stack Styles */
+        .exercise-stack {
+            position: relative;
+            background: #f9f9f9;
+            border-radius: 10px;
+            height: 140px; 
+            margin-bottom: 20px;
+            overflow: hidden; 
+            border: 1px solid #eee;
         }
 
-        #modal-image {
+        .stack-item {
+            position: absolute;
             width: 100%;
-            aspect-ratio: 16 / 9;
-            background: #f1f3f4;
-            border-radius: 6px;
-            margin-top: 10px;
-            border: 1px solid #e0e0e0;
-            object-fit: contain;
-            transition: background 0.3s, border-color 0.3s;
+            height: 40px; 
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            transition: all 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+            will-change: transform, top, opacity, color; 
+            left: 0;
         }
 
-        /* --- DARK MODE PROPERTIES --- */
-        body.dark-mode {
-            background: #121212;
-            color: #e8eaed;
+        .pos-hidden-top { top: -30px; opacity: 0; transform: scale(0.66); color: #aaa; }
+        .pos-prev { top: 15px; opacity: 0.5; color: #aaa; transform: scale(0.66); }
+        .pos-curr { 
+            top: 50px; opacity: 1; color: #28a745; 
+            transform: scale(1.2); font-size: 18px; 
+            z-index: 10; text-shadow: 0 1px 2px rgba(0,0,0,0.1);
         }
-        body.dark-mode .theme-toggle {
-            background: #2d2d2d;
-            color: #e8eaed;
-            border-color: #444;
+        .pos-next { top: 85px; opacity: 0.5; color: #aaa; transform: scale(0.66); }
+        .pos-hidden-bot { top: 130px; opacity: 0; transform: scale(0.66); color: #aaa; }
+        .no-transition { transition: none !important; }
+
+        @media (min-width: 600px) and (orientation: landscape) {
+            .container { max-width: 700px; padding: 1rem; }
+            .timer-layout { display: flex; flex-direction: row; gap: 40px; margin-bottom: 20px; align-items: center;}
+            .exercise-stack { flex: 1; margin-bottom: 0 !important; height: 180px; }
+            .pos-prev { top: 25px; } .pos-curr { top: 70px; } .pos-next { top: 115px; } .pos-hidden-bot { top: 160px; }
+            .timer-area { flex: 1; }
         }
-        body.dark-mode .theme-toggle:hover {
-            background: #3c4043;
-        }
-        body.dark-mode h1 { color: #8ab4f8; }
-        body.dark-mode p { color: #9aa0a6; }
-        body.dark-mode label { color: #8ab4f8; }
-        body.dark-mode .dataset-header { color: #8ab4f8; border-color: #3c4043; }
+
+        .stats-bar { border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px; font-size: 14px; color: #666; font-weight: bold; display: flex; justify-content: space-between; margin-top: 15px;}
+        .stats-highlight { color: #007BFF; }
         
-        body.dark-mode .right-column {
-            background: #1e1e1e;
-            border-color: #3c4043;
-        }
-        body.dark-mode .import-box {
-            background: #1e1e1e;
-            border-color: #8ab4f8;
-        }
-        body.dark-mode .import-box div span {
-            color: #8ab4f8 !important;
-        }
-        body.dark-mode #trainer-container {
-            background: #1e1e1e;
-            border-color: #3c4043;
-            box-shadow: 0 4px 24px rgba(0,0,0,0.4);
-        }
-        body.dark-mode .view-panel {
-            border-color: #3c4043;
-        }
-        body.dark-mode #countdown-overlay {
-            background: rgba(0, 0, 0, 0.6);
-            color: #8ab4f8;
-            text-shadow: 0 0 20px rgba(0,0,0,0.8);
-        }
-        body.dark-mode input[type="text"] {
-            background: #2d2d2d;
-            color: #ffffff;
-            border-color: #5f6368;
-        }
-        body.dark-mode #log-box {
-            background: #202124;
-            color: #bdc1c6;
-            border-color: #3c4043;
-        }
-        body.dark-mode .entry-item {
-            background: #202124;
-            border-color: #3c4043;
-            color: #e8eaed;
-        }
-        body.dark-mode .entry-item:hover {
-            background: #2d2d2d;
-        }
-        body.dark-mode .entry-meta {
-            color: #9aa0a6;
-        }
-        body.dark-mode button:disabled {
-            background: #3c4043;
-            color: #80868b;
-        }
-        body.dark-mode #preview-modal {
-            background: rgba(0,0,0,0.85);
-        }
-        body.dark-mode .modal-content {
-            background: #1e1e1e;
-            border-color: #8ab4f8;
-        }
-        body.dark-mode .modal-content h3 {
-            color: #8ab4f8 !important;
-        }
-        body.dark-mode .modal-close {
-            color: #9aa0a6;
-        }
-        body.dark-mode #modal-image {
-            background: #202124;
-            border-color: #3c4043;
-        }
+        .progress-bar-bg { width: 100%; height: 6px; background: #eee; border-radius: 3px; margin: 15px 0 5px 0; overflow: hidden; }
+        .progress-bar-fill { height: 100%; background: #28a745; width: 0%; transition: width 0.5s ease; }
+
+        .input-group { margin-bottom: 15px; text-align: left; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; color: #333; }
+        input, textarea { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #ddd; border-radius: 5px; font-size: 16px; font-family: inherit; }
+        textarea { resize: vertical; height: 80px; }
+        .hint { font-size: 12px; color: #777; margin-top: 2px; display: block; }
+
+        button.btn-block { border: none; padding: 12px 20px; font-size: 16px; border-radius: 5px; cursor: pointer; width: 100%; margin-top: 10px; transition: background 0.2s; color: white; -webkit-tap-highlight-color: transparent; }
+        .btn-primary { background-color: #007BFF; } .btn-primary:hover { background-color: #0056b3; }
+        .btn-danger { background-color: #dc3545; margin-top: 15px; } .btn-danger:hover { background-color: #a71d2a; }
+        .btn-success { background-color: #28a745; font-weight: bold; font-size: 18px; padding: 15px; } .btn-success:hover { background-color: #218838; }
+
+        .btn-control-row { display: flex; gap: 10px; margin-top: 20px; }
+        .btn-control-row button { margin-top: 0; height: 50px; }
+        .btn-main-action { background-color: #28a745; color: white; font-weight: bold; flex-basis: 65%; } .btn-main-action:hover { background-color: #218838; }
+        .btn-color-pause { background-color: #ffc107; color: #333; flex-basis: 65%; } .btn-color-pause:hover { background-color: #e0a800; }
+        .btn-stop-small { background-color: #6c757d; color: white; flex-basis: 35%; }
+
+        /* Shared Menu / Row Layout Rules */
+        .btn-menu-row { display: flex; gap: 10px; margin-top: 10px; }
+        .btn-menu-row button { margin-top: 0; font-size: 15px; padding: 12px; background-color: #6c757d; }
+        .btn-menu-row button:hover { background-color: #5a6268; }
+
+        #timer-screen { display: none; }
+        .status-label { font-size: 24px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 5px; }
+        .timer-display { font-size: 80px; font-weight: bold; color: #333; line-height: 1; margin: 10px 0; }
+        .sets-display { font-size: 16px; color: #666; margin-bottom: 20px; }
+        .work-mode { color: #28a745; } .rest-mode { color: #ffc107; } .finished-mode { color: #007BFF; }
+        #completion-options { display: none; margin-top: 20px; border-top: 1px solid #eee; padding-top: 10px; }
     </style>
 </head>
 <body>
 
-    <!-- Floating Theme Controller -->
-    <button id="theme-toggle" class="theme-toggle">🌙 Dark Mode</button>
+    <div class="container">
+        <button class="btn-icon btn-mute" id="btn-mute" onclick="toggleMute()" title="Mute Sound">🔊</button>
+        <button class="btn-icon btn-fullscreen" onclick="safeToggleFullScreen()" title="Full Screen">⤢</button>
 
-    <h1>High-Res Expression Dataset Studio</h1>
-    <p>Capturing structural facial layouts matching modern high-fidelity inputs.</p>
+        <div id="setup-screen">
+            <h2>Setup Workout</h2>
+            <div class="input-group">
+                <label>Number of Intervals</label>
+                <input type="number" id="numIntervals" value="5" min="1">
+            </div>
+            <div class="input-group">
+                <label>Work Duration (seconds)</label>
+                <input type="number" id="workDuration" value="30" min="1">
+            </div>
+            <div class="input-group">
+                <label>Rest Duration (seconds)</label>
+                <input type="number" id="restDuration" value="10" min="0">
+            </div>
+            <div class="input-group">
+                <label>Exercise Names (Optional)</label>
+                <span class="hint">Separate with commas or new lines.</span>
+                <textarea id="exerciseNames" placeholder="Pushups, Situps, Squats..."></textarea>
+            </div>
+            <button class="btn-block btn-primary" onclick="setupReadyScreen()">Start Workout</button>
+            
+            <div class="btn-menu-row">
+                <button class="btn-block" onclick="triggerCSVLoad()">Load Programme</button>
+                <button class="btn-block" onclick="saveProgrammeCSV()">Save Programme</button>
+            </div>
+            <input type="file" id="csv-file-input" accept=".csv" style="display:none;" onchange="handleCSVLoad(this)">
+        </div>
 
-    <div id="main-studio">
-        
-        <div class="left-column">
-            <div class="import-box">
-                <div>
-                    <label style="display:block; margin-bottom:5px;">Load Existing File:</label>
-                    <input type="file" id="file-loader" accept=".json">
-                </div>
-                <div style="text-align: right; color: #5f6368; font-size: 0.85rem;">
-                    Total Set Size: <span id="file-count" style="color: #1a73e8; font-weight: bold;">0</span>
-                </div>
+        <div id="timer-screen">
+            <div class="stats-bar">
+                <span>Total Sets Completed:</span>
+                <span id="total-sets-count" class="stats-highlight">0</span>
             </div>
 
-            <div id="trainer-container">
-                <div class="view-panel">
-                    <video id="webcam" autoplay muted playsinline></video>
-                    <canvas id="overlay-canvas"></canvas>
-                    
-                    <div id="countdown-overlay">2</div>
+            <div class="timer-layout">
+                <div class="exercise-stack">
+                    <div id="slot-1" class="stack-item pos-prev">-</div>
+                    <div id="slot-2" class="stack-item pos-curr">Interval 1</div>
+                    <div id="slot-3" class="stack-item pos-next">Interval 2</div>
+                    <div id="slot-4" class="stack-item pos-hidden-bot">Buffer</div>
                 </div>
 
-                <div class="interactive-footer">
-                    <div class="control-panel">
-                        <div class="input-group">
-                            <label for="expression-label">Expression Key/Label:</label>
-                            <input type="text" id="expression-label" placeholder="e.g. angry_cat, smile_huge">
-                        </div>
-
-                        <div class="btn-stack">
-                            <button id="snap-btn" disabled>Add High-Res Frame</button>
-                            <button id="export-btn" disabled>Export Dataset (.json)</button>
-                        </div>
+                <div class="timer-area">
+                    <div id="status-label" class="status-label">Get Ready</div>
+                    <div id="time-display" class="timer-display">00</div>
+                    <div class="progress-bar-bg">
+                        <div id="progress-fill" class="progress-bar-fill"></div>
                     </div>
-                    
-                    <div id="log-box">System booting...</div>
+                    <div id="sets-display" class="sets-display">Interval 1 / 5</div>
                 </div>
             </div>
-        </div>
+            
+            <div id="active-controls" class="btn-control-row">
+                <button id="main-btn" class="btn-block btn-main-action" onclick="handleMainButton()">Start</button>
+                <button class="btn-block btn-stop-small" onclick="resetToMenu()">Stop</button>
+            </div>
 
-        <div class="right-column">
-            <h3 class="dataset-header">Current Library Entries</h3>
-            <ul class="entry-list" id="ui-entry-list"></ul>
-        </div>
-
-    </div>
-
-    <div id="preview-modal">
-        <div class="modal-content">
-            <span class="modal-close" id="close-modal-btn">&times;</span>
-            <h3 id="modal-title" style="margin: 0; color: #1a73e8;">Matrix Blueprint</h3>
-            <img id="modal-image" src="" alt="Skeletal Face Blueprint">
+            <div id="completion-options">
+                <button class="btn-block btn-success" onclick="setupReadyScreen()">Start Next Set</button>
+                <button class="btn-block btn-danger" onclick="resetToMenu()">New Workout</button>
+            </div>
         </div>
     </div>
 
     <script>
-        const video = document.getElementById('webcam');
-const canvas = document.getElementById('overlay-canvas');
-const snapBtn = document.getElementById('snap-btn');
-const exportBtn = document.getElementById('export-btn');
-const logBox = document.getElementById('log-box');
-const labelInput = document.getElementById('expression-label');
-const fileLoader = document.getElementById('file-loader');
-const fileCountSpan = document.getElementById('file-count');
-const uiEntryList = document.getElementById('ui-entry-list');
-const countdownOverlay = document.getElementById('countdown-overlay');
-
-const modal = document.getElementById('preview-modal');
-const modalTitle = document.getElementById('modal-title');
-const modalImg = document.getElementById('modal-image');
-const closeModalBtn = document.getElementById('close-modal-btn');
-const themeToggle = document.getElementById('theme-toggle');
-
-let latestDetection = null;
-let datasetSessionMemory = [];
-
-// Theme Switching Routine
-themeToggle.addEventListener('click', () => {
-    document.body.classList.toggle('dark-mode');
-    const isActiveDark = document.body.classList.contains('dark-mode');
-    themeToggle.innerHTML = isActiveDark ? '☀️ Light Mode' : '🌙 Dark Mode';
-});
-
-function log(msg) {
-    logBox.innerHTML += `<div>[${new Date().toLocaleTimeString()}] ${msg}</div>`;
-    logBox.scrollTop = logBox.scrollHeight;
-}
-
-async function init() {
-    const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
-    try {
-        log("Downloading advanced tracking engines...");
-        await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
-        await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
-        log("Engines ready. Booting mobile-optimized stream...");
-        startVideo();
-    } catch (err) {
-        log(`Init Error: ${err.message}`);
-    }
-}
-
-function startVideo() {
-    navigator.mediaDevices.getUserMedia({ 
-        video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" } 
-    })
-    .then(stream => {
-        video.srcObject = stream;
-        video.onloadedmetadata = () => {
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            snapBtn.disabled = false;
-            processWireframeLoop();
-        };
-    })
-    .catch(err => log(`Webcam Connection Error: ${err.message}`));
-}
-
-async function processWireframeLoop() {
-    if (video.paused || video.ended) return;
-
-    const trackingOptions = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });
-    const detection = await faceapi.detectSingleFace(video, trackingOptions).withFaceLandmarks();
-    
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    if (detection) {
-        // 1. Read the actual CSS layout dimensions of the video box on screen
-        const displaySize = { 
-            width: video.offsetWidth, 
-            height: video.offsetHeight 
-        };
-
-        // 2. Force the drawing canvas properties to match the visual box exactly
-        if (canvas.width !== displaySize.width || canvas.height !== displaySize.height) {
-            canvas.width = displaySize.width;
-            canvas.height = displaySize.height;
+        // --- SETTINGS PERSISTENCE ---
+        function saveSettings() {
+            try {
+                localStorage.setItem('numIntervals', document.getElementById('numIntervals').value);
+                localStorage.setItem('workDuration', document.getElementById('workDuration').value);
+                localStorage.setItem('restDuration', document.getElementById('restDuration').value);
+                localStorage.setItem('exerciseNames', document.getElementById('exerciseNames').value);
+            } catch(e) {}
         }
 
-        // 3. Scale and display the skeletal map onto the updated portrait/landscape space
-        const resizedResults = faceapi.resizeResults(detection, displaySize);
-        latestDetection = resizedResults;
-        faceapi.draw.drawFaceLandmarks(canvas, resizedResults);
-    } else {
-        latestDetection = null;
-    }
+        function loadSettings() {
+            try {
+                if(localStorage.getItem('numIntervals')) document.getElementById('numIntervals').value = localStorage.getItem('numIntervals');
+                if(localStorage.getItem('workDuration')) document.getElementById('workDuration').value = localStorage.getItem('workDuration');
+                if(localStorage.getItem('restDuration')) document.getElementById('restDuration').value = localStorage.getItem('restDuration');
+                if(localStorage.getItem('exerciseNames')) document.getElementById('exerciseNames').value = localStorage.getItem('exerciseNames');
+            } catch(e) {}
+        }
+        
+        // Load settings immediately
+        loadSettings();
 
-    requestAnimationFrame(processWireframeLoop);
-}
-
-function refreshDatasetUI() {
-    uiEntryList.innerHTML = '';
-    fileCountSpan.innerText = datasetSessionMemory.length;
-    if (datasetSessionMemory.length > 0) exportBtn.disabled = false;
-
-    datasetSessionMemory.forEach((item, index) => {
-        const li = document.createElement('li');
-        li.className = 'entry-item';
-        li.innerHTML = `<div><strong>${item.expressionLabel}</strong></div><div class="entry-meta">Normalized Map</div>`;
-        li.addEventListener('click', () => showWireframePreview(index));
-        uiEntryList.insertBefore(li, uiEntryList.firstChild);
-    });
-}
-
-function showWireframePreview(index) {
-    const targetRecord = datasetSessionMemory[index];
-    if (targetRecord) {
-        modalTitle.innerText = `Normalized Template: "${targetRecord.expressionLabel}"`;
-        modalImg.src = targetRecord.wireframeVisual || "";
-        modal.style.display = "flex";
-    }
-}
-
-closeModalBtn.addEventListener('click', () => modal.style.display = "none");
-
-fileLoader.addEventListener('change', (event) => {
-    const selectedFile = event.target.files[0];
-    if (!selectedFile) return;
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        try {
-            const parsedData = JSON.parse(e.target.result);
-            if (Array.isArray(parsedData)) {
-                datasetSessionMemory = datasetSessionMemory.concat(parsedData);
-                refreshDatasetUI();
+        // --- CSV PROGRAMME EXPORT / IMPORT SYSTEM ---
+        function saveProgrammeCSV() {
+            const numIntervals = document.getElementById('numIntervals').value;
+            const workDuration = document.getElementById('workDuration').value;
+            const restDuration = document.getElementById('restDuration').value;
+            const exerciseNames = document.getElementById('exerciseNames').value;
+            
+            // Standard CSV cell formatting to handle double quotes safely
+            const escapedExercises = '"' + exerciseNames.replace(/"/g, '""') + '"';
+            const csvContent = "numIntervals,workDuration,restDuration,exerciseNames\n" 
+                             + `${numIntervals},${workDuration},${restDuration},${escapedExercises}`;
+            
+            try {
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.setAttribute("href", url);
+                link.setAttribute("download", "workout_programme.csv");
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } catch (e) {
+                alert("Could not export file on this device.");
             }
-        } catch (err) { alert("JSON parse error."); }
-    };
-    reader.readAsText(selectedFile);
-});
-
-snapBtn.addEventListener('click', () => {
-    const labelValue = labelInput.value.trim().toLowerCase();
-    if (!labelValue) return alert("Please declare an expression code text label first.");
-
-    snapBtn.disabled = true;
-    let secondsRemaining = 2;
-    countdownOverlay.innerText = secondsRemaining;
-    countdownOverlay.style.display = "flex";
-
-    const timerInterval = setInterval(() => {
-        secondsRemaining--;
-        if (secondsRemaining > 0) {
-            countdownOverlay.innerText = secondsRemaining;
-        } else {
-            clearInterval(timerInterval);
-            countdownOverlay.style.display = "none";
-            executeActualCapture(labelValue);
-            snapBtn.disabled = false;
         }
-    }, 1000);
-});
 
-function executeActualCapture(labelValue) {
-    if (!latestDetection) return alert("Face track dropped! Try holding steadier.");
+        function triggerCSVLoad() {
+            document.getElementById('csv-file-input').click();
+        }
 
-    const box = latestDetection.detection.box;
-    const rawPoints = latestDetection.landmarks.positions;
+        function handleCSVLoad(input) {
+            const file = input.files[0];
+            if (!file) return;
 
-    // Convert absolute pixel values into relative percentages inside the face box
-    const normalizedPoints = rawPoints.map(p => ({
-        x: (p.x - box.x) / box.width,
-        y: (p.y - box.y) / box.height
-    }));
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                parseCSVAndPopulate(e.target.result);
+                input.value = ''; // Flush variable target
+            };
+            reader.readAsText(file);
+        }
 
-    const trainingFrame = {
-        expressionLabel: labelValue,
-        landmarksCoordinates: normalizedPoints,
-        wireframeVisual: canvas.toDataURL('image/png'),
-        capturedAt: new Date().toISOString()
-    };
+        function parseCSVAndPopulate(text) {
+            const lines = [];
+            let row = [];
+            let inQuotes = false;
+            let currentField = '';
 
-    datasetSessionMemory.push(trainingFrame);
-    log(`Logged normalized snapshot for "${labelValue}"`);
-    refreshDatasetUI();
-}
+            for (let i = 0; i < text.length; i++) {
+                const char = text[i];
+                const nextChar = text[i+1];
 
-exportBtn.addEventListener('click', () => {
-    if (datasetSessionMemory.length === 0) return;
-    const dataBlob = new Blob([JSON.stringify(datasetSessionMemory, null, 2)], { type: 'application/json' });
-    const dummyLink = document.createElement('a');
-    dummyLink.href = URL.createObjectURL(dataBlob);
-    dummyLink.download = `normalized_expression_dataset.json`;
-    document.body.appendChild(dummyLink);
-    dummyLink.click();
-    document.body.removeChild(dummyLink);
-});
+                if (inQuotes) {
+                    if (char === '"') {
+                        if (nextChar === '"') {
+                            currentField += '"';
+                            i++; 
+                        } else {
+                            inQuotes = false;
+                        }
+                    } else {
+                        currentField += char;
+                    }
+                } else {
+                    if (char === '"') {
+                        inQuotes = true;
+                    } else if (char === ',') {
+                        row.push(currentField);
+                        currentField = '';
+                    } else if (char === '\n' || char === '\r') {
+                        if (char === '\r' && nextChar === '\n') i++; 
+                        row.push(currentField);
+                        lines.push(row);
+                        row = [];
+                        currentField = '';
+                    } else {
+                        currentField += char;
+                    }
+                }
+            }
+            if (currentField || row.length > 0) {
+                row.push(currentField);
+                lines.push(row);
+            }
 
-init();
+            if (lines.length < 2) {
+                alert("Invalid or incomplete profile structure.");
+                return;
+            }
+
+            const headers = lines[0].map(h => h.trim());
+            const data = lines[1];
+
+            const numIdx = headers.indexOf('numIntervals');
+            const workIdx = headers.indexOf('workDuration');
+            const restIdx = headers.indexOf('restDuration');
+            const exIdx = headers.indexOf('exerciseNames');
+
+            if (numIdx !== -1 && data[numIdx]) document.getElementById('numIntervals').value = data[numIdx];
+            if (workIdx !== -1 && data[workIdx]) document.getElementById('workDuration').value = data[workIdx];
+            if (restIdx !== -1 && data[restIdx]) document.getElementById('restDuration').value = data[restIdx];
+            if (exIdx !== -1 && data[exIdx] !== undefined) document.getElementById('exerciseNames').value = data[exIdx];
+
+            saveSettings(); 
+        }
+
+        // --- WAKE LOCK (KEEP SCREEN ON) ---
+        let wakeLock = null;
+        async function requestWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                }
+            } catch (err) { console.log("Wake Lock error:", err); }
+        }
+        async function releaseWakeLock() {
+            if (wakeLock !== null) {
+                await wakeLock.release();
+                wakeLock = null;
+            }
+        }
+
+        // --- AUDIO SYSTEM & MUTE ---
+        let audioCtx = null;
+        let isMuted = false;
+
+        function toggleMute() {
+            isMuted = !isMuted;
+            document.getElementById('btn-mute').innerText = isMuted ? "🔇" : "🔊";
+        }
+
+        function safeInitAudio() {
+            try {
+                if (!audioCtx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    if (AudioContext) audioCtx = new AudioContext();
+                }
+                if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+            } catch (e) { console.log("Audio init failed"); }
+        }
+
+        function playBeep(type) {
+            if (isMuted) return;
+            try {
+                if (!audioCtx) return;
+                
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                const vol = 0.5;
+
+                if (type === 'work') { osc.frequency.value = 880; gain.gain.value = vol; osc.type = 'sine'; }
+                else if (type === 'rest') { osc.frequency.value = 440; gain.gain.value = vol; osc.type = 'sine'; }
+                else if (type === 'warning') { 
+                    osc.frequency.value = 600; gain.gain.value = 0.3; osc.type = 'triangle';
+                    osc.start(); osc.stop(audioCtx.currentTime + 0.1); return; 
+                }
+                else { 
+                    osc.frequency.value = 500; gain.gain.value = vol; osc.type = 'square';
+                    osc.start(); osc.stop(audioCtx.currentTime + 1.0); return; 
+                }
+                osc.start(); osc.stop(audioCtx.currentTime + 0.5);
+            } catch (e) {}
+        }
+
+        function safeToggleFullScreen() {
+            try {
+                const doc = window.document;
+                const docEl = doc.documentElement;
+                const requestFullScreen = docEl.requestFullscreen || docEl.mozRequestFullScreen || docEl.webkitRequestFullScreen || docEl.msRequestFullscreen;
+                const cancelFullScreen = doc.exitFullscreen || doc.mozCancelFullScreen || doc.webkitExitFullscreen || doc.msExitFullscreen;
+                const isFullScreen = doc.fullscreenElement || doc.mozFullScreenElement || doc.webkitFullscreenElement || doc.msFullscreenElement;
+
+                if (!isFullScreen) { if(requestFullScreen) requestFullScreen.call(docEl); } 
+                else { if(cancelFullScreen) cancelFullScreen.call(doc); }
+            } catch(e) {}
+        }
+
+        // --- APP LOGIC ---
+        let timerInterval;
+        let totalIntervals;
+        let workTime, restTime;
+        let currentInterval = 1;
+        let setsCompleted = 0;
+        let currentTime = 0;
+        let isWorking = true; 
+        let isPaused = false;
+        let isPreStart = true;
+        let isCountdown = false;
+        let exercises = [];
+        let slotOrder = ['slot-1', 'slot-2', 'slot-3', 'slot-4'];
+
+        function parseExerciseNames(inputStr, count) {
+            let names = inputStr.split(/[\n,]+/).map(s => s.trim()).filter(s => s.length > 0);
+            if (names.length === 0) {
+                for (let i = 1; i <= count; i++) names.push(`Interval ${i}`);
+                return names;
+            }
+            const result = [];
+            for (let i = 0; i < count; i++) result.push(names[i % names.length]);
+            return result;
+        }
+
+        function updateStack(animate = true) {
+            let valBuffer;
+            if (isWorking) {
+                if (currentInterval >= totalIntervals) valBuffer = ""; 
+                else valBuffer = exercises[currentInterval]; 
+            } else {
+                if (currentInterval + 1 >= totalIntervals && isWorking) valBuffer = "Finish Set";
+                else valBuffer = "REST";
+            }
+
+            if (!animate) {
+                slotOrder = ['slot-1', 'slot-2', 'slot-3', 'slot-4'];
+                document.getElementById(slotOrder[0]).innerText = "-";
+                document.getElementById(slotOrder[1]).innerText = exercises[0];
+                document.getElementById(slotOrder[2]).innerText = "REST";
+                document.getElementById(slotOrder[3]).innerText = exercises[1] || "";
+                assignClass(slotOrder[0], 'pos-prev');
+                assignClass(slotOrder[1], 'pos-curr');
+                assignClass(slotOrder[2], 'pos-next');
+                assignClass(slotOrder[3], 'pos-hidden-bot');
+                return;
+            }
+
+            assignClass(slotOrder[0], 'pos-hidden-top'); 
+            assignClass(slotOrder[1], 'pos-prev');       
+            assignClass(slotOrder[2], 'pos-curr');       
+            assignClass(slotOrder[3], 'pos-next');       
+
+            const recycledItem = slotOrder.shift(); 
+            slotOrder.push(recycledItem); 
+
+            document.getElementById(recycledItem).innerText = valBuffer;
+
+            setTimeout(() => {
+                const el = document.getElementById(recycledItem);
+                el.classList.add('no-transition');
+                el.className = 'stack-item pos-hidden-bot no-transition';
+                void el.offsetWidth; 
+                el.classList.remove('no-transition');
+            }, 500);
+        }
+
+        function assignClass(id, className) {
+            const el = document.getElementById(id);
+            if(el) el.className = `stack-item ${className}`;
+        }
+
+        function setupReadyScreen() {
+            safeInitAudio(); 
+            requestWakeLock(); 
+            saveSettings(); 
+
+            totalIntervals = parseInt(document.getElementById('numIntervals').value) || 5;
+            workTime = parseInt(document.getElementById('workDuration').value) || 30;
+            restTime = parseInt(document.getElementById('restDuration').value) || 10;
+            exercises = parseExerciseNames(document.getElementById('exerciseNames').value, totalIntervals);
+
+            document.getElementById('setup-screen').style.display = 'none';
+            document.getElementById('timer-screen').style.display = 'block';
+            document.getElementById('completion-options').style.display = 'none';
+            document.getElementById('active-controls').style.display = 'flex';
+            document.getElementById('progress-fill').style.width = '0%';
+
+            currentInterval = 1;
+            isWorking = true;
+            isPaused = false;
+            isPreStart = true;
+            isCountdown = false;
+            currentTime = 5; 
+
+            updateStack(false); 
+            document.getElementById('sets-display').innerText = `Interval 1 / ${totalIntervals}`;
+            document.getElementById('status-label').innerText = "Get Ready";
+            document.getElementById('status-label').className = "status-label"; 
+            
+            updateTimeDisplay();
+            updateMainButton();
+        }
+
+        function handleMainButton() {
+            safeInitAudio();
+
+            if (isPreStart) {
+                isPreStart = false;
+                isCountdown = true;
+                updateMainButton(); 
+                runTimer();
+            } else {
+                isPaused = !isPaused;
+                updateMainButton();
+                if (isPaused) document.body.classList.remove('pulsing');
+            }
+        }
+
+        function updateMainButton() {
+            const btn = document.getElementById('main-btn');
+            btn.classList.remove('btn-main-action', 'btn-color-pause');
+
+            if (isPreStart) {
+                btn.innerText = "Start";
+                btn.classList.add('btn-main-action');
+            } else if (isPaused) {
+                btn.innerText = "Resume";
+                btn.classList.add('btn-main-action');
+            } else {
+                btn.innerText = "Pause";
+                btn.classList.add('btn-color-pause');
+            }
+        }
+
+        function runTimer() {
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                if (isPaused) return;
+
+                currentTime--;
+                updateTimeDisplay();
+
+                if (isCountdown) {
+                    document.body.classList.add('pulsing');
+                    if (currentTime > 0) playBeep('warning');
+                    
+                    if (currentTime < 0) {
+                        isCountdown = false;
+                        document.body.classList.remove('pulsing');
+                        startFirstInterval();
+                    }
+                } else {
+                    if (currentTime < 0) {
+                        switchPhase();
+                    } else {
+                        if (currentTime <= 5 && currentTime > 0) {
+                            document.body.classList.add('pulsing');
+                            playBeep('warning');
+                        } else {
+                            document.body.classList.remove('pulsing');
+                        }
+                    }
+                }
+            }, 1000);
+        }
+
+        function startFirstInterval() {
+            isWorking = true;
+            currentTime = workTime;
+            const statusLabel = document.getElementById('status-label');
+            statusLabel.innerText = "WORK";
+            statusLabel.className = "status-label work-mode";
+            playBeep('work');
+            updateTimeDisplay();
+        }
+
+        function switchPhase() {
+            document.body.classList.remove('pulsing');
+            let progressPct = (currentInterval / totalIntervals) * 100;
+
+            if (isWorking) {
+                if (currentInterval === totalIntervals) { finishSet(); return; }
+                isWorking = false;
+                currentTime = restTime;
+                
+                const statusLabel = document.getElementById('status-label');
+                statusLabel.innerText = "REST";
+                statusLabel.className = "status-label rest-mode";
+                
+                playBeep('rest');
+                updateStack(true); 
+                updateTimeDisplay();
+                document.getElementById('progress-fill').style.width = `${progressPct - (50/totalIntervals)}%`;
+            } else {
+                isWorking = true;
+                currentInterval++;
+                currentTime = workTime;
+                
+                const statusLabel = document.getElementById('status-label');
+                statusLabel.innerText = "WORK";
+                statusLabel.className = "status-label work-mode";
+                
+                document.getElementById('sets-display').innerText = `Interval ${currentInterval} / ${totalIntervals}`;
+                playBeep('work');
+                updateStack(true); 
+                updateTimeDisplay();
+                document.getElementById('progress-fill').style.width = `${(currentInterval-1)/totalIntervals * 100}%`;
+            }
+        }
+
+        function updateTimeDisplay() {
+            let displayTime = currentTime < 10 ? "0" + currentTime : currentTime;
+            document.getElementById('time-display').innerText = displayTime;
+        }
+
+        function finishSet() {
+            clearInterval(timerInterval);
+            releaseWakeLock(); 
+            document.body.classList.remove('pulsing');
+            setsCompleted++;
+            document.getElementById('total-sets-count').innerText = setsCompleted;
+            document.getElementById('progress-fill').style.width = `100%`;
+
+            const statusLabel = document.getElementById('status-label');
+            statusLabel.innerText = "SET COMPLETE!";
+            statusLabel.className = "status-label finished-mode";
+            
+            document.getElementById(slotOrder[1]).innerText = "-"; 
+            document.getElementById(slotOrder[2]).innerText = "Good Job!"; 
+            document.getElementById(slotOrder[3]).innerText = "-"; 
+
+            document.getElementById('time-display').innerText = "00";
+            document.getElementById('active-controls').style.display = 'none';
+            document.getElementById('completion-options').style.display = 'block';
+            
+            playBeep('finish');
+        }
+
+        function resetToMenu() {
+            clearInterval(timerInterval);
+            releaseWakeLock(); 
+            document.body.classList.remove('pulsing');
+            document.getElementById('timer-screen').style.display = 'none';
+            document.getElementById('setup-screen').style.display = 'block';
+        }
     </script>
 </body>
 </html>
