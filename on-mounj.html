@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,8 +13,29 @@
             --danger: #ff3b30;
             --bg-body: #f4f4f9;
             --bg-card: #ffffff;
+            --input-bg: #ffffff;
             --text-main: #333333;
+            --text-muted: #555555;
             --border-color: #e5e5ea;
+            --table-header-bg: #f8f9fa;
+            --mobile-card-bg: #ffffff;
+            --mobile-card-sub-bg: #f8f9fa;
+            --taper-row-bg: #fffde6;
+            --taken-row-bg: #fafafa;
+        }
+
+        [data-theme="dark"] {
+            --bg-body: #121212;
+            --bg-card: #1c1c1e;
+            --input-bg: #2c2c2e;
+            --text-main: #f2f2f7;
+            --text-muted: #aeaeae;
+            --border-color: #3a3a3c;
+            --table-header-bg: #2c2c2e;
+            --mobile-card-bg: #1c1c1e;
+            --mobile-card-sub-bg: #2c2c2e;
+            --taper-row-bg: #3a3822;
+            --taken-row-bg: #242426;
         }
 
         body { 
@@ -26,6 +47,40 @@
             color: var(--text-main); 
             line-height: 1.4; 
             -webkit-font-smoothing: antialiased;
+            position: relative;
+        }
+
+        /* Top Bar Header & Theme Toggle Container */
+        .header-container {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            margin-bottom: 12px;
+            padding-right: 4px;
+        }
+
+        .theme-toggle-btn {
+            background: none;
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            margin: 0;
+            padding: 0;
+            transition: background-color 0.15s, transform 0.1s ease;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .theme-toggle-btn:hover {
+            background-color: var(--table-header-bg);
+        }
+        .theme-toggle-btn:active {
+            transform: scale(0.95);
         }
 
         /* Responsive Grid System */
@@ -57,7 +112,7 @@
         h2, h3 { 
             margin-top: 0; 
             margin-bottom: 12px;
-            color: #111; 
+            color: var(--text-main); 
             border-bottom: 2px solid var(--bg-body); 
             padding-bottom: 8px; 
             font-size: 1.2rem;
@@ -68,18 +123,23 @@
             font-size: 0.85rem; 
             display: block; 
             margin-top: 10px; 
-            color: #555;
+            color: var(--text-muted);
         }
 
-        /* Form Controls optimized for desktop hover & mobile touch targets */
+        /* Form Controls */
         input, select, button { 
             width: 100%; 
             padding: 12px; 
             margin: 4px 0 10px 0; 
             border-radius: 8px; 
-            border: 1px solid #ccc; 
+            border: 1px solid var(--border-color); 
             box-sizing: border-box; 
             font-size: 1rem; 
+        }
+
+        input[type="text"], input[type="number"], input[type="date"], select {
+            background-color: var(--input-bg);
+            color: var(--text-main);
         }
         
         select {
@@ -88,6 +148,11 @@
             background-position: right 12px center;
             background-size: 10px 6px;
             padding-right: 30px;
+            appearance: none;
+            -webkit-appearance: none;
+        }
+        [data-theme="dark"] select {
+            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='%23aaa' d='M0 0l5 5 5-5z'/></svg>");
         }
 
         button { 
@@ -120,11 +185,11 @@
             text-align: left; 
             vertical-align: middle; 
         }
-        th { background-color: #f8f9fa; font-weight: 600; color: #444; }
+        th { background-color: var(--table-header-bg); font-weight: 600; color: var(--text-muted); }
         
         /* Mobile Stacked Card View Styling */
         .mobile-row-card {
-            background: #f8f9fa;
+            background: var(--mobile-card-bg);
             border: 1px solid var(--border-color);
             border-radius: 10px;
             padding: 14px;
@@ -144,11 +209,11 @@
         }
 
         /* Shared States & Classes */
-        .taper-row, .mobile-row-card.taper-style { background-color: #fffde6; }
+        .taper-row, .mobile-row-card.taper-style { background-color: var(--taper-row-bg); }
         
-        .roadmap-row:hover { background-color: #f0f4f9; }
+        .roadmap-row:hover { background-color: var(--table-header-bg); }
         
-        .taken-row, .mobile-row-card.taken-style { background-color: #fafafa !important; color: #bbb !important; opacity: 0.5; text-decoration: line-through; }
+        .taken-row, .mobile-row-card.taken-style { background-color: var(--taken-row-bg) !important; color: #bbb !important; opacity: 0.5; text-decoration: line-through; }
         .taken-row b, .taken-row span, .taken-row td, .mobile-row-card.taken-style * { color: #bbb !important; }
         
         .error { 
@@ -198,25 +263,36 @@
             font-size: 0.85rem; 
         }
         
-        .small-text { color: #666; font-size: 0.8rem; margin-top: -6px; margin-bottom: 10px; }
+        .small-text { color: var(--text-muted); font-size: 0.8rem; margin-top: -6px; margin-bottom: 10px; }
         
         .chip-container { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
         .chip { 
-            background: #e5e5ea; 
+            background: var(--border-color); 
             padding: 8px 14px; 
             border-radius: 20px; 
             font-size: 0.82rem; 
             font-weight: 600; 
             cursor: pointer; 
             user-select: none; 
-            color: #333;
+            color: var(--text-main);
         }
         
         .inline-check { width: 18px; height: 18px; margin: 0; cursor: pointer; vertical-align: middle; }
-        .table-input { margin: 0; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.9rem; width: 100%; font-weight: 600; box-sizing: border-box; }
+        .table-input { margin: 0; padding: 8px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; width: 100%; font-weight: 600; box-sizing: border-box; background-color: var(--input-bg); color: var(--text-main); }
     </style>
+    <script>
+        // Run immediately to establish correct theme framework state before layout paint
+        (function() {
+            const savedTheme = localStorage.getItem('mounjaro_theme') || 'light';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        })();
+    </script>
 </head>
 <body>
+
+<div class="header-container">
+    <button id="themeToggle" class="theme-toggle-btn" onclick="toggleTheme()" title="Toggle Theme">🌙</button>
+</div>
 
 <div class="grid">
     <div>
@@ -271,7 +347,7 @@
                 <span class="chip" onclick="setInsightClicks(15)">15 clks</span>
                 <span class="chip" onclick="setInsightClicks(30)">30 clks</span>
                 <span class="chip" onclick="setInsightClicks(45)">45 clks</span>
-                <span class="chip" onclick="setInsightClicks(60)">60 clks (Standard Full)</span>
+                <span class="chip" onclick="setInsightClicks(60 holiday-chip)">60 clks (Standard Full)</span>
             </div>
             
             <div id="insightsContainer"></div>
@@ -325,6 +401,11 @@ let currentSchedule = [];
 let takenDoses = {}; 
 
 window.onload = function() {
+    // Synchronize UI elements with the theme established early in runtime head block
+    const activeTheme = document.documentElement.getAttribute('data-theme') || 'light';
+    const btn = document.getElementById('themeToggle');
+    if (btn) btn.innerHTML = activeTheme === 'dark' ? '☀️' : '🌙';
+
     const savedInv = localStorage.getItem('mounjaro_inventory_v6');
     if (savedInv) {
         inventory = JSON.parse(savedInv);
@@ -361,6 +442,17 @@ window.onload = function() {
         calculateSchedule();
     }
 };
+
+function toggleTheme() {
+    const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+    const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+    
+    document.documentElement.setAttribute('data-theme', newTheme);
+    localStorage.setItem('mounjaro_theme', newTheme);
+    
+    const btn = document.getElementById('themeToggle');
+    if (btn) btn.innerHTML = newTheme === 'dark' ? '☀️' : '🌙';
+}
 
 function saveInputs() {
     const data = {
@@ -529,7 +621,7 @@ function renderInventory() {
         </tr>`;
 
         // Build Mobile Fluid Cards
-        mobileHtml += `<div class="mobile-row-card" style="background:#ffffff; border: 1px solid var(--border-color)" onclick="event.stopPropagation();">
+        mobileHtml += `<div class="mobile-row-card" onclick="event.stopPropagation();">
             <div style="margin-bottom: 8px;">
                 <label style="margin:0 0 4px 0;">Nickname / Label</label>
                 <input type="text" class="table-input" value="${item.nickname}" onchange="renamePen('${item.id}', this.value)">
@@ -542,7 +634,7 @@ function renderInventory() {
                 <label style="margin:0 0 4px 0;">Pen Price (£)</label>
                 <input type="number" class="table-input" value="${item.price || ''}" placeholder="0.00" step="0.01" onchange="updatePenPriceInTable('${item.id}', this.value)">
             </div>
-            <div style="display:flex; justify-content:space-between; align-items:center; background:#f8f9fa; padding:8px; border-radius:6px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; background:var(--mobile-card-sub-bg); padding:8px; border-radius:6px;">
                 <label style="margin:0; display:flex; align-items:center; gap:6px; cursor:pointer;">
                     <input type="checkbox" class="inline-check" ${checkedStr} onchange="toggleGoldenDose('${item.id}')">
                     <span style="font-size:0.8rem; font-weight:600; color:#34c759;">Syringe Extra (+60)</span>
@@ -559,7 +651,7 @@ function renderInventory() {
         html += `<tr><td colspan="7" style="text-align:center; color:#888; padding:20px;">Fridge is empty.</td></tr>`;
         mobileHtml += `<p style="text-align:center; color:#888; padding:10px; font-style:italic;">Fridge is empty.</p>`;
     } else {
-        html += `<tr style="background:#f8f9fa; font-weight:bold;"><td colspan="3">Total Pile Capacity</td><td>£${totalCost.toFixed(2)}</td><td></td><td>${totalClicks} clks</td><td></td></tr>`;
+        html += `<tr style="background:var(--table-header-bg); font-weight:bold;"><td colspan="3">Total Pile Capacity</td><td>£${totalCost.toFixed(2)}</td><td></td><td>${totalClicks} clks</td><td></td></tr>`;
         mobileHtml += `<div style="background:#007aff; color:white; padding:12px; border-radius:8px; text-align:center; font-weight:bold; margin-top:10px; display:flex; justify-content:space-between;"><span>💰 Value: £${totalCost.toFixed(2)}</span><span>📦 Vol: ${totalClicks} clks</span></div>`;
     }
     
@@ -605,7 +697,7 @@ function updateLongevityInsights() {
 
     let uniquePenSizes = [...new Set(inventory.map(item => item.size))];
     
-    let html = `<div style="margin-top:10px; background:#f8f9fa; padding:12px; border-radius:8px; border-left:4px solid var(--primary); font-size:0.9rem;">`;
+    let html = `<div style="margin-top:10px; background:var(--mobile-card-sub-bg); padding:12px; border-radius:8px; border-left:4px solid var(--primary); font-size:0.9rem;">`;
     html += `🎯 <b>Total Lifespan:</b> Yields exactly <b>${weeksDisplay} injections</b> at <b>${targetClicks} clicks per week</b>.`;
     html += endDateHtml;
     html += `</div>`;
@@ -633,7 +725,7 @@ function toggleLinkInventory() {
             });
             totalClicksInput.value = totalClicks;
             totalClicksInput.readOnly = true;
-            totalClicksInput.style.backgroundColor = "#e5e5ea";
+            totalClicksInput.style.backgroundColor = "var(--border-color)";
         } else {
             totalClicksInput.readOnly = false;
             totalClicksInput.style.backgroundColor = "";
@@ -871,14 +963,14 @@ function renderTable(schedule) {
             <td><b>${item.clicks} clks</b></td>
             <td><b style="color:var(--primary);">${item.mg.toFixed(1)} mg</b></td>
             <td><b style="color:var(--secondary);">${costDisplay}</b></td>
-            <td style="font-size: 0.85rem; color: #444;">${item.penInfo}</td>
+            <td style="font-size: 0.85rem;">${item.penInfo}</td>
         </tr>`;
 
         // Build Mobile Card Markup
         mobileHtml += `<div id="mobile_card_dose_${index}" class="${cardClass}" onclick="toggleDoseTaken(${index})">
             <div class="mobile-card-header">
                 <div>Dose #${index + 1}</div>
-                <div style="color: #666;">${item.date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
+                <div style="color: var(--text-muted);">${item.date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; margin-bottom: 6px; font-size: 0.95rem;">
                 <div>Volume: <b>${item.clicks} clks</b></div>
@@ -887,16 +979,16 @@ function renderTable(schedule) {
             <div style="margin-bottom: 8px; font-size: 0.95rem;">
                 Cost / Dose: <b style="color:var(--secondary);">${costDisplay}</b>
             </div>
-            <div style="font-size: 0.85rem; background: rgba(0,0,0,0.02); padding: 8px; border-radius: 6px;">
-                <div style="font-weight: 600; margin-bottom: 2px; font-size: 0.75rem; color: #777;">PEN ALLOCATION DETAILS:</div>
+            <div style="font-size: 0.85rem; background: var(--mobile-card-sub-bg); padding: 8px; border-radius: 6px;">
+                <div style="font-weight: 600; margin-bottom: 2px; font-size: 0.75rem; color: var(--text-muted);">PEN ALLOCATION DETAILS:</div>
                 <div>${item.penInfo}</div>
             </div>
         </div>`;
     });
     
-    html += `<tr style="background:#f8f9fa; font-weight:bold;"><td colspan="2">Total Allocated:</td><td>${verifiedTotal} clicks</td><td></td><td>£${runningTotalCost.toFixed(2)}</td><td></td></tr></tbody></table>`;
+    html += `<tr style="background:var(--table-header-bg); font-weight:bold;"><td colspan="2">Total Allocated:</td><td>${verifiedTotal} clicks</td><td></td><td>£${runningTotalCost.toFixed(2)}</td><td></td></tr></tbody></table>`;
     
-    mobileHtml += `<div style="background:#f8f9fa; border: 1px solid var(--border-color); padding: 14px; border-radius: 8px; font-weight: bold; margin-top: 10px; display:flex; justify-content:space-between; font-size:0.95rem;"><span>📊 Vol: ${verifiedTotal} clicks</span><span style="color:var(--secondary);">💰 Total: £${runningTotalCost.toFixed(2)}</span></div></div>`;
+    mobileHtml += `<div style="background:var(--table-header-bg); border: 1px solid var(--border-color); padding: 14px; border-radius: 8px; font-weight: bold; margin-top: 10px; display:flex; justify-content:space-between; font-size:0.95rem;"><span>📊 Vol: ${verifiedTotal} clicks</span><span style="color:var(--secondary);">💰 Total: £${runningTotalCost.toFixed(2)}</span></div></div>`;
     
     document.getElementById('results').innerHTML = html + mobileHtml;
 }
