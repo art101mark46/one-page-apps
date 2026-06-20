@@ -20,10 +20,37 @@
             min-height: 100vh;
             margin: 0;
             padding: 20px;
+            transition: background 0.3s ease, color 0.3s ease;
         }
 
-        h1 { color: #1a73e8; margin-bottom: 5px; }
-        p { color: #5f6368; margin-top: 0; margin-bottom: 25px; }
+        /* Floating Theme Toggle Styling */
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #f1f3f4;
+            color: #333;
+            border: 1px solid #ccc;
+            padding: 8px 14px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            width: auto;
+            z-index: 1000;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            transition: background 0.2s, color 0.2s;
+        }
+        .theme-toggle:hover {
+            opacity: 0.9;
+            background: #e8eaed;
+        }
+
+        h1 { color: #1a73e8; margin-bottom: 5px; transition: color 0.3s; }
+        p { color: #5f6368; margin-top: 0; margin-bottom: 25px; transition: color 0.3s; }
 
         #main-studio {
             display: flex;
@@ -48,6 +75,7 @@
             display: flex;
             flex-direction: column;
             max-height: 640px;
+            transition: background 0.3s, border-color 0.3s;
         }
 
         .import-box {
@@ -61,6 +89,7 @@
             gap: 15px;
             width: 100%;
             box-sizing: border-box;
+            transition: background 0.3s;
         }
 
         #trainer-container {
@@ -72,6 +101,7 @@
             display: flex;
             flex-direction: column;
             gap: 25px;
+            transition: background 0.3s, border-color 0.3s, box-shadow 0.3s;
         }
 
         .view-panel {
@@ -82,6 +112,7 @@
             border-radius: 8px;
             overflow: hidden;
             border: 3px solid #dcdcdc;
+            transition: border-color 0.3s;
         }
 
         video, #overlay-canvas {
@@ -112,6 +143,7 @@
             color: #1a73e8;
             text-shadow: 0 0 20px rgba(255,255,255,0.8);
             pointer-events: none;
+            transition: background 0.3s, color 0.3s;
         }
 
         .interactive-footer {
@@ -133,15 +165,16 @@
             gap: 10px;
         }
 
-        label { font-weight: bold; color: #1a73e8; font-size: 0.95rem;}
+        label { font-weight: bold; color: #1a73e8; font-size: 0.95rem; transition: color 0.3s;}
 
         input[type="text"] {
             padding: 12px;
             border-radius: 6px;
-            border: 1px solid #chchch;
+            border: 1px solid #cccccc;
             background: #ffffff;
             color: #000;
             font-size: 1rem;
+            transition: background 0.3s, color 0.3s, border-color 0.3s;
         }
 
         input[type="text"]::placeholder {
@@ -181,6 +214,7 @@
             overflow-y: auto;
             color: #333;
             border: 1px solid #e0e0e0;
+            transition: background 0.3s, color 0.3s, border-color 0.3s;
         }
 
         .dataset-header {
@@ -189,6 +223,7 @@
             font-size: 1.2rem;
             border-bottom: 1px solid #e0e0e0;
             padding-bottom: 10px;
+            transition: color 0.3s, border-color 0.3s;
         }
 
         .entry-list {
@@ -213,10 +248,11 @@
             border-right: 1px solid #e0e0e0;
             border-bottom: 1px solid #e0e0e0;
             cursor: pointer;
+            transition: background 0.3s, border-color 0.3s, color 0.3s;
         }
 
         .entry-item:hover { background: #f8f9fa; border-left-color: #1a73e8; }
-        .entry-meta { color: #5f6368; font-size: 0.75rem; text-align: right; }
+        .entry-meta { color: #5f6368; font-size: 0.75rem; text-align: right; transition: color 0.3s; }
 
         #preview-modal {
             display: none;
@@ -226,6 +262,7 @@
             z-index: 100;
             align-items: center;
             justify-content: center;
+            transition: background 0.3s;
         }
 
         .modal-content {
@@ -238,11 +275,13 @@
             max-width: 900px;
             width: 95%;
             box-shadow: 0 4px 24px rgba(0,0,0,0.1);
+            transition: background 0.3s, border-color 0.3s;
         }
 
         .modal-close {
             position: absolute;
             top: 10px; right: 15px; font-size: 1.7rem; cursor: pointer; color: #5f6368;
+            transition: color 0.3s;
         }
 
         #modal-image {
@@ -253,10 +292,99 @@
             margin-top: 10px;
             border: 1px solid #e0e0e0;
             object-fit: contain;
+            transition: background 0.3s, border-color 0.3s;
+        }
+
+        /* --- DARK MODE PROPERTIES --- */
+        body.dark-mode {
+            background: #121212;
+            color: #e8eaed;
+        }
+        body.dark-mode .theme-toggle {
+            background: #2d2d2d;
+            color: #e8eaed;
+            border-color: #444;
+        }
+        body.dark-mode .theme-toggle:hover {
+            background: #3c4043;
+        }
+        body.dark-mode h1 { color: #8ab4f8; }
+        body.dark-mode p { color: #9aa0a6; }
+        body.dark-mode label { color: #8ab4f8; }
+        body.dark-mode .dataset-header { color: #8ab4f8; border-color: #3c4043; }
+        
+        body.dark-mode .right-column {
+            background: #1e1e1e;
+            border-color: #3c4043;
+        }
+        body.dark-mode .import-box {
+            background: #1e1e1e;
+            border-color: #8ab4f8;
+        }
+        body.dark-mode .import-box div span {
+            color: #8ab4f8 !important;
+        }
+        body.dark-mode #trainer-container {
+            background: #1e1e1e;
+            border-color: #3c4043;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+        }
+        body.dark-mode .view-panel {
+            border-color: #3c4043;
+        }
+        body.dark-mode #countdown-overlay {
+            background: rgba(0, 0, 0, 0.6);
+            color: #8ab4f8;
+            text-shadow: 0 0 20px rgba(0,0,0,0.8);
+        }
+        body.dark-mode input[type="text"] {
+            background: #2d2d2d;
+            color: #ffffff;
+            border-color: #5f6368;
+        }
+        body.dark-mode #log-box {
+            background: #202124;
+            color: #bdc1c6;
+            border-color: #3c4043;
+        }
+        body.dark-mode .entry-item {
+            background: #202124;
+            border-color: #3c4043;
+            color: #e8eaed;
+        }
+        body.dark-mode .entry-item:hover {
+            background: #2d2d2d;
+        }
+        body.dark-mode .entry-meta {
+            color: #9aa0a6;
+        }
+        body.dark-mode button:disabled {
+            background: #3c4043;
+            color: #80868b;
+        }
+        body.dark-mode #preview-modal {
+            background: rgba(0,0,0,0.85);
+        }
+        body.dark-mode .modal-content {
+            background: #1e1e1e;
+            border-color: #8ab4f8;
+        }
+        body.dark-mode .modal-content h3 {
+            color: #8ab4f8 !important;
+        }
+        body.dark-mode .modal-close {
+            color: #9aa0a6;
+        }
+        body.dark-mode #modal-image {
+            background: #202124;
+            border-color: #3c4043;
         }
     </style>
 </head>
 <body>
+
+    <!-- Floating Theme Controller -->
+    <button id="theme-toggle" class="theme-toggle">🌙 Dark Mode</button>
 
     <h1>High-Res Expression Dataset Studio</h1>
     <p>Capturing structural facial layouts matching modern high-fidelity inputs.</p>
@@ -331,9 +459,17 @@ const modal = document.getElementById('preview-modal');
 const modalTitle = document.getElementById('modal-title');
 const modalImg = document.getElementById('modal-image');
 const closeModalBtn = document.getElementById('close-modal-btn');
+const themeToggle = document.getElementById('theme-toggle');
 
 let latestDetection = null;
 let datasetSessionMemory = [];
+
+// Theme Switching Routine
+themeToggle.addEventListener('click', () => {
+    document.body.classList.toggle('dark-mode');
+    const isActiveDark = document.body.classList.contains('dark-mode');
+    themeToggle.innerHTML = isActiveDark ? '☀️ Light Mode' : '🌙 Dark Mode';
+});
 
 function log(msg) {
     logBox.innerHTML += `<div>[${new Date().toLocaleTimeString()}] ${msg}</div>`;
