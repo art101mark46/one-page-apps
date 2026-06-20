@@ -120,6 +120,7 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
+            flex-shrink: 0;
         }
         button.danger:hover { background-color: #dc2626; }
 
@@ -198,6 +199,12 @@
             color: var(--text-color);
         }
 
+        /* Target the Climb column specifically */
+        .climb-col-header {
+            min-width: 110px !important;
+            width: 110px;
+        }
+
         th {
             background-color: var(--header-bg);
             font-weight: 600;
@@ -228,7 +235,8 @@
         .climb-cell {
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 4px;
+            width: 100%;
         }
 
         input[type="text"] {
@@ -249,7 +257,11 @@
             background-color: var(--input-focus);
         }
 
-        .climb-name-input { text-align: left !important; font-weight: 500; }
+        .climb-name-input { 
+            text-align: left !important; 
+            font-weight: 500;
+            min-width: 0; /* Allows input to shrink gracefully on mobile */
+        }
         .hidden { display: none !important; }
 
         .footer-controls {
@@ -293,7 +305,7 @@
         <table id="trackerTable">
             <thead>
                 <tr id="headerRow1">
-                    <th rowspan="2" style="min-width: 160px;">Climb</th>
+                    <th rowspan="2" class="climb-col-header">Climb</th>
                 </tr>
                 <tr id="headerRow2"></tr>
             </thead>
@@ -322,14 +334,14 @@
     };
 
     // Load Local Storage
-    if (localStorage.getItem('climbingTrackerState_v4')) {
+    if (localStorage.getItem('climbingTrackerState_v5')) {
         try {
-            state = JSON.parse(localStorage.getItem('climbingTrackerState_v4'));
+            state = JSON.parse(localStorage.getItem('climbingTrackerState_v5'));
         } catch (e) { console.error(e); }
     }
 
     function saveState() {
-        localStorage.setItem('climbingTrackerState_v4', JSON.stringify(state));
+        localStorage.setItem('climbingTrackerState_v5', JSON.stringify(state));
     }
 
     function applyTheme() {
@@ -366,7 +378,7 @@
         }
 
         // Reset dynamic headers and rows
-        headerRow1.innerHTML = '<th rowspan="2" style="min-width: 160px;">Climb</th>';
+        headerRow1.innerHTML = '<th rowspan="2" class="climb-col-header">Climb Name / #</th>';
         headerRow2.innerHTML = '';
         tableBody.innerHTML = '';
         totalRow.innerHTML = '<td style="text-align: right;">Total Earned:</td>';
@@ -528,6 +540,7 @@
         renderTable();
     }
 
+    // Export Data Action
     function exportData() {
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state, null, 2));
         const a = document.createElement('a');
@@ -538,6 +551,7 @@
         a.remove();
     }
 
+    // Import Data Action
     function importData(e) {
         const reader = new FileReader();
         reader.onload = function(evt) {
