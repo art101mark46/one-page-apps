@@ -75,6 +75,18 @@ body {
 
 .hidden { display: none !important; }
 
+#sign-video-player {
+    width: 100%;       /* Match your sign-viewer styling */
+    max-width: 400px;  /* Example boundary */
+    border-radius: 8px;
+    background: #000;  /* Clean backing color while loading */
+}
+
+/* Mirror support for your left-handed toggle preference */
+#sign-video-player.left-handed-mirror {
+    transform: scaleX(-1);
+}
+
 /* Handedness Dynamic Real-Time Mirror Engine Modifier */
 .left-handed-mirror {
     transform: scaleX(-1) !important;
