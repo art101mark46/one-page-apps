@@ -69,6 +69,7 @@ const btnReplay = document.getElementById('btn-replay');
 const btnSubmit = document.getElementById('btn-submit');
 const btnExport = document.getElementById('btn-export');
 const csvImportInput = document.getElementById('csv-import');
+const signVideoPlayer = document.getElementById('sign-video-player');
 
 // DOM References - Mistake Modal Components
 const mistakesModal = document.getElementById('mistakes-modal');
@@ -111,12 +112,15 @@ function updateImageMirrorPreference() {
     const selectedRadio = document.querySelector('input[name="handedness"]:checked');
     state.handedness = selectedRadio ? selectedRadio.value : "right";
 
-    const targetImages = [signViewer, revisionViewerImg, flashTestImg];
+    // Added signVideoPlayer to the mirror target array
+    const targetImages = [signViewer, signVideoPlayer, revisionViewerImg, flashTestImg];
     targetImages.forEach(img => {
-        if (state.handedness === 'left') {
-            img.classList.add('left-handed-mirror');
-        } else {
-            img.classList.remove('left-handed-mirror');
+        if (img) {
+            if (state.handedness === 'left') {
+                img.classList.add('left-handed-mirror');
+            } else {
+                img.classList.remove('left-handed-mirror');
+            }
         }
     });
 }
@@ -418,20 +422,54 @@ async function determineAndPlayWord(word) {
     toggleUIState(true);
 
     const lowercaseWord = word.toLowerCase();
+    
+    // Configured paths for expansion files
     const signGifPath = `assets/signs/${lowercaseWord}.gif`;
+    const signVideoPath = `assets/signs/${lowercaseWord}.mp4`; // Assuming mp4 format
+
+    // Reset visibility states
+    signViewer.classList.remove('hidden');
+    signVideoPlayer.classList.add('hidden');
+    signVideoPlayer.pause();
 
     try {
-        const response = await fetch(signGifPath, { method: 'HEAD' });
-        if (response.ok) {
+        // 1. Try Video clip first (for your new vocabulary expansion)
+        const videoResponse = await fetch(signVideoPath, { method: 'HEAD' });
+        if (videoResponse.ok) {
+            statusIndicator.textContent = "Playing Clip...";
+            
+            signViewer.classList.add('hidden');
+            signVideoPlayer.classList.remove('hidden');
+            
+            signVideoPlayer.src = signVideoPath;
+            
+            // Programmatically load and trigger playback
+            signVideoPlayer.load();
+            await signVideoPlayer.play();
+
+            // When the video naturally ends, return UI control back to the user
+            signVideoPlayer.onended = () => {
+                toggleUIState(false);
+            };
+            return;
+        }
+
+        // 2. Fallback to existing GIF infrastructure
+        const gifResponse = await fetch(signGifPath, { method: 'HEAD' });
+        if (gifResponse.ok) {
             statusIndicator.textContent = "Signing Word...";
             signViewer.src = signGifPath;
             state.playbackTimeout = setTimeout(() => {
                 toggleUIState(false);
             }, 2500);
-        } else {
-            playFingerspelling(word);
+            return;
         }
+
+        // 3. Fallback to Fingerspelling if no video or GIF asset is caught
+        playFingerspelling(word);
+
     } catch (error) {
+        // Fallback safety barrier
         playFingerspelling(word);
     }
 }
@@ -518,6 +556,11 @@ function toggleUIState(playing) {
         statusIndicator.className = "status-idle";
         userGuess.disabled = false;
         btnSubmit.disabled = false;
+        
+        // Stop any playing video when shifting states out of playback
+        if (signVideoPlayer && !signVideoPlayer.paused) {
+            signVideoPlayer.pause();
+        }
     }
 }
 
