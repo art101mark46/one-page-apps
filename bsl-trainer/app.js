@@ -523,16 +523,22 @@ function checkAnswer() {
     userStats.attempts++;
     userStats.totalReplays += state.currentWordReplays;
 
-    if (guess === state.currentWord) {
+    // NEW: Normalize both strings by converting all hyphens to regular spaces
+    // This allows "HELP-YOU" from the dictionary to match a user typing "HELP YOU"
+    const normalizedGuess = guess.replace(/-/g, ' ');
+    const normalizedTarget = state.currentWord.replace(/-/g, ' ');
+
+    if (normalizedGuess === normalizedTarget) {
         userStats.correct++;
-        showFeedback(`Correct! It was ${state.currentWord} (${state.currentWordReplays} replays)`, 'correct');
+        // Display the clean target with a space instead of a hyphen in the feedback
+        showFeedback(`Correct! It was ${normalizedTarget} (${state.currentWordReplays} replays)`, 'correct');
     } else {
         if (!userStats.mistakes[state.currentWord]) {
             userStats.mistakes[state.currentWord] = 0;
         }
         userStats.mistakes[state.currentWord]++;
         
-        showFeedback(`Not quite! It was actually ${state.currentWord}.`, 'incorrect');
+        showFeedback(`Not quite! It was actually ${normalizedTarget}.`, 'incorrect');
     }
 
     saveScoresToDisk();
