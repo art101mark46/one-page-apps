@@ -1,0 +1,1134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BMR Calculator</title>
+    <!-- Include Chart.js for data visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-color: #f4f6f9;
+            --card-bg: #ffffff;
+            --text-color: #333333;
+            --border-color: #dddddd;
+            --input-bg: #e8f5e9;
+            --input-border: #81c784;
+            --accent-color: #2196f3;
+            
+            /* Default Base State */
+            --report-bg: transparent;
+            --report-border: #ffb74d; 
+            --report-text: #333333;
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --text-color: #e0e0e0;
+            --border-color: #444444;
+            --input-bg: #1b3a24;
+            --input-border: #2e7d32;
+            --accent-color: #64b5f6;
+            --report-text: #e0e0e0;
+        }
+
+        /* Safe & Alert Conditional Styling Mapping */
+        .bmi-safe-zone { /* Trim & Acceptable */
+            --report-bg: #e8f5e9 !important;
+            --report-border: #4caf50 !important;
+            --report-text: #2e7d32 !important;
+        }
+        [data-theme="dark"] .bmi-safe-zone {
+            --report-bg: #1b3a24 !important;
+            --report-border: #4caf50 !important;
+            --report-text: #a5d6a7 !important;
+        }
+
+        .bmi-alert-zone { /* Underweight & Overweight */
+            --report-bg: #e8f5e9 !important;
+            --report-border: #f44336 !important;
+            --report-text: #2e7d32 !important;
+        }
+        [data-theme="dark"] .bmi-alert-zone {
+            --report-bg: #1b3a24 !important;
+            --report-border: #f44336 !important;
+            --report-text: #a5d6a7 !important;
+        }
+
+        /* Graduating Obese Red Fills */
+        .bmi-class1 {
+            --report-bg: #ffebee !important;
+            --report-border: #d32f2f !important;
+            --report-text: #c62828 !important;
+        }
+        [data-theme="dark"] .bmi-class1 {
+            --report-bg: #3c1e1e !important;
+            --report-border: #ef5350 !important;
+            --report-text: #ffcdd2 !important;
+        }
+
+        .bmi-class2 {
+            --report-bg: #ffcdd2 !important;
+            --report-border: #b71c1c !important;
+            --report-text: #b71c1c !important;
+        }
+        [data-theme="dark"] .bmi-class2 {
+            --report-bg: #5c1e1e !important;
+            --report-border: #f44336 !important;
+            --report-text: #ffbaf2 !important;
+        }
+
+        .bmi-class3 {
+            --report-bg: #ef5350 !important;
+            --report-border: #7f0000 !important;
+            --report-text: #ffffff !important; 
+        }
+        [data-theme="dark"] .bmi-class3 {
+            --report-bg: #b71c1c !important;
+            --report-border: #ff1744 !important;
+            --report-text: #ffffff !important;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+
+        h1 { margin: 0; font-size: 24px; }
+
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        /* Navigation Tabs Layout */
+        .tab-bar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 25px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px;
+        }
+
+        .tab-btn {
+            background: none;
+            border: 1px solid transparent;
+            color: var(--text-color);
+            padding: 10px 20px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .tab-btn:hover {
+            background-color: rgba(0,0,0,0.04);
+        }
+        [data-theme="dark"] .tab-btn:hover {
+            background-color: rgba(255,255,255,0.04);
+        }
+
+        .tab-btn.active {
+            background-color: var(--accent-color);
+            color: white;
+        }
+
+        .icon-btn {
+            background: none;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 20px;
+            padding: 6px 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.2s;
+        }
+        
+        .icon-btn:hover {
+            background-color: rgba(0,0,0,0.05);
+        }
+        [data-theme="dark"] .icon-btn:hover {
+            background-color: rgba(255,255,255,0.05);
+        }
+
+        .icon-btn.active {
+            background-color: var(--accent-color);
+            border-color: var(--accent-color);
+        }
+
+        .unit-toggle {
+            display: flex;
+            background: var(--border-color);
+            border-radius: 20px;
+            padding: 3px;
+        }
+
+        .unit-toggle button {
+            background: none;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 17px;
+            cursor: pointer;
+            font-weight: bold;
+            color: var(--text-color);
+        }
+
+        .unit-toggle button.active {
+            background: var(--accent-color);
+            color: #fff;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 25px;
+        }
+
+        section {
+            background: rgba(0,0,0,0.01);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            transition: all 0.3s ease;
+        }
+
+        h2 { margin-top: 0; font-size: 18px; padding-bottom: 8px; }
+
+        .form-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 15px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        label { font-weight: 500; font-size: 14px; }
+
+        .input-field {
+            background-color: var(--input-bg);
+            border: 1px solid var(--input-border);
+            color: var(--text-color);
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 14px;
+            box-sizing: border-box;
+            width: 100%;
+        }
+
+        .dual-input { display: flex; gap: 5px; }
+
+        .report-box {
+            background-color: var(--report-bg);
+            border: 3px solid var(--report-border);
+            color: var(--report-text);
+            padding: 25px;
+            border-radius: 8px;
+            line-height: 1.6;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .report-box p { margin: 0 0 15px 0; }
+        .report-box p:last-child { margin-bottom: 0; }
+        .highlight { font-weight: 700; }
+        .hidden { display: none !important; }
+
+        /* Chart & Logging Controls Elements */
+        .chart-container {
+            position: relative;
+            margin-top: 20px;
+            width: 100%;
+            height: 340px;
+        }
+
+        .btn-submit {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            align-self: flex-end;
+            margin-top: 5px;
+        }
+
+        .btn-submit:hover { opacity: 0.9; }
+
+        /* View Toggle Mode Pill Design */
+        .view-toggle {
+            display: flex;
+            background: var(--border-color);
+            border-radius: 8px;
+            padding: 2px;
+        }
+
+        .view-toggle button {
+            background: none;
+            border: none;
+            padding: 6px 12px;
+            font-size: 13px;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            color: var(--text-color);
+        }
+
+        .view-toggle button.active {
+            background: var(--card-bg);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .options-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        /* Historical Entries Table Styling */
+        .table-wrapper {
+            margin-top: 15px;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 14px;
+        }
+
+        th, td {
+            padding: 12px 10px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th { font-weight: 600; background-color: rgba(0,0,0,0.02); }
+        [data-theme="dark"] th { background-color: rgba(255,255,255,0.02); }
+
+        .edit-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            padding: 4px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+        .edit-btn:hover { background-color: rgba(0,0,0,0.05); }
+        [data-theme="dark"] .edit-btn:hover { background-color: rgba(255,255,255,0.05); }
+
+        /* Full Screen Red Alert Flash Overlay */
+        #alertFlash {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(244, 67, 54, 0.45);
+            pointer-events: none;
+            z-index: 9999;
+            opacity: 0;
+            transition: opacity 0.1s ease-out;
+        }
+        #alertFlash.pulse {
+            opacity: 1;
+            transition: none;
+        }
+    </style>
+</head>
+<body>
+
+<div id="alertFlash"></div>
+
+<div class="container">
+    <header>
+        <h1>BMR Calculator</h1>
+        <div class="controls">
+            <button class="icon-btn" id="whrToggleBtn" onclick="toggleWhrPanel()" title="Toggle Hip to Waist Ratio Analysis (📏)">📏</button>
+            <div class="unit-toggle">
+                <button id="unitMetric" class="active" onclick="setUnits('metric')">Metric</button>
+                <button id="unitImperial" onclick="setUnits('imperial')">Imperial</button>
+            </div>
+            <button class="icon-btn" id="themeToggle" onclick="toggleTheme()" aria-label="Toggle theme">☀️</button>
+        </div>
+    </header>
+
+    <!-- Navigation Bar Control system -->
+    <div class="tab-bar">
+        <button id="tabBtnCalculator" class="tab-btn active" onclick="switchTab('calculator')">Profile & Setup</button>
+        <button id="tabBtnTracker" class="tab-btn" onclick="switchTab('tracker')">Weight Tracking Hub</button>
+    </div>
+
+    <!-- TAB 1: CALCULATOR FRAMEWORK -->
+    <div id="tabContentCalculator" class="grid">
+        <section style="border-left: 5px solid var(--input-border);">
+            <h2>Profile Setup</h2>
+            <div class="form-container">
+                <div class="form-group">
+                    <label for="sex">Sex</label>
+                    <select id="sex" class="input-field" onchange="calculateAll()">
+                        <option value="M">Male</option>
+                        <option value="F">Female</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="age">Age (Years)</label>
+                    <input type="number" id="age" class="input-field" value="44" oninput="calculateAll()">
+                </div>
+
+                <div class="form-group" id="heightContainer"><!-- Dynamic --></div>
+                <div class="form-group" id="weightContainer"><!-- Dynamic --></div>
+                <div class="form-group" id="targetWeightContainer"><!-- Dynamic --></div>
+
+                <div class="form-group">
+                    <label for="exercise">Exercise Routine</label>
+                    <select id="exercise" class="input-field" onchange="calculateAll()">
+                        <option value="1.2">Little to no exercise</option>
+                        <option value="1.375">Light exercise (1-3 days/wk)</option>
+                        <option value="1.55" selected>Moderate exercise (3-5 days/wk)</option>
+                        <option value="1.725">Heavy exercise (6-7 days/wk)</option>
+                        <option value="1.9">Very heavy exercise (2x daily)</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="lossContainer"><!-- Dynamic --></div>
+            </div>
+        </section>
+
+        <section id="whrInputsPanel" class="hidden" style="border-left: 5px solid var(--accent-color);">
+            <h2>Hip to Waist Ratio</h2>
+            <div class="form-container">
+                <div class="form-group">
+                    <label for="waist">Main Circumference (cm)</label>
+                    <input type="number" id="waist" class="input-field" placeholder="e.g. 102.5" oninput="calculateAll()">
+                </div>
+                <div class="form-group">
+                    <label for="hip">Secondary Circumference (cm)</label>
+                    <input type="number" id="hip" class="input-field" placeholder="e.g. 112" oninput="calculateAll()">
+                </div>
+            </div>
+        </section>
+
+        <div id="reportBox" class="report-box">
+            <h2>Calculated Report Summary</h2>
+            <p>Based on your profile, your Current BMI is <span id="repBmi" class="highlight">-</span> which is classed as <span id="repBmiCat" class="highlight">-</span>.</p>
+            
+            <p>To maintain your current weight, your daily calories should be <span id="repBmr" class="highlight">-</span> calories per day.</p>
+            
+            <p id="targetPlanSentence">Based on your target weight and desired weekly change, you need to change your daily calorific intake to <span id="repDailyBudget" class="highlight">-</span> calories. It will take approximately <span id="repWeeks" class="highlight">-</span> weeks to hit your target.</p>
+            
+            <p id="repWhrBlock" class="hidden">Your Hip-to-Waist Ratio is <span id="repWhrVal" class="highlight">-</span>, which positions you in the <span id="repWhrRisk" class="highlight">-</span> tier for metabolic risk profiles.</p>
+            
+            <p>Your Target weight would put you in the <span id="repTargetBmiCat" class="highlight">-</span> category.</p>
+        </div>
+    </div>
+
+    <!-- TAB 2: WEIGHT HISTORICAL HUB -->
+    <div id="tabContentTracker" class="grid hidden">
+        <section style="border-left: 5px solid var(--accent-color);">
+            <h2 id="logFormHeading">Log New Weigh-In Entry</h2>
+            <form id="weightLogForm" onsubmit="addWeightEntry(event)">
+                <div class="form-container">
+                    <div class="form-group">
+                        <label for="logDate">Date of Record</label>
+                        <input type="date" id="logDate" class="input-field" required>
+                    </div>
+                    <div class="form-group" id="logWeightInputContainer">
+                        <!-- Dynamic content controlled via setUnits -->
+                    </div>
+                    <button type="submit" class="btn-submit" id="logFormBtn">Commit Entry</button>
+                </div>
+            </form>
+        </section>
+
+        <section>
+            <div class="options-bar">
+                <h2>Historical Progress Timeline</h2>
+                
+                <div style="display: flex; align-items: center; gap: 20px;">
+                    <!-- View Mode Toggle Element -->
+                    <div class="view-toggle">
+                        <button id="viewToggleChart" class="active" onclick="setViewMode('chart')">Chart View</button>
+                        <button id="viewToggleList" onclick="setViewMode('list')">Entries List View</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Graphic Chart Framework Area -->
+            <div id="chartViewArea" class="chart-container">
+                <canvas id="historyChart"></canvas>
+            </div>
+
+            <!-- Historical Data Entries Table List Frame -->
+            <div id="listViewArea" class="table-wrapper hidden">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th id="thWeightHeader">Weight</th>
+                            <th>Net Progress Change</th>
+                            <th style="text-align: right; padding-right: 20px;">Edit</th>
+                        </tr>
+                    </thead>
+                    <tbody id="entriesTableBody">
+                        <!-- Generated Dynamically -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+</div>
+
+<script>
+    let currentUnitMode = 'metric';
+    let whrActive = false;
+    let chartInstance = null;
+    let currentViewMode = 'chart';
+
+    // Hardcoded historical baseline dataset (stored securely in Kgs internally)
+    let weightLogData = [
+        { date: '2026-06-01', weight: 75.0 },
+        { date: '2026-06-08', weight: 74.2 },
+        { date: '2026-06-15', weight: 73.1 },
+        { date: '2026-06-22', weight: 72.0 }
+    ];
+
+    // Precise Metrics Conversion Engines
+    function kgToStonesLbs(kg) {
+        const totalLbs = kg * 2.2046226218;
+        return { stones: Math.floor(totalLbs / 14), lbs: Math.round((totalLbs % 14) * 10) / 10 };
+    }
+
+    function stonesLbsToKg(stones, lbs) {
+        return ((parseInt(stones) || 0) * 14 + (parseFloat(lbs) || 0)) / 2.2046226218;
+    }
+
+    function cmToFeetInches(cm) {
+        const totalInches = cm / 2.54;
+        return { feet: Math.floor(totalInches / 12), inches: Math.round((totalInches % 12) * 10) / 10 };
+    }
+
+    function feetInchesToCm(feet, inches) {
+        return ((parseInt(feet) || 0) * 12 + (parseFloat(inches) || 0)) * 2.54;
+    }
+
+    // Tab Navigation Switch Engine
+    function switchTab(targetTab) {
+        document.getElementById('tabBtnCalculator').classList.toggle('active', targetTab === 'calculator');
+        document.getElementById('tabBtnTracker').classList.toggle('active', targetTab === 'tracker');
+        
+        document.getElementById('tabContentCalculator').classList.toggle('hidden', targetTab !== 'calculator');
+        document.getElementById('tabContentTracker').classList.toggle('hidden', targetTab !== 'tracker');
+        
+        if (targetTab === 'tracker') {
+            refreshTrackerInterface();
+        }
+    }
+
+    // Dynamic View Toggle Configuration Controller
+    function setViewMode(mode) {
+        currentViewMode = mode;
+        document.getElementById('viewToggleChart').classList.toggle('active', mode === 'chart');
+        document.getElementById('viewToggleList').classList.toggle('active', mode === 'list');
+        
+        document.getElementById('chartViewArea').classList.toggle('hidden', mode !== 'chart');
+        document.getElementById('listViewArea').classList.toggle('hidden', mode !== 'list');
+        
+        refreshTrackerInterface();
+    }
+
+    function toggleWhrPanel() {
+        whrActive = !whrActive;
+        document.getElementById('whrToggleBtn').classList.toggle('active', whrActive);
+        document.getElementById('whrInputsPanel').classList.toggle('hidden', !whrActive);
+        document.getElementById('repWhrBlock').classList.toggle('hidden', !whrActive);
+        calculateAll();
+    }
+
+    // Core Content Field Structurer
+    function renderDynamicInputs() {
+        const hContainer = document.getElementById('heightContainer');
+        const wContainer = document.getElementById('weightContainer');
+        const tContainer = document.getElementById('targetWeightContainer');
+        const lContainer = document.getElementById('lossContainer');
+        const logWeightContainer = document.getElementById('logWeightInputContainer');
+
+        if (currentUnitMode === 'metric') {
+            hContainer.innerHTML = `<label>Height (CM)</label><input type="number" id="height" class="input-field" value="176" oninput="calculateAll()">`;
+            wContainer.innerHTML = `<label>Weight (Kgs)</label><input type="number" id="weight" class="input-field" value="72" step="0.1" oninput="calculateAll()">`;
+            tContainer.innerHTML = `<label>Target Weight (Kgs)</label><input type="number" id="targetWeight" class="input-field" value="71" step="0.1" oninput="calculateAll()">`;
+            lContainer.innerHTML = `<label>Weekly Target Change (Kgs)</label><input type="number" id="desiredLoss" class="input-field" value="0.7" step="0.05" oninput="calculateAll()">`;
+            
+            logWeightContainer.innerHTML = `<label>Weight Record (Kgs)</label><input type="number" id="logWeightMain" class="input-field" step="0.1" placeholder="e.g. 71.5" required>`;
+        } else {
+            hContainer.innerHTML = `
+                <label>Height (Feet / Inches)</label>
+                <div class="dual-input">
+                    <input type="number" id="heightFt" class="input-field" value="5" placeholder="ft" oninput="calculateAll()">
+                    <input type="number" id="heightIn" class="input-field" value="9" step="0.1" placeholder="in" oninput="calculateAll()">
+                </div>`;
+            wContainer.innerHTML = `
+                <label>Weight (Stones / Lbs)</label>
+                <div class="dual-input">
+                    <input type="number" id="weightSt" class="input-field" value="11" placeholder="st" oninput="calculateAll()">
+                    <input type="number" id="weightLb" class="input-field" value="5" step="0.1" placeholder="lb" oninput="handlePoundsInput(this)">
+                </div>`;
+            tContainer.innerHTML = `
+                <label>Target (Stones / Lbs)</label>
+                <div class="dual-input">
+                    <input type="number" id="targetSt" class="input-field" value="11" placeholder="st" oninput="calculateAll()">
+                    <input type="number" id="targetLb" class="input-field" value="2" step="0.1" placeholder="lb" oninput="handlePoundsInput(this)">
+                </div>`;
+            lContainer.innerHTML = `<label>Weekly Target Change (lbs)</label><input type="number" id="desiredLoss" class="input-field" value="1.5" step="0.1" oninput="calculateAll()">`;
+            
+            logWeightContainer.innerHTML = `
+                <label>Weight Record (Stones / Lbs)</label>
+                <div class="dual-input">
+                    <input type="number" id="logWeightSt" class="input-field" placeholder="st" required>
+                    <input type="number" id="logWeightLb" class="input-field" step="0.1" placeholder="lb" oninput="validatePoundsInput(this)" required>
+                </div>`;
+        }
+        calculateAll();
+    }
+
+    function handlePoundsInput(inputEl) {
+        validatePoundsInput(inputEl);
+        calculateAll();
+    }
+
+    function validatePoundsInput(inputEl) {
+        if (parseFloat(inputEl.value) >= 14) {
+            inputEl.value = 13;
+            const flashEl = document.getElementById('alertFlash');
+            flashEl.classList.add('pulse');
+            setTimeout(() => { flashEl.classList.remove('pulse'); }, 150);
+        }
+    }
+
+    function setUnits(mode) {
+        if (currentUnitMode === mode) return;
+        let currentKg = 72, targetKg = 71, lossInLbs = 1.5, heightCm = 176;
+
+        if (currentUnitMode === 'metric') {
+            heightCm = parseFloat(document.getElementById('height').value) || 0;
+            currentKg = parseFloat(document.getElementById('weight').value) || 0;
+            targetKg = parseFloat(document.getElementById('targetWeight').value) || 0;
+            lossInLbs = (parseFloat(document.getElementById('desiredLoss').value) || 0) * 2.2046226218;
+        } else {
+            heightCm = feetInchesToCm(document.getElementById('heightFt').value, document.getElementById('heightIn').value);
+            currentKg = stonesLbsToKg(document.getElementById('weightSt').value, document.getElementById('weightLb').value);
+            targetKg = stonesLbsToKg(document.getElementById('targetSt').value, document.getElementById('targetLb').value);
+            lossInLbs = parseFloat(document.getElementById('desiredLoss').value) || 0;
+        }
+
+        currentUnitMode = mode;
+        document.getElementById('unitMetric').classList.toggle('active', mode === 'metric');
+        document.getElementById('unitImperial').classList.toggle('active', mode === 'imperial');
+
+        renderDynamicInputs();
+
+        if (mode === 'metric') {
+            document.getElementById('height').value = Math.round(heightCm);
+            document.getElementById('weight').value = currentKg.toFixed(1);
+            document.getElementById('targetWeight').value = targetKg.toFixed(1);
+            document.getElementById('desiredLoss').value = (lossInLbs / 2.2046226218).toFixed(2);
+        } else {
+            const hImp = cmToFeetInches(heightCm);
+            const wImp = kgToStonesLbs(currentKg);
+            const tImp = kgToStonesLbs(targetKg);
+            
+            document.getElementById('heightFt').value = hImp.feet;
+            document.getElementById('heightIn').value = hImp.inches;
+            document.getElementById('weightSt').value = wImp.stones;
+            document.getElementById('weightLb').value = wImp.lbs > 13 ? 13 : wImp.lbs;
+            document.getElementById('targetSt').value = tImp.stones;
+            document.getElementById('targetLb').value = tImp.lbs > 13 ? 13 : tImp.lbs;
+            document.getElementById('desiredLoss').value = lossInLbs.toFixed(1);
+        }
+        
+        refreshTrackerInterface();
+    }
+
+    function getInputsInMetric() {
+        let weightKg = 0, targetWeightKg = 0, targetChangeLbs = 0, heightCm = 0;
+
+        if (currentUnitMode === 'metric') {
+            heightCm = parseFloat(document.getElementById('height').value) || 0;
+            weightKg = parseFloat(document.getElementById('weight').value) || 0;
+            targetWeightKg = parseFloat(document.getElementById('targetWeight').value) || 0;
+            targetChangeLbs = (parseFloat(document.getElementById('desiredLoss').value) || 0) * 2.2046226218;
+        } else {
+            heightCm = feetInchesToCm(document.getElementById('heightFt').value, document.getElementById('heightIn').value);
+            weightKg = stonesLbsToKg(document.getElementById('weightSt').value, document.getElementById('weightLb').value);
+            targetWeightKg = stonesLbsToKg(document.getElementById('targetSt').value, document.getElementById('targetLb').value);
+            targetChangeLbs = parseFloat(document.getElementById('desiredLoss').value) || 0;
+        }
+        return { weightKg, targetWeightKg, targetChangeLbs, heightCm };
+    }
+
+    function calculateAll() {
+        const metrics = getInputsInMetric();
+        const sex = document.getElementById('sex').value;
+        const age = parseFloat(document.getElementById('age').value) || 0;
+        const multiplier = parseFloat(document.getElementById('exercise').value) || 1.2;
+
+        if (!metrics.weightKg || !metrics.heightCm || !age) return;
+
+        const bmr = (sex === 'M') 
+            ? 66 + (13.7 * metrics.weightKg) + (5 * metrics.heightCm) - (6.8 * age)
+            : 655 + (9.6 * metrics.weightKg) + (1.8 * metrics.heightCm) - (4.7 * age);
+
+        const bmi = metrics.weightKg / ((metrics.heightCm / 100) ** 2);
+        const targetBmi = metrics.targetWeightKg / ((metrics.heightCm / 100) ** 2);
+        const dailyMaintenance = bmr * multiplier;
+        
+        let dailyBudget = dailyMaintenance;
+        let weeksToTarget = 0;
+        const isGain = metrics.targetWeightKg > metrics.weightKg;
+        const weightDiffLbs = Math.abs(metrics.weightKg - metrics.targetWeightKg) * 2.2046226218;
+
+        if (metrics.targetChangeLbs > 0) {
+            weeksToTarget = weightDiffLbs / metrics.targetChangeLbs;
+            dailyBudget = isGain 
+                ? dailyMaintenance + ((metrics.targetChangeLbs * 3500) / 7)
+                : dailyMaintenance - ((metrics.targetChangeLbs * 3500) / 7);
+        }
+
+        document.getElementById('repBmi').innerText = bmi.toFixed(2);
+        const bmiCat = getBmiCategory(bmi);
+        document.getElementById('repBmiCat').innerText = bmiCat;
+        document.getElementById('repBmr').innerText = Math.round(dailyMaintenance);
+        document.getElementById('repTargetBmiCat').innerText = getBmiCategory(targetBmi);
+
+        const planSentence = document.getElementById('targetPlanSentence');
+        if (metrics.weightKg === metrics.targetWeightKg) {
+            planSentence.innerHTML = `Your current weight matches your target weight exactly. Follow your daily maintenance budget above to remain stable.`;
+        } else {
+            const actionWord = isGain ? "increase" : "change";
+            planSentence.innerHTML = `Based on your target weight and desired weekly change, you need to ${actionWord} your daily calorific intake to <span class="highlight">${Math.round(dailyBudget)}</span> calories. It will take approximately <span class="highlight">${weeksToTarget.toFixed(1)}</span> weeks to hit your target.`;
+        }
+
+        // Color dynamic background shifts
+        const rBox = document.getElementById('reportBox');
+        rBox.className = "report-box";
+
+        if (bmiCat === 'Trim' || bmiCat === 'Acceptable') rBox.classList.add('bmi-safe-zone');
+        else if (bmiCat === 'Underweight' || bmiCat === 'Overweight') rBox.classList.add('bmi-alert-zone');
+        else if (bmiCat === 'Class 1 Obese') rBox.classList.add('bmi-class1');
+        else if (bmiCat === 'Class 2 Obese') rBox.classList.add('bmi-class2');
+        else if (bmiCat === 'Class 3 Obese') rBox.classList.add('bmi-class3');
+
+        if (whrActive) {
+            const waist = parseFloat(document.getElementById('waist').value);
+            const hip = parseFloat(document.getElementById('hip').value);
+            if (waist && hip) {
+                const whr = waist / hip;
+                document.getElementById('repWhrVal').innerText = whr.toFixed(3);
+                document.getElementById('repWhrRisk').innerText = getWhrRisk(whr, sex);
+            } else {
+                document.getElementById('repWhrVal').innerText = "-";
+                document.getElementById('repWhrRisk').innerText = "awaiting data";
+            }
+        }
+        if (chartInstance) refreshTrackerInterface();
+    }
+
+    function getBmiCategory(bmi) {
+        if (bmi < 18) return 'Underweight';
+        if (bmi < 22) return 'Trim';
+        if (bmi < 25) return 'Acceptable';
+        if (bmi < 30) return 'Overweight';
+        if (bmi < 35) return 'Class 1 Obese';
+        if (bmi < 40) return 'Class 2 Obese';
+        return 'Class 3 Obese';
+    }
+
+    function getWhrRisk(whr, sex) {
+        if (sex === 'M') return whr <= 0.95 ? 'Low Risk' : whr <= 1.0 ? 'Moderate Risk' : 'High Risk';
+        return whr <= 0.80 ? 'Low Risk' : whr <= 0.85 ? 'Moderate Risk' : 'High Risk';
+    }
+
+    // DATA LOGGING SYSTEM ARCHITECTURE
+    function addWeightEntry(e) {
+        e.preventDefault();
+        const dateVal = document.getElementById('logDate').value;
+        let convertedKg = 0;
+
+        if (currentUnitMode === 'metric') {
+            convertedKg = parseFloat(document.getElementById('logWeightMain').value);
+        } else {
+            const stones = document.getElementById('logWeightSt').value;
+            const lbs = document.getElementById('logWeightLb').value;
+            convertedKg = stonesLbsToKg(stones, lbs);
+        }
+
+        if (!dateVal || !convertedKg) return;
+
+        weightLogData = weightLogData.filter(item => item.date !== dateVal);
+        weightLogData.push({ date: dateVal, weight: convertedKg });
+        weightLogData.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+        document.getElementById('logFormHeading').innerText = "Log New Weigh-In Entry";
+        document.getElementById('logFormBtn').innerText = "Commit Entry";
+        
+        if (currentUnitMode === 'metric') document.getElementById('logWeightMain').value = '';
+        else {
+            document.getElementById('logWeightSt').value = '';
+            document.getElementById('logWeightLb').value = '';
+        }
+
+        refreshTrackerInterface();
+    }
+
+    function editEntry(dateString) {
+        const target = weightLogData.find(item => item.date === dateString);
+        if (!target) return;
+
+        document.getElementById('logFormHeading').innerText = `Modify Entry for ${dateString}`;
+        document.getElementById('logFormBtn').innerText = "Update Entry";
+        document.getElementById('logDate').value = target.date;
+
+        if (currentUnitMode === 'metric') {
+            document.getElementById('logWeightMain').value = target.weight.toFixed(1);
+        } else {
+            const imp = kgToStonesLbs(target.weight);
+            document.getElementById('logWeightSt').value = imp.stones;
+            document.getElementById('logWeightLb').value = imp.lbs;
+        }
+        
+        document.getElementById('weightLogForm').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function refreshTrackerInterface() {
+        if (weightLogData.length === 0) return;
+
+        if (currentViewMode === 'chart') {
+            initOrRefreshChart();
+        } else {
+            buildEntriesTableList();
+        }
+    }
+
+    function buildEntriesTableList() {
+        const tbody = document.getElementById('entriesTableBody');
+        const thWeightHeader = document.getElementById('thWeightHeader');
+        
+        thWeightHeader.innerText = `Weight (${currentUnitMode === 'metric' ? 'Kg' : 'Stones/Lbs'})`;
+        tbody.innerHTML = '';
+
+        const sortedLogs = [...weightLogData].sort((a, b) => new Date(a.date) - new Date(b.date));
+        const baselineWeight = sortedLogs[0].weight;
+
+        sortedLogs.forEach(item => {
+            const tr = document.createElement('tr');
+            
+            let weightCellDisplay = '';
+            if (currentUnitMode === 'metric') {
+                weightCellDisplay = `${item.weight.toFixed(1)} kg`;
+            } else {
+                const imp = kgToStonesLbs(item.weight);
+                weightCellDisplay = `${imp.stones}st ${imp.lbs}lb`;
+            }
+
+            const rawDiffKg = item.weight - baselineWeight;
+            const sign = rawDiffKg > 0 ? '+' : '';
+            
+            let deltaDisplay = '';
+            if (currentUnitMode === 'metric') {
+                deltaDisplay = `${sign}${rawDiffKg.toFixed(2)} kg`;
+            } else {
+                const diffLbs = rawDiffKg * 2.2046226218;
+                deltaDisplay = `${sign}${diffLbs.toFixed(1)} lbs`;
+            }
+            if (rawDiffKg === 0) deltaDisplay = 'Baseline';
+
+            tr.innerHTML = `
+                <td><span class="highlight">${item.date}</span></td>
+                <td>${weightCellDisplay}</td>
+                <td>${deltaDisplay}</td>
+                <td style="text-align: right; padding-right: 15px;">
+                    <button class="edit-btn" onclick="editEntry('${item.date}')" title="Edit entry">✏️</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    // Chart View Architecture Handler
+    function initOrRefreshChart() {
+        const ctx = document.getElementById('historyChart').getContext('2d');
+        const sortedLogs = [...weightLogData].sort((a, b) => new Date(a.date) - new Date(b.date));
+        
+        const labels = sortedLogs.map(item => item.date);
+        const baselineWeight = sortedLogs[0].weight;
+
+        const weightDataConverted = sortedLogs.map(item => {
+            if (currentUnitMode === 'metric') return parseFloat(item.weight.toFixed(2));
+            return parseFloat((item.weight * 2.2046226218).toFixed(2));
+        });
+
+        const totalChangeCalculated = sortedLogs.map(item => {
+            const diff = item.weight - baselineWeight;
+            if (currentUnitMode === 'metric') return parseFloat(diff.toFixed(2));
+            return parseFloat((diff * 2.2046226218).toFixed(2));
+        });
+
+        const profile = getInputsInMetric();
+        let trajectoryDataset = [];
+        
+        if (profile.weightKg && profile.targetWeightKg) {
+            const changePerDayKg = (profile.targetChangeLbs / 2.2046226218) / 7;
+            const isLossPlan = profile.targetWeightKg < profile.weightKg;
+
+            for (let i = 0; i < labels.length; i++) {
+                const daysElapsed = Math.round((new Date(labels[i]) - new Date(labels[0])) / (1000 * 60 * 60 * 24));
+                let projectedKg = isLossPlan 
+                    ? profile.weightKg - (changePerDayKg * daysElapsed)
+                    : profile.weightKg + (changePerDayKg * daysElapsed);
+
+                if (isLossPlan && projectedKg < profile.targetWeightKg) projectedKg = profile.targetWeightKg;
+                if (!isLossPlan && projectedKg > profile.targetWeightKg) projectedKg = profile.targetWeightKg;
+
+                const convertedProj = currentUnitMode === 'metric' ? projectedKg : (projectedKg * 2.2046226218);
+                trajectoryDataset.push(parseFloat(convertedProj.toFixed(2)));
+            }
+        }
+
+        // Calculate Acceptable BMI Boundary Targets (BMI 22 to 25)
+        let bmiLowerDataset = [];
+        let bmiUpperDataset = [];
+
+        if (profile.heightCm > 0) {
+            const heightMetersSq = (profile.heightCm / 100) ** 2;
+            const lowerBoundKg = 22.0 * heightMetersSq;
+            const upperBoundKg = 24.9 * heightMetersSq;
+
+            const finalLowerValue = currentUnitMode === 'metric' ? lowerBoundKg : (lowerBoundKg * 2.2046226218);
+            const finalUpperValue = currentUnitMode === 'metric' ? upperBoundKg : (upperBoundKg * 2.2046226218);
+
+            labels.forEach(() => {
+                bmiLowerDataset.push(parseFloat(finalLowerValue.toFixed(2)));
+                bmiUpperDataset.push(parseFloat(finalUpperValue.toFixed(2)));
+            });
+        }
+
+        // Preserve hidden state from previous instance if it exists
+        let bmiInitiallyHidden = false;
+        if (chartInstance && chartInstance.data.datasets[2]) {
+            bmiInitiallyHidden = !chartInstance.isDatasetVisible(2);
+        }
+
+        if (chartInstance) {
+            chartInstance.destroy();
+        }
+
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        const primaryColor = '#2196f3';
+        const secondaryColor = '#ff9800';
+        const rangeFillColor = isDark ? 'rgba(76, 175, 80, 0.25)' : 'rgba(76, 175, 80, 0.12)';
+        const gridColor = isDark ? '#444444' : '#dddddd';
+        const labelTextColor = isDark ? '#e0e0e0' : '#333333';
+
+        const datasets = [{
+            label: `Weight`,
+            data: weightDataConverted,
+            borderColor: primaryColor,
+            backgroundColor: 'rgba(33, 150, 243, 0.1)',
+            borderWidth: 3,
+            tension: 0.2,
+            pointRadius: 5,
+            fill: false,
+            yAxisID: 'y',
+            order: 1
+        }];
+
+        if (trajectoryDataset.length > 0) {
+            datasets.push({
+                label: `Calc. Weight`,
+                data: trajectoryDataset,
+                borderColor: secondaryColor,
+                borderDash: [6, 6],
+                backgroundColor: 'transparent',
+                borderWidth: 2,
+                tension: 0,
+                pointRadius: 3,
+                fill: false,
+                yAxisID: 'y',
+                order: 2
+            });
+        }
+
+        // Inject corridor-filled target bands if calculated
+        if (bmiLowerDataset.length > 0) {
+            datasets.push({
+                label: `BMI Range`,
+                data: bmiUpperDataset,
+                borderColor: 'rgba(76, 175, 80, 0.6)',
+                borderWidth: 1.5,
+                borderDash: [4, 4],
+                pointRadius: 0,
+                fill: false,
+                hidden: bmiInitiallyHidden,
+                yAxisID: 'y',
+                order: 3
+            }, {
+                label: `BMI Range Lower Bound`,
+                data: bmiLowerDataset,
+                borderColor: 'rgba(76, 175, 80, 0.6)',
+                borderWidth: 1.5,
+                borderDash: [4, 4],
+                pointRadius: 0,
+                fill: '-1', // Floods target area down to preceding dataset ('BMI Range')
+                backgroundColor: rangeFillColor,
+                hidden: bmiInitiallyHidden,
+                yAxisID: 'y',
+                order: 4
+            });
+        }
+
+        chartInstance = new Chart(ctx, {
+            type: 'line',
+            data: { labels, datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        grid: { color: gridColor },
+                        ticks: { color: labelTextColor }
+                    },
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        grid: { color: gridColor },
+                        ticks: {
+                            color: labelTextColor,
+                            callback: function(value) {
+                                if (currentUnitMode === 'metric') return value + ' kg';
+                                const st = Math.floor(value / 14);
+                                const lb = Math.round(value % 14);
+                                return `${st}st ${lb}lb`;
+                            }
+                        }
+                    }
+                },
+                plugins: {
+                    legend: { 
+                        labels: { 
+                            color: labelTextColor,
+                            filter: function(item) {
+                                // Strip lower bound label to leave exactly one beautiful 'BMI Range' item
+                                return !item.text.includes('Lower Bound');
+                            }
+                        },
+                        // Custom handler to sync upper line, lower line, and fill visibility on a single click
+                        onClick: function(e, legendItem, legend) {
+                            const index = legendItem.datasetIndex;
+                            const chart = legend.chart;
+                            
+                            if (legendItem.text === 'BMI Range') {
+                                const isVisible = chart.isDatasetVisible(index);
+                                // Set visibility for both Upper (index 2) and Lower (index 3) datasets simultaneously
+                                if (isVisible) {
+                                    chart.setDatasetVisibility(index, false);
+                                    chart.setDatasetVisibility(index + 1, false);
+                                } else {
+                                    chart.setDatasetVisibility(index, true);
+                                    chart.setDatasetVisibility(index + 1, true);
+                                }
+                            } else {
+                                // Default handler for standard datasets
+                                chart.setDatasetVisibility(index, !chart.isDatasetVisible(index));
+                            }
+                            chart.update();
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const index = context.dataIndex;
+                                const val = context.raw;
+                                
+                                let weightString = '';
+                                if (currentUnitMode === 'metric') {
+                                    weightString = `${val} kg`;
+                                } else {
+                                    const st = Math.floor(val / 14);
+                                    const lb = (val % 14).toFixed(1);
+                                    weightString = `${st}st ${lb}lb (${val} lbs)`;
+                                }
+
+                                if (context.dataset.label === 'Weight') {
+                                    const diff = totalChangeCalculated[index];
+                                    const sign = diff > 0 ? '+' : '';
+                                    const unitLabel = currentUnitMode === 'metric' ? 'kg' : 'lbs';
+                                    return [
+                                        `Weight: ${weightString}`,
+                                        `Net Progress Change: ${sign}${diff} ${unitLabel}`
+                                    ];
+                                } else if (context.dataset.label === 'Calc. Weight') {
+                                    return `Calc. Weight Projection: ${weightString}`;
+                                } else if (context.dataset.label.includes('BMI Range')) {
+                                    const boundLabel = context.datasetIndex === 3 ? "Upper Bound (24.9)" : "Lower Bound (22.0)";
+                                    return `BMI Range ${boundLabel}: ${weightString}`;
+                                }
+                                return `${context.dataset.label}: ${weightString}`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function toggleTheme() {
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', newTheme);
+        document.getElementById('themeToggle').innerText = newTheme === 'dark' ? '🌙' : '☀️';
+        refreshTrackerInterface();
+    }
+
+    window.onload = function() {
+        document.getElementById('logDate').value = new Date().toISOString().split('T')[0];
+        renderDynamicInputs();
+    };
+</script>
+</body>
+</html>
