@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ceefaux Broadcaster & Export Studio</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+        :root {
+            --tt-black: #000000; --tt-white: #ffffff;
+            --tt-red: #ff0000; --tt-green: #00ff00;
+            --tt-yellow: #ffff00; --tt-blue: #0000ff;
+            --tt-magenta: #ff00ff; --tt-cyan: #00ffff;
+        }
+
+        body {
+            background: radial-gradient(circle at center, #1c2331 0%, #0d1117 100%);
+            color: #e2e8f0;
+            font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+        }
+
+        .teletext-text {
+            font-family: 'VT323', monospace;
+            font-size: 1.65rem;
+            line-height: 1.15;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        @media (max-width: 640px) { .teletext-text { font-size: 1.1rem; } }
+
+        /* Teletext Colors */
+        .color-w { color: var(--tt-white); } .color-r { color: var(--tt-red); }
+        .color-g { color: var(--tt-green); } .color-y { color: var(--tt-yellow); }
+        .color-b { color: var(--tt-blue); } .color-m { color: var(--tt-magenta); }
+        .color-c { color: var(--tt-cyan); }
+        
+        .bg-w { background-color: var(--tt-white); color: var(--tt-black); }
+        .bg-r { background-color: var(--tt-red); color: var(--tt-white); }
+        .bg-g { background-color: var(--tt-green); color: var(--tt-black); }
+        .bg-y { background-color: var(--tt-yellow); color: var(--tt-black); }
+        .bg-b { background-color: var(--tt-blue); color: var(--tt-white); }
+        .bg-m { background-color: var(--tt-magenta); color: var(--tt-white); }
+        .bg-c { background-color: var(--tt-cyan); color: var(--tt-black); }
+        .bg-k { background-color: var(--tt-black); color: var(--tt-white); }
+
+        /* CRT Effects */
+        .crt-frame {
+            position: relative; background: #1e1e1c;
+            border: 12px solid #2d2d2a; border-radius: 35px;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.9), 0 10px 40px rgba(0,0,0,0.8), 0 0 0 4px #151514;
+            overflow: hidden;
+        }
+
+        .crt-screen { position: relative; background-color: var(--tt-black); }
+        .crt-screen::before {
+            content: " "; display: block; position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: radial-gradient(circle at center, transparent 60%, rgba(0, 0, 0, 0.4) 100%);
+            pointer-events: none; z-index: 10;
+        }
+
+        .scanlines {
+            position: absolute; top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.35) 50%),
+                        linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 4px, 6px 100%; pointer-events: none; z-index: 12;
+        }
+
+        .flicker { animation: crt-flicker 0.15s infinite; }
+        @keyframes crt-flicker { 0% { opacity: 0.985; } 50% { opacity: 0.995; } 100% { opacity: 0.985; } }
+
+        .noise-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 200%;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+            opacity: 0.18; pointer-events: none; display: none; z-index: 11;
+            animation: static-noise 0.2s steps(4) infinite;
+        }
+        @keyframes static-noise { 0% { transform: translateY(0); } 100% { transform: translateY(-50%); } }
+
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #182232; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+    </style>
+</head>
+<body class="p-4 md:p-8 min-h-screen flex flex-col justify-between">
+
+    <header class="max-w-7xl mx-auto w-full mb-8 flex flex-col md:flex-row justify-between items-center border-b border-slate-700 pb-4 gap-4">
+        <div>
+            <h1 class="text-3xl font-extrabold tracking-tight text-white flex items-center gap-2">
+                <span class="text-yellow-400 font-mono">CEEFAUX</span> 
+                <span class="text-sm font-light text-slate-400">Broadcaster Studio</span>
+            </h1>
+            <p class="text-slate-400 text-sm mt-1">Design pages on the left, export for GitHub on the right.</p>
+        </div>
+        <div class="bg-indigo-900/50 border border-indigo-500/30 px-4 py-2 rounded-xl flex items-center gap-3">
+            <button onclick="exportToGitHubPages()" class="bg-indigo-500 hover:bg-indigo-400 text-white font-bold py-2 px-6 rounded-lg transition shadow-lg shadow-indigo-900/50 flex items-center gap-2">
+                <i class="fa-solid fa-file-export"></i> Export index.html
+            </button>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-8 items-start grow">
+        
+        <!-- Left: Live CRT Preview -->
+        <section class="lg:col-span-7 flex flex-col gap-4">
+            <div class="crt-frame">
+                <div class="scanlines"></div>
+                <div id="static-layer" class="noise-overlay"></div>
+
+                <div class="crt-screen flicker p-4 sm:p-6 aspect-[4/3] flex flex-col justify-between select-none">
+                    
+                    <!-- Header -->
+                    <div class="teletext-text flex justify-between border-b border-dashed border-slate-800 pb-1 mb-2">
+                        <div>
+                            <span class="color-w">P</span><span id="screen-page-num" class="color-w">100</span>
+                            <span class="ml-4 color-y">CEEFAUX</span>
+                            <span id="screen-subpage-num" class="color-c ml-4"></span>
+                        </div>
+                        <div id="screen-clock" class="color-y">00:00/00</div>
+                    </div>
+
+                    <!-- Canvas -->
+                    <div id="screen-canvas" class="teletext-text grow flex flex-col justify-start gap-1 overflow-hidden tracking-wider"></div>
+
+                    <!-- Footer -->
+                    <div id="fastext-bar" class="teletext-text mt-2 pt-2 border-t border-dashed border-slate-800 flex justify-between text-center text-xs sm:text-sm">
+                        <!-- Dynamically filled by Fastext settings -->
+                    </div>
+                </div>
+            </div>
+            
+            <div class="text-center text-slate-500 text-sm">
+                <i class="fa-solid fa-eye text-cyan-400"></i> Live Monitor Preview
+            </div>
+        </section>
+
+        <!-- Right: Editor Console -->
+        <section class="lg:col-span-5">
+            <div class="bg-slate-900 border border-slate-700 rounded-2xl p-5 shadow-xl flex flex-col gap-4">
+                <div class="flex justify-between items-center">
+                    <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-keyboard text-green-400"></i> Page Editor
+                    </h2>
+                    <div class="flex gap-2">
+                        <input type="number" id="nav-page" placeholder="Page" class="w-16 bg-black border border-slate-600 rounded px-2 text-white font-mono text-center" onkeypress="if(event.key==='Enter') previewPage(this.value)">
+                        <button onclick="previewPage(document.getElementById('nav-page').value)" class="bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded text-xs text-white">GO</button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">EDITING PAGE</label>
+                        <input type="number" id="edit-page-num" min="100" max="899" value="100" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-cyan-500" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">AUTO CAROUSEL</label>
+                        <select id="edit-carousel-timer" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500">
+                            <option value="4000">4 Seconds</option>
+                            <option value="7000" selected>7 Seconds</option>
+                            <option value="12000">12 Seconds</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="block text-xs font-semibold text-slate-300">SUB-PAGES</label>
+                        <div class="flex gap-2">
+                            <button onclick="addSubPage()" class="text-[10px] bg-slate-800 hover:bg-slate-700 text-cyan-400 px-2 py-1 rounded border border-cyan-500/20 font-bold transition">+ ADD</button>
+                            <button onclick="removeCurrentSubPage()" class="text-[10px] bg-slate-800 hover:bg-slate-700 text-red-400 px-2 py-1 rounded border border-red-500/20 font-bold transition">DELETE</button>
+                        </div>
+                    </div>
+                    <div id="subpage-tabs" class="flex gap-1.5 overflow-x-auto pb-1"></div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">CONTENT (40 Chars Max Per Line)</label>
+                    <textarea id="edit-page-content" rows="12" class="w-full bg-black border border-slate-700 rounded-xl p-3 text-green-400 font-mono text-xs focus:outline-none focus:border-cyan-500 leading-relaxed resize-none whitespace-pre" oninput="validateRowLength(this)"></textarea>
+                </div>
+
+                <button onclick="saveAndPreview()" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-3 rounded-xl transition shadow-lg shadow-cyan-900/30">
+                    SAVE & PREVIEW ON MONITOR
+                </button>
+                
+                <div class="mt-2 p-3 bg-slate-950 rounded-lg border border-slate-800 text-[10px] font-mono text-slate-400">
+                    <span class="text-white font-bold mb-1 block">Markup Guide:</span>
+                    [w] White | [r] Red | [y] Yellow | [g] Green | [c] Cyan | [m] Magenta <br>
+                    [bg-b] Blue Background | [bg-w] White BG | [bg-k] Black BG
+                </div>
+
+                <!-- Fastext Settings -->
+                <div class="mt-2 pt-4 border-t border-slate-800">
+                    <label class="block text-xs font-semibold text-slate-300 mb-2">FASTEXT COLOUR BUTTONS (GLOBAL)</label>
+                    <div class="grid grid-cols-4 gap-2">
+                        <div class="flex flex-col gap-1">
+                            <input type="text" id="ft-r-p" value="101" class="bg-black border border-slate-700 rounded text-center text-xs text-white p-1" title="Red Page Number">
+                            <input type="text" id="ft-r-l" value="NEWS" class="bg-black border border-red-800 rounded text-center text-[10px] text-red-500 font-bold p-1" title="Red Label">
+                        </div>
+                        <div class="flex flex-col gap-1">
+                            <input type="text" id="ft-g-p" value="110" class="bg-black border border-slate-700 rounded text-center text-xs text-white p-1" title="Green Page Number">
+                            <input type="text" id="ft-g-l" value="SPORT" class="bg-black border border-green-800 rounded text-center text-[10px] text-green-500 font-bold p-1" title="Green Label">
+                        </div>
+                        <div class="flex flex-col gap-1">
+                            <input type="text" id="ft-y-p" value="130" class="bg-black border border-slate-700 rounded text-center text-xs text-white p-1" title="Yellow Page Number">
+                            <input type="text" id="ft-y-l" value="WEATHER" class="bg-black border border-yellow-800 rounded text-center text-[10px] text-yellow-500 font-bold p-1" title="Yellow Label">
+                        </div>
+                        <div class="flex flex-col gap-1">
+                            <input type="text" id="ft-b-p" value="199" class="bg-black border border-slate-700 rounded text-center text-xs text-white p-1" title="Blue Page Number">
+                            <input type="text" id="ft-b-l" value="HELP" class="bg-black border border-cyan-800 rounded text-center text-[10px] text-cyan-500 font-bold p-1" title="Blue Label">
+                        </div>
+                    </div>
+                    <button onclick="applyFastext()" class="w-full mt-2 bg-slate-800 hover:bg-slate-700 text-white text-xs py-1.5 rounded transition border border-slate-700">Apply Hotkeys</button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // Database
+        let ceefauxDatabase = {
+            "100": {
+                timer: 7000,
+                subpages: [
+                    `[bg-b][w]           CEEFAUX NEWS SERVICE           
+[w]----------------------------------------
+[y] TODAY'S TOP STORIES          [c]PAGE 100
+[w]----------------------------------------
+[c]101 [w]BREAKING NEWS BULLETIN (2 PARTS)
+[c]110 [w]SPORTING REPORTS
+[c]130 [w]METEOROLOGICAL REPORT
+[c]199 [w]SYSTEM DOCUMENTATION
+[w]----------------------------------------
+[g] WELCOME TO THE CEEFAUX EDITOR:
+[w] USE THE EDITOR ON THE RIGHT TO DESIGN
+[w] YOUR OWN PAGES, ADD SUB-PAGES, AND 
+[w] CHANGE COLORS WITH MARKUP TAGS.
+[w]
+[y] ONCE FINISHED, CLICK EXPORT TO GET YOUR
+[y] STANDALONE GITHUB HOMEPAGE FILE!
+[w]
+[bg-w] INDEX 100     SETTINGS 199     TV CH 7 `
+                ]
+            },
+            "101": {
+                timer: 6000,
+                subpages: [
+                    `[bg-b][w] CEEFAUX BREAKING STORY           1/2 
+[w]----------------------------------------
+[r] BREAKING NEWS: RETRO TECH REVIVAL
+[w]----------------------------------------
+[w] AMATEUR RADIO ENTHUSIASTS AND VINTAGE
+[w] PROGRAMMERS IN THE UK HAVE RECORDED A
+[w] SURGE IN LOCAL TELETEXT DECODER SYNC.
+[w]
+[y] SCIENTISTS AGREE THAT THE TEXT IS MOST
+[y] LIKELY RETURNING FROM AN ACTIVE EXTRA-
+[y] TERRESTRIAL BROADCAST NODE.
+[w]
+[w] REPORT CONTINUED ON MULTI-PAGE 2.
+[w]
+[bg-r] HEADLINES 100                     TV CH 7 `,
+                    `[bg-b][w] CEEFAUX BREAKING STORY           2/2 
+[w]----------------------------------------
+[r] UPDATE: ANTENNA ALIGNMENT ACTIVE
+[w]----------------------------------------
+[w] REPORTS FROM WEST YORKSHIRE SUGGEST
+[w] SEVERAL CRT MONITORS WERE SPOTTED
+[w] DISPLAYING HIGH CONTRAST CYAN SYNC
+[w] PATTERNS WITHOUT POWER CORDS.
+[w]
+[g] \"IT IS ABSOLUTELY MAGNIFICENT\"
+[w] DECLARED A RETRO COMPUTING HISTORIAN.
+[w]
+[bg-r] HEADLINES 100                     TV CH 7 `
+                ]
+            }
+        };
+
+        // Editor Hotkeys State
+        let hotkeys = {
+            r: { p: '101', l: 'NEWS' },
+            g: { p: '110', l: 'SPORT' },
+            y: { p: '130', l: 'WEATHER' },
+            b: { p: '199', l: 'HELP' }
+        };
+
+        // Editor State
+        let activeEditorPage = "100";
+        let activeEditorSubpages = [];
+        let activeEditorSubpageIndex = 0;
+
+        // Preview State
+        let currentPreviewPage = "100";
+        let currentPreviewSubIndex = 0;
+        let rotationTimer = null;
+        let searchTimer = null;
+
+        // --- FASTEXT LOGIC ---
+        function applyFastext() {
+            hotkeys.r = { p: document.getElementById('ft-r-p').value, l: document.getElementById('ft-r-l').value };
+            hotkeys.g = { p: document.getElementById('ft-g-p').value, l: document.getElementById('ft-g-l').value };
+            hotkeys.y = { p: document.getElementById('ft-y-p').value, l: document.getElementById('ft-y-l').value };
+            hotkeys.b = { p: document.getElementById('ft-b-p').value, l: document.getElementById('ft-b-l').value };
+            
+            document.getElementById('fastext-bar').innerHTML = `
+                <span onclick="previewPage('${hotkeys.r.p}')" class="bg-r px-2 py-0.5 rounded font-bold cursor-pointer hover:opacity-85">${hotkeys.r.p} ${hotkeys.r.l}</span>
+                <span onclick="previewPage('${hotkeys.g.p}')" class="bg-g px-2 py-0.5 rounded font-bold cursor-pointer hover:opacity-85">${hotkeys.g.p} ${hotkeys.g.l}</span>
+                <span onclick="previewPage('${hotkeys.y.p}')" class="bg-y px-2 py-0.5 rounded font-bold cursor-pointer hover:opacity-85">${hotkeys.y.p} ${hotkeys.y.l}</span>
+                <span onclick="previewPage('${hotkeys.b.p}')" class="bg-c px-2 py-0.5 rounded font-bold cursor-pointer hover:opacity-85">${hotkeys.b.p} ${hotkeys.b.l}</span>
+            `;
+        }
+
+        // --- PREVIEW MONITOR LOGIC ---
+
+        function startClock() {
+            setInterval(() => {
+                const now = new Date();
+                const d = now.toString().split(' ');
+                document.getElementById('screen-clock').innerText = 
+                    `${d[0].toUpperCase()} ${d[2]} ${d[1].toUpperCase()} ${d[4].substring(0,5)}/${d[4].substring(6,8)}`;
+            }, 1000);
+        }
+
+        function previewPage(pageNum) {
+            if (!pageNum || pageNum.length !== 3) return;
+            
+            clearTimeout(rotationTimer);
+            clearInterval(searchTimer);
+
+            const staticLayer = document.getElementById('static-layer');
+            staticLayer.style.display = "block";
+            document.getElementById('screen-subpage-num').innerText = "";
+            
+            searchTimer = setInterval(() => {
+                document.getElementById('screen-page-num').innerText = Math.floor(Math.random() * 800) + 100;
+            }, 60);
+
+            setTimeout(() => {
+                clearInterval(searchTimer);
+                staticLayer.style.display = "none";
+                currentPreviewPage = pageNum;
+                renderPreview(pageNum, 0);
+            }, 800);
+        }
+
+        function renderPreview(pageNum, subIndex) {
+            const page = ceefauxDatabase[pageNum];
+            const canvas = document.getElementById('screen-canvas');
+            document.getElementById('screen-page-num').innerText = pageNum;
+            canvas.innerHTML = "";
+
+            if (!page) {
+                document.getElementById('screen-subpage-num').innerText = "";
+                canvas.innerHTML = `<div class="row"></div><div class="row color-r">404: PAGE ${pageNum} NOT BROADCASTING</div>`;
+                return;
+            }
+
+            if (page.subpages.length > 1) {
+                document.getElementById('screen-subpage-num').innerText = `${subIndex + 1}/${page.subpages.length}`;
+            } else {
+                document.getElementById('screen-subpage-num').innerText = "";
+            }
+
+            const lines = (page.subpages[subIndex] || "").split('\n');
+            lines.forEach(line => {
+                const rowDiv = document.createElement('div');
+                rowDiv.className = 'row flex min-h-[1.25em]';
+                rowDiv.innerHTML = parseLineToTeletextSpans(line);
+                canvas.appendChild(rowDiv);
+            });
+
+            if (page.subpages.length > 1) {
+                rotationTimer = setTimeout(() => {
+                    renderPreview(pageNum, (subIndex + 1) % page.subpages.length);
+                }, page.timer || 7000);
+            }
+        }
+
+        function parseLineToTeletextSpans(lineText) {
+            const parts = lineText.split(/(\[[a-z0-9\-]+\])/g);
+            let fg = "color-w", bg = "bg-k", html = "";
+
+            parts.forEach(part => {
+                if (part.startsWith('[') && part.endsWith(']')) {
+                    const tag = part.slice(1, -1);
+                    if (tag.startsWith('bg-')) bg = `bg-${tag.substring(3)}`;
+                    else fg = `color-${tag}`;
+                } else if (part !== '') {
+                    // Turn valid 3-digit page numbers into clickable spans, preserving layout spaces
+                    const textChunks = part.split(/\b([1-8][0-9]{2})\b/g);
+                    let processedText = "";
+                    textChunks.forEach((chunk, i) => {
+                        if (i % 2 === 1) { 
+                            processedText += `<span onclick="previewPage('${chunk}')" class="cursor-pointer border-b border-dashed border-slate-500 hover:border-white hover:text-white transition-all" title="Go to Page ${chunk}">${chunk}</span>`;
+                        } else {
+                            processedText += chunk.replace(/ /g, '&nbsp;');
+                        }
+                    });
+                    html += `<span class="${fg} ${bg} font-mono tracking-wider">${processedText}</span>`;
+                }
+            });
+            return html || '<span class="color-w">&nbsp;</span>';
+        }
+
+        // --- EDITOR LOGIC ---
+
+        function initEditorForm(pageNum) {
+            activeEditorPage = String(pageNum);
+            document.getElementById('edit-page-num').value = activeEditorPage;
+            
+            const existing = ceefauxDatabase[activeEditorPage];
+            if (existing) {
+                activeEditorSubpages = [...existing.subpages];
+                document.getElementById('edit-carousel-timer').value = String(existing.timer || 7000);
+            } else {
+                activeEditorSubpages = ["[w] NEW PAGE CREATED.\n[w] TYPE CONTENT HERE."];
+                document.getElementById('edit-carousel-timer').value = "7000";
+            }
+            activeEditorSubpageIndex = 0;
+            updateEditorTabs();
+        }
+
+        document.getElementById('edit-page-num').addEventListener('change', (e) => {
+            if (e.target.value >= 100 && e.target.value <= 899) {
+                saveCurrentTextarea();
+                initEditorForm(e.target.value);
+            }
+        });
+
+        function saveCurrentTextarea() {
+            activeEditorSubpages[activeEditorSubpageIndex] = document.getElementById('edit-page-content').value;
+        }
+
+        function updateEditorTabs() {
+            const tabContainer = document.getElementById('subpage-tabs');
+            tabContainer.innerHTML = "";
+            activeEditorSubpages.forEach((_, idx) => {
+                const btn = document.createElement('button');
+                btn.className = `px-3 py-1 rounded text-xs font-mono transition flex-shrink-0 ${idx === activeEditorSubpageIndex ? 'bg-cyan-600 text-white' : 'bg-slate-800 text-slate-400'}`;
+                btn.innerText = `SUB ${idx + 1}`;
+                btn.onclick = () => {
+                    saveCurrentTextarea();
+                    activeEditorSubpageIndex = idx;
+                    updateEditorTabs();
+                };
+                tabContainer.appendChild(btn);
+            });
+            document.getElementById('edit-page-content').value = activeEditorSubpages[activeEditorSubpageIndex] || "";
+        }
+
+        function addSubPage() {
+            saveCurrentTextarea();
+            activeEditorSubpages.push("[w] NEW SUB PAGE");
+            activeEditorSubpageIndex = activeEditorSubpages.length - 1;
+            updateEditorTabs();
+        }
+
+        function removeCurrentSubPage() {
+            if (activeEditorSubpages.length > 1) {
+                activeEditorSubpages.splice(activeEditorSubpageIndex, 1);
+                activeEditorSubpageIndex = Math.max(0, activeEditorSubpageIndex - 1);
+                updateEditorTabs();
+            }
+        }
+
+        function validateRowLength(textarea) {
+            const max = 40;
+            const lines = textarea.value.split('\n');
+            let updated = [], changed = false;
+
+            lines.forEach((line) => {
+                const clean = line.replace(/\[[a-z0-9\-]+\]/g, "");
+                if (clean.length > max) {
+                    changed = true;
+                    updated.push(line.substring(0, max + (line.length - clean.length)));
+                } else {
+                    updated.push(line);
+                }
+            });
+            if (changed) textarea.value = updated.join('\n');
+        }
+
+        function saveAndPreview() {
+            saveCurrentTextarea();
+            const pageNum = document.getElementById('edit-page-num').value;
+            ceefauxDatabase[pageNum] = {
+                timer: Number(document.getElementById('edit-carousel-timer').value),
+                subpages: activeEditorSubpages.filter(t => t.trim().length > 0)
+            };
+            previewPage(pageNum);
+        }
+
+        // --- BOOT ---
+        window.onload = () => {
+            startClock();
+            applyFastext();
+            initEditorForm("100");
+            renderPreview("100", 0);
+        };
+
+        // --- GITHUB EXPORT ENGINE ---
+        
+        function exportToGitHubPages() {
+            saveAndPreview(); // Ensure latest changes are committed to memory
+            const dbPayload = JSON.stringify(ceefauxDatabase);
+            const hkPayload = JSON.stringify(hotkeys);
+
+            // We safely construct the viewer HTML template.
+            // By using "\x3Cscript", we avoid the HTML parser breaking the JS literal.
+            const viewerHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ceefaux - Live Teletext Feed</title>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    \x3Cscript src="https://cdn.tailwindcss.com">\x3C/script>
+    <style>
+        :root {
+            --tt-black: #000000; --tt-white: #ffffff; --tt-red: #ff0000; --tt-green: #00ff00;
+            --tt-yellow: #ffff00; --tt-blue: #0000ff; --tt-magenta: #ff00ff; --tt-cyan: #00ffff;
+        }
+        body { background: radial-gradient(circle at center, #11141a 0%, #05070a 100%); color: #e2e8f0; font-family: sans-serif; overflow-x: hidden;}
+        .teletext-text { font-family: 'VT323', monospace; font-size: 1.65rem; line-height: 1.15; letter-spacing: 0.5px; text-transform: uppercase; }
+        @media (max-width: 640px) { .teletext-text { font-size: 1.1rem; } }
+        
+        .color-w { color: var(--tt-white); } .color-r { color: var(--tt-red); } .color-g { color: var(--tt-green); }
+        .color-y { color: var(--tt-yellow); } .color-b { color: var(--tt-blue); } .color-m { color: var(--tt-magenta); } .color-c { color: var(--tt-cyan); }
+        .bg-w { background-color: var(--tt-white); color: var(--tt-black); } .bg-r { background-color: var(--tt-red); color: var(--tt-white); }
+        .bg-g { background-color: var(--tt-green); color: var(--tt-black); } .bg-y { background-color: var(--tt-yellow); color: var(--tt-black); }
+        .bg-b { background-color: var(--tt-blue); color: var(--tt-white); } .bg-m { background-color: var(--tt-magenta); color: var(--tt-white); }
+        .bg-c { background-color: var(--tt-cyan); color: var(--tt-black); } .bg-k { background-color: var(--tt-black); color: var(--tt-white); }
+
+        .crt-frame { position: relative; background: #1e1e1c; border: 12px solid #2d2d2a; border-radius: 35px; box-shadow: inset 0 0 20px rgba(0,0,0,0.9), 0 10px 40px rgba(0,0,0,0.8), 0 0 0 4px #151514; overflow: hidden; }
+        .crt-screen { position: relative; background-color: var(--tt-black); }
+        .crt-screen::before { content: " "; display: block; position: absolute; top: 0; left: 0; bottom: 0; right: 0; background: radial-gradient(circle at center, transparent 60%, rgba(0, 0, 0, 0.4) 100%); pointer-events: none; z-index: 10; }
+        .scanlines { position: absolute; top: 0; left: 0; bottom: 0; right: 0; background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.35) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06)); background-size: 100% 4px, 6px 100%; pointer-events: none; z-index: 12; }
+        .flicker { animation: crt-flicker 0.15s infinite; }
+        @keyframes crt-flicker { 0% { opacity: 0.985; } 50% { opacity: 0.995; } 100% { opacity: 0.985; } }
+        .noise-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 200%; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E"); opacity: 0.18; pointer-events: none; display: none; z-index: 11; animation: static-noise 0.2s steps(4) infinite; }
+        @keyframes static-noise { 0% { transform: translateY(0); } 100% { transform: translateY(-50%); } }
+        
+        .handheld-remote { background: linear-gradient(135deg, #2e2f33 0%, #1a1b1d 100%); border: 4px solid #43454a; box-shadow: 0 15px 35px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.1); }
+        .remote-btn { box-shadow: 0 3px 0px #121315, inset 0 1px 1px rgba(255,255,255,0.2); transition: all 0.1s ease; }
+        .remote-btn:active { transform: translateY(2px); box-shadow: 0 1px 0px #121315; }
+    </style>
+</head>
+<body class="p-4 md:p-8 min-h-screen flex flex-col items-center justify-center gap-8">
+    <main id="viewer-main" class="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-center transition-all duration-500 mx-auto">
+        <!-- CRT Monitor -->
+        <section id="crt-section" class="lg:col-span-8 w-full transition-all duration-500">
+            <div class="crt-frame">
+                <div class="scanlines"></div>
+                <div id="static-layer" class="noise-overlay"></div>
+                <div class="crt-screen flicker p-4 sm:p-6 aspect-[4/3] flex flex-col justify-between select-none">
+                    <div class="teletext-text flex justify-between border-b border-dashed border-slate-800 pb-1 mb-2">
+                        <div><span class="color-w">P</span><span id="screen-page-num" class="color-w">100</span><span class="ml-4 color-y">CEEFAUX</span><span id="screen-subpage-num" class="color-c ml-4"></span></div>
+                        <div id="screen-clock" class="color-y">00:00/00</div>
+                    </div>
+                    <div id="screen-canvas" class="teletext-text grow flex flex-col justify-start gap-1 overflow-hidden tracking-wider"></div>
+                    <div id="fastext-bar" class="teletext-text mt-2 pt-2 border-t border-dashed border-slate-800 flex justify-between text-center text-xs sm:text-sm">
+                        <!-- Dynamic Hotkeys -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Compact TV Controls -->
+            <div class="mt-4 flex flex-col sm:flex-row justify-between items-center gap-4 bg-slate-900/50 p-3 rounded-2xl border border-slate-800/80 shadow-lg">
+                <div class="text-slate-500 text-xs font-mono text-center sm:text-left tracking-wide ml-2">
+                    <i class="fa-solid fa-keyboard mr-1 text-slate-400"></i> KEYPAD / PGUP / PGDN
+                </div>
+                <button onclick="toggleRemote()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2 rounded-xl text-xs font-bold transition shadow-md shadow-indigo-900/40 flex items-center gap-2">
+                    <i class="fa-solid fa-gamepad"></i> TOGGLE REMOTE
+                </button>
+            </div>
+        </section>
+
+        <!-- Remote Control -->
+        <section id="remote-section" class="lg:col-span-4 flex justify-center w-full transition-all duration-300">
+            <div class="handheld-remote w-72 rounded-3xl p-5 flex flex-col items-center gap-4">
+                <div class="text-center font-mono text-xs tracking-widest text-slate-400 border-b border-slate-700 w-full pb-2 flex justify-between px-2">
+                    <span>CEEFAUX</span><span class="text-red-500 animate-pulse"><i class="fa-solid fa-circle text-[9px]"></i></span>
+                </div>
+                <div class="bg-black/80 border border-slate-700 rounded-lg w-full p-2 text-center">
+                    <span class="font-mono text-cyan-400 text-xl tracking-widest" id="remote-screen">PAGE 100</span>
+                </div>
+                <div class="grid grid-cols-3 gap-3 w-full">
+                    <button onclick="offsetPage(-1)" class="remote-btn bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 rounded-2xl text-xs"><i class="fa-solid fa-chevron-left text-red-400"></i></button>
+                    <button onclick="goPage('100')" class="remote-btn bg-yellow-500 hover:bg-yellow-400 text-black font-bold py-3 rounded-2xl text-xs"><i class="fa-solid fa-house"></i></button>
+                    <button onclick="offsetPage(1)" class="remote-btn bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 rounded-2xl text-xs"><i class="fa-solid fa-chevron-right text-green-400"></i></button>
+                </div>
+                <div class="grid grid-cols-3 gap-3 w-full">
+                    <button onclick="typeDigit('1')" class="remote-btn bg-zinc-800 text-white font-mono text-lg font-bold py-2 rounded-full">1</button>
+                    <button onclick="typeDigit('2')" class="remote-btn bg-zinc-800 text-white font-mono text-lg font-bold py-2 rounded-full">2</button>
+                    <button onclick="typeDigit('3')" class="remote-btn bg-zinc-800 text-white font-mono text-lg font-bold py-2 rounded-full">3</button>
+                    <button onclick="typeDigit('4')" class="remote-btn bg-zinc-800 text-white font-mono text-lg font-bold py-2 rounded-full">4</button>
+                    <button onclick="typeDigit('5')" class="remote-btn bg-zinc-800 text-white font-mono text-lg font-bold py-2 rounded-full">5</button>
+                    <button onclick="typeDigit('6')" class="remote-btn bg-zinc-800 text-white font-mono text-lg font-bold py-2 rounded-full">6</button>
+                    <button onclick="typeDigit('7')" class="remote-btn bg-zinc-800 text-white font-mono text-lg font-bold py-2 rounded-full">7</button>
+                    <button onclick="typeDigit('8')" class="remote-btn bg-zinc-800 text-white font-mono text-lg font-bold py-2 rounded-full">8</button>
+                    <button onclick="typeDigit('9')" class="remote-btn bg-zinc-800 text-white font-mono text-lg font-bold py-2 rounded-full">9</button>
+                    <button onclick="clearDigit()" class="remote-btn bg-amber-700 text-white text-xs font-bold py-2 rounded-2xl">CLR</button>
+                    <button onclick="typeDigit('0')" class="remote-btn bg-zinc-800 text-white font-mono text-lg font-bold py-2 rounded-full">0</button>
+                    <button onclick="toggleHold()" id="btn-hold" class="remote-btn bg-slate-700 text-yellow-400 text-xs font-bold py-2 rounded-2xl">HLD</button>
+                </div>
+                <div class="grid grid-cols-4 gap-2 w-full pt-2 border-t border-slate-800">
+                    <button id="rem-btn-r" class="remote-btn bg-red-600 hover:bg-red-500 py-1.5 rounded-md shadow text-[10px] font-bold text-white tracking-widest overflow-hidden"></button>
+                    <button id="rem-btn-g" class="remote-btn bg-green-600 hover:bg-green-500 py-1.5 rounded-md shadow text-[10px] font-bold text-white tracking-widest overflow-hidden"></button>
+                    <button id="rem-btn-y" class="remote-btn bg-yellow-500 hover:bg-yellow-400 py-1.5 rounded-md shadow text-[10px] font-bold text-black tracking-widest overflow-hidden"></button>
+                    <button id="rem-btn-b" class="remote-btn bg-cyan-500 hover:bg-cyan-400 py-1.5 rounded-md shadow text-[10px] font-bold text-black tracking-widest overflow-hidden"></button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    \x3Cscript>
+        const db = ${dbPayload};
+        const hotkeys = ${hkPayload};
+        let curPage = "100", curSub = 0, rotTimer, searchTimer, isHeld = false, buf = "";
+
+        setInterval(() => {
+            const d = new Date().toString().split(' ');
+            document.getElementById('screen-clock').innerText = \`\${d[0].toUpperCase()} \${d[2]} \${d[1].toUpperCase()} \${d[4].substring(0,5)}/\${d[4].substring(6,8)}\`;
+        }, 1000);
+
+        function initFastext() {
+            document.getElementById('fastext-bar').innerHTML = \`
+                <span onclick="goPage('\${hotkeys.r.p}')" class="bg-r px-2 py-0.5 rounded font-bold cursor-pointer hover:opacity-85">\${hotkeys.r.p} \${hotkeys.r.l}</span>
+                <span onclick="goPage('\${hotkeys.g.p}')" class="bg-g px-2 py-0.5 rounded font-bold cursor-pointer hover:opacity-85">\${hotkeys.g.p} \${hotkeys.g.l}</span>
+                <span onclick="goPage('\${hotkeys.y.p}')" class="bg-y px-2 py-0.5 rounded font-bold cursor-pointer hover:opacity-85">\${hotkeys.y.p} \${hotkeys.y.l}</span>
+                <span onclick="goPage('\${hotkeys.b.p}')" class="bg-c px-2 py-0.5 rounded font-bold cursor-pointer hover:opacity-85">\${hotkeys.b.p} \${hotkeys.b.l}</span>
+            \`;
+            document.getElementById('rem-btn-r').onclick = () => goPage(hotkeys.r.p);
+            document.getElementById('rem-btn-r').innerText = hotkeys.r.l;
+            document.getElementById('rem-btn-g').onclick = () => goPage(hotkeys.g.p);
+            document.getElementById('rem-btn-g').innerText = hotkeys.g.l;
+            document.getElementById('rem-btn-y').onclick = () => goPage(hotkeys.y.p);
+            document.getElementById('rem-btn-y').innerText = hotkeys.y.l;
+            document.getElementById('rem-btn-b').onclick = () => goPage(hotkeys.b.p);
+            document.getElementById('rem-btn-b').innerText = hotkeys.b.l;
+        }
+
+        function toggleRemote() {
+            const rs = document.getElementById('remote-section');
+            const crt = document.getElementById('crt-section');
+            const main = document.getElementById('viewer-main');
+            rs.classList.toggle('hidden');
+            if(rs.classList.contains('hidden')) {
+                crt.classList.replace('lg:col-span-8', 'lg:col-span-12');
+                main.classList.replace('max-w-6xl', 'max-w-4xl');
+            } else {
+                crt.classList.replace('lg:col-span-12', 'lg:col-span-8');
+                main.classList.replace('max-w-4xl', 'max-w-6xl');
+            }
+        }
+
+        function render(pageNum, subIdx) {
+            const page = db[pageNum];
+            const canvas = document.getElementById('screen-canvas');
+            document.getElementById('screen-page-num').innerText = pageNum;
+            canvas.innerHTML = "";
+
+            if(!page) {
+                document.getElementById('screen-subpage-num').innerText = "";
+                canvas.innerHTML = '<div class="row"></div><div class="row color-r">404: NODE NOT FOUND</div>';
+                return;
+            }
+
+            if(page.subpages.length > 1) document.getElementById('screen-subpage-num').innerText = \`\${subIdx+1}/\${page.subpages.length}\`;
+            else document.getElementById('screen-subpage-num').innerText = "";
+
+            const lines = (page.subpages[subIdx]||"").split('\\n');
+            lines.forEach(l => {
+                let fg="color-w", bg="bg-k", html="";
+                l.split(/(\\[[a-z0-9\\-]+\\])/g).forEach(p => {
+                    if(p.startsWith('[') && p.endsWith(']')) {
+                        const t = p.slice(1,-1);
+                        if(t.startsWith('bg-')) bg = \`bg-\${t.substring(3)}\`;
+                        else fg = \`color-\${t}\`;
+                    } else if(p) {
+                        const chunks = p.split(/\\b([1-8][0-9]{2})\\b/g);
+                        let processed = "";
+                        chunks.forEach((chunk, i) => {
+                            if (i % 2 === 1) { 
+                                processed += \`<span onclick="goPage('\${chunk}')" class="cursor-pointer border-b border-dashed border-slate-500 hover:border-white hover:text-white transition-all" title="Go to Page \${chunk}">\${chunk}</span>\`;
+                            } else {
+                                processed += chunk.replace(/ /g, '&nbsp;');
+                            }
+                        });
+                        html += \`<span class="\${fg} \${bg} font-mono tracking-wider">\${processed}</span>\`;
+                    }
+                });
+                canvas.innerHTML += \`<div class="row flex min-h-[1.25em]">\${html||'<span class="color-w">&nbsp;</span>'}</div>\`;
+            });
+
+            if(page.subpages.length > 1 && !isHeld) {
+                rotTimer = setTimeout(() => render(pageNum, (subIdx+1)%page.subpages.length), page.timer||7000);
+            }
+        }
+
+        function goPage(pageNum) {
+            clearTimeout(rotTimer); clearInterval(searchTimer);
+            document.getElementById('static-layer').style.display = "block";
+            document.getElementById('screen-subpage-num').innerText = "";
+            searchTimer = setInterval(() => document.getElementById('screen-page-num').innerText = Math.floor(Math.random()*800)+100, 60);
+            
+            setTimeout(() => {
+                clearInterval(searchTimer);
+                document.getElementById('static-layer').style.display = "none";
+                curPage = pageNum; curSub = 0;
+                document.getElementById('remote-screen').innerText = "PAGE " + curPage;
+                render(curPage, 0);
+            }, 800);
+        }
+
+        function typeDigit(d) {
+            buf = (buf.length >= 3) ? d : buf + d;
+            document.getElementById('remote-screen').innerText = "P" + buf.padEnd(3, "-");
+            if(buf.length === 3) setTimeout(() => { goPage(buf); buf=""; }, 300);
+        }
+        function clearDigit() { buf=""; document.getElementById('remote-screen').innerText="PAGE "+curPage; }
+        
+        function offsetPage(dir) {
+            const keys = Object.keys(db).map(Number).sort((a,b)=>a-b);
+            if(!keys.length) return;
+            let idx = keys.indexOf(Number(curPage));
+            if(idx===-1) idx = keys.findIndex(k => k > Number(curPage));
+            if(idx===-1) idx = 0;
+            goPage(String(keys[(idx + dir + keys.length) % keys.length]));
+        }
+
+        function toggleHold() {
+            isHeld = !isHeld;
+            const b = document.getElementById('btn-hold');
+            if(isHeld) { b.classList.replace('bg-slate-700','bg-yellow-400'); b.classList.replace('text-yellow-400','text-black'); clearTimeout(rotTimer); }
+            else { b.classList.replace('bg-yellow-400','bg-slate-700'); b.classList.replace('text-black','text-yellow-400'); render(curPage, curSub); }
+        }
+
+        document.addEventListener('keydown', e => {
+            if(e.key>='0' && e.key<='9') typeDigit(e.key);
+            if(e.key==='PageUp') { e.preventDefault(); offsetPage(-1); }
+            if(e.key==='PageDown') { e.preventDefault(); offsetPage(1); }
+        });
+
+        window.onload = () => { initFastext(); goPage("100"); };
+    \x3C/script>
+</body>
+</html>`;
+
+            const blob = new Blob([viewerHtml], { type: 'text/html' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = "index.html";
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+</body>
+</html>
