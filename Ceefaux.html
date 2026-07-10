@@ -83,6 +83,17 @@
         }
         @keyframes static-noise { 0% { transform: translateY(0); } 100% { transform: translateY(-50%); } }
 
+        .row { white-space: nowrap; overflow: hidden; }
+        .row-dh { font-size: 3.3rem; }
+
+        .block-char-btn {
+            background: #0f172a; border: 1px solid #334155; border-radius: 4px;
+            color: #4ade80; font-family: 'VT323', monospace; font-size: 1.1rem;
+            padding: 2px; cursor: pointer; text-align: center; line-height: 1;
+            transition: background 0.1s, border-color 0.1s;
+        }
+        .block-char-btn:hover { background: #1e3a5f; border-color: #22d3ee; color: #fff; }
+
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: #182232; }
         ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
@@ -99,6 +110,13 @@
             <p class="text-slate-400 text-sm mt-1">Design pages on the left, export for GitHub on the right.</p>
         </div>
         <div class="bg-indigo-900/50 border border-indigo-500/30 px-4 py-2 rounded-xl flex items-center gap-3">
+            <input type="file" id="import-file-input" accept=".json" class="hidden" onchange="handleImportFile(event)">
+            <button onclick="document.getElementById('import-file-input').click()" class="bg-slate-700 hover:bg-slate-600 text-white font-bold py-2 px-4 rounded-lg transition flex items-center gap-2 text-sm">
+                <i class="fa-solid fa-file-import"></i> Import
+            </button>
+            <button onclick="exportDatabase()" class="bg-slate-700 hover:bg-slate-600 text-white font-bold py-2 px-4 rounded-lg transition flex items-center gap-2 text-sm">
+                <i class="fa-solid fa-download"></i> Backup
+            </button>
             <button onclick="exportToGitHubPages()" class="bg-indigo-500 hover:bg-indigo-400 text-white font-bold py-2 px-6 rounded-lg transition shadow-lg shadow-indigo-900/50 flex items-center gap-2">
                 <i class="fa-solid fa-file-export"></i> Export index.html
             </button>
@@ -126,7 +144,7 @@
                     </div>
 
                     <!-- Canvas -->
-                    <div id="screen-canvas" class="teletext-text grow flex flex-col justify-start gap-1 overflow-hidden tracking-wider"></div>
+                    <div id="screen-canvas" class="teletext-text grow flex flex-col justify-start gap-0 overflow-hidden tracking-wider"></div>
 
                     <!-- Footer -->
                     <div id="fastext-bar" class="teletext-text mt-2 pt-2 border-t border-dashed border-slate-800 flex justify-between text-center text-xs sm:text-sm">
@@ -181,17 +199,86 @@
 
                 <div>
                     <label class="block text-xs font-semibold text-slate-300 mb-1">CONTENT (40 Chars Max Per Line)</label>
-                    <textarea id="edit-page-content" rows="12" class="w-full bg-black border border-slate-700 rounded-xl p-3 text-green-400 font-mono text-xs focus:outline-none focus:border-cyan-500 leading-relaxed resize-none whitespace-pre" oninput="validateRowLength(this)"></textarea>
+                    <div class="flex gap-1 items-stretch">
+                        <textarea id="edit-page-content" rows="12" class="w-full bg-black border border-slate-700 rounded-xl p-3 text-green-400 font-mono text-xs focus:outline-none focus:border-cyan-500 leading-relaxed resize-none whitespace-pre" oninput="validateRowLength(this); updateCharCounter(); scheduleAutoPreview()"></textarea>
+                        <div id="char-counter" class="bg-black border border-slate-700 rounded-xl pt-3 pb-3 pr-2 pl-1 font-mono text-[10px] leading-relaxed select-none flex-shrink-0 overflow-hidden text-right" style="min-width:2.2rem"></div>
+                    </div>
+                </div>
+
+                <!-- Block Art Palette -->
+                <div class="mt-1 pt-3 border-t border-slate-800">
+                    <button onclick="toggleBlockPalette()" class="w-full flex justify-between items-center text-xs font-semibold text-slate-300 mb-2 hover:text-white transition">
+                        <span><i class="fa-solid fa-border-all text-yellow-400 mr-1"></i> BLOCK ART CHARACTERS</span>
+                        <span id="block-palette-arrow">▾</span>
+                    </button>
+                    <div id="block-palette" class="hidden">
+                        <div class="grid gap-1 mb-2" style="grid-template-columns: repeat(auto-fill, minmax(1.6rem, 1fr))">
+                            <!-- Full / half blocks -->
+                            <button onclick="insertAtCursor('█')" title="Full block"         class="block-char-btn">█</button>
+                            <button onclick="insertAtCursor('▀')" title="Upper half"         class="block-char-btn">▀</button>
+                            <button onclick="insertAtCursor('▄')" title="Lower half"         class="block-char-btn">▄</button>
+                            <button onclick="insertAtCursor('▌')" title="Left half"          class="block-char-btn">▌</button>
+                            <button onclick="insertAtCursor('▐')" title="Right half"         class="block-char-btn">▐</button>
+                            <button onclick="insertAtCursor('░')" title="Light shade"        class="block-char-btn">░</button>
+                            <button onclick="insertAtCursor('▒')" title="Medium shade"       class="block-char-btn">▒</button>
+                            <button onclick="insertAtCursor('▓')" title="Dark shade"         class="block-char-btn">▓</button>
+                            <!-- Quadrant blocks -->
+                            <button onclick="insertAtCursor('▘')" title="Top-left"           class="block-char-btn">▘</button>
+                            <button onclick="insertAtCursor('▝')" title="Top-right"          class="block-char-btn">▝</button>
+                            <button onclick="insertAtCursor('▖')" title="Bot-left"           class="block-char-btn">▖</button>
+                            <button onclick="insertAtCursor('▗')" title="Bot-right"          class="block-char-btn">▗</button>
+                            <button onclick="insertAtCursor('▙')" title="All but top-right"  class="block-char-btn">▙</button>
+                            <button onclick="insertAtCursor('▛')" title="All but bot-right"  class="block-char-btn">▛</button>
+                            <button onclick="insertAtCursor('▜')" title="All but bot-left"   class="block-char-btn">▜</button>
+                            <button onclick="insertAtCursor('▟')" title="All but top-left"   class="block-char-btn">▟</button>
+                            <!-- Box drawing -->
+                            <button onclick="insertAtCursor('─')" title="Horizontal"         class="block-char-btn">─</button>
+                            <button onclick="insertAtCursor('│')" title="Vertical"           class="block-char-btn">│</button>
+                            <button onclick="insertAtCursor('┼')" title="Cross"              class="block-char-btn">┼</button>
+                            <button onclick="insertAtCursor('┬')" title="T-down"             class="block-char-btn">┬</button>
+                            <button onclick="insertAtCursor('┴')" title="T-up"               class="block-char-btn">┴</button>
+                            <button onclick="insertAtCursor('├')" title="T-right"            class="block-char-btn">├</button>
+                            <button onclick="insertAtCursor('┤')" title="T-left"             class="block-char-btn">┤</button>
+                            <button onclick="insertAtCursor('┌')" title="Corner TL"          class="block-char-btn">┌</button>
+                            <button onclick="insertAtCursor('┐')" title="Corner TR"          class="block-char-btn">┐</button>
+                            <button onclick="insertAtCursor('└')" title="Corner BL"          class="block-char-btn">└</button>
+                            <button onclick="insertAtCursor('┘')" title="Corner BR"          class="block-char-btn">┘</button>
+                            <!-- Double-line box drawing -->
+                            <button onclick="insertAtCursor('═')" title="Double horiz"       class="block-char-btn">═</button>
+                            <button onclick="insertAtCursor('║')" title="Double vert"        class="block-char-btn">║</button>
+                            <button onclick="insertAtCursor('╔')" title="Double corner TL"   class="block-char-btn">╔</button>
+                            <button onclick="insertAtCursor('╗')" title="Double corner TR"   class="block-char-btn">╗</button>
+                            <button onclick="insertAtCursor('╚')" title="Double corner BL"   class="block-char-btn">╚</button>
+                            <button onclick="insertAtCursor('╝')" title="Double corner BR"   class="block-char-btn">╝</button>
+                            <button onclick="insertAtCursor('╠')" title="Double T-right"     class="block-char-btn">╠</button>
+                            <button onclick="insertAtCursor('╣')" title="Double T-left"      class="block-char-btn">╣</button>
+                            <button onclick="insertAtCursor('╦')" title="Double T-down"      class="block-char-btn">╦</button>
+                            <button onclick="insertAtCursor('╩')" title="Double T-up"        class="block-char-btn">╩</button>
+                            <button onclick="insertAtCursor('╬')" title="Double cross"       class="block-char-btn">╬</button>
+                            <!-- Shapes -->
+                            <button onclick="insertAtCursor('■')" title="Filled square"      class="block-char-btn">■</button>
+                            <button onclick="insertAtCursor('□')" title="Open square"        class="block-char-btn">□</button>
+                            <button onclick="insertAtCursor('●')" title="Filled circle"      class="block-char-btn">●</button>
+                            <button onclick="insertAtCursor('○')" title="Open circle"        class="block-char-btn">○</button>
+                            <button onclick="insertAtCursor('◆')" title="Filled diamond"     class="block-char-btn">◆</button>
+                            <button onclick="insertAtCursor('◇')" title="Open diamond"       class="block-char-btn">◇</button>
+                            <button onclick="insertAtCursor('★')" title="Star"               class="block-char-btn">★</button>
+                            <button onclick="insertAtCursor('▶')" title="Right arrow"        class="block-char-btn">▶</button>
+                        </div>
+                        <p class="text-[9px] text-slate-600 font-mono">Click to insert at cursor. Hover for name.</p>
+                    </div>
                 </div>
 
                 <button onclick="saveAndPreview()" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-3 rounded-xl transition shadow-lg shadow-cyan-900/30">
                     SAVE & PREVIEW ON MONITOR
                 </button>
-                
+
                 <div class="mt-2 p-3 bg-slate-950 rounded-lg border border-slate-800 text-[10px] font-mono text-slate-400">
                     <span class="text-white font-bold mb-1 block">Markup Guide:</span>
                     [w] White | [r] Red | [y] Yellow | [g] Green | [c] Cyan | [m] Magenta <br>
-                    [bg-b] Blue Background | [bg-w] White BG | [bg-k] Black BG
+                    [bg-k] Black BG | [bg-r] Red BG | [bg-g] Green BG | [bg-y] Yellow BG <br>
+                    [bg-b] Blue BG | [bg-m] Magenta BG | [bg-c] Cyan BG | [bg-w] White BG <br>
+                    [dh] Double-height line (counts as 2 rows)
                 </div>
 
                 <!-- Fastext Settings -->
@@ -216,6 +303,10 @@
                         </div>
                     </div>
                     <button onclick="applyFastext()" class="w-full mt-2 bg-slate-800 hover:bg-slate-700 text-white text-xs py-1.5 rounded transition border border-slate-700">Apply Hotkeys</button>
+                    <label class="flex items-center gap-2 mt-3 cursor-pointer select-none">
+                        <input type="checkbox" id="remote-default-on" checked class="w-3.5 h-3.5 accent-cyan-500">
+                        <span class="text-xs text-slate-300">Show remote control by default on export</span>
+                    </label>
                 </div>
             </div>
         </section>
@@ -367,11 +458,18 @@
                 document.getElementById('screen-subpage-num').innerText = "";
             }
 
-            const lines = (page.subpages[subIndex] || "").split('\n');
+            const allLines = (page.subpages[subIndex] || "").split('\n');
+            let rowCount = 0, lines = [];
+            for (const line of allLines) {
+                if (rowCount >= 24) break;
+                lines.push(line);
+                rowCount += /\[dh\]/.test(line) ? 2 : 1;
+            }
             lines.forEach(line => {
+                const isDH = /\[dh\]/.test(line);
                 const rowDiv = document.createElement('div');
-                rowDiv.className = 'row flex min-h-[1.25em]';
-                rowDiv.innerHTML = parseLineToTeletextSpans(line);
+                rowDiv.className = 'row flex min-h-[1.25em]' + (isDH ? ' row-dh' : '');
+                rowDiv.innerHTML = parseLineToTeletextSpans(line.replace(/\[dh\]/g, ''));
                 canvas.appendChild(rowDiv);
             });
 
@@ -452,6 +550,7 @@
                 tabContainer.appendChild(btn);
             });
             document.getElementById('edit-page-content').value = activeEditorSubpages[activeEditorSubpageIndex] || "";
+            updateCharCounter();
         }
 
         function addSubPage() {
@@ -469,24 +568,80 @@
             }
         }
 
+        function updateCharCounter() {
+            const ta = document.getElementById('edit-page-content');
+            const counter = document.getElementById('char-counter');
+            const lines = ta.value.split('\n');
+            counter.innerHTML = lines.map(line => {
+                const n = line.replace(/\[[a-z0-9\-]+\]/g, '').length;
+                const color = n >= 40 ? '#ef4444' : n >= 35 ? '#eab308' : '#475569';
+                return `<div style="color:${color};line-height:1.625">${n}</div>`;
+            }).join('');
+            counter.scrollTop = ta.scrollTop;
+        }
+
         function validateRowLength(textarea) {
             const max = 40;
+            const tagRe = /^\[[a-z0-9\-]+\]/;
             const lines = textarea.value.split('\n');
             let updated = [], changed = false;
 
             lines.forEach((line) => {
-                const clean = line.replace(/\[[a-z0-9\-]+\]/g, "");
-                if (clean.length > max) {
-                    changed = true;
-                    updated.push(line.substring(0, max + (line.length - clean.length)));
-                } else {
-                    updated.push(line);
+                let visible = 0, i = 0, result = '';
+                while (i < line.length) {
+                    const tag = line.slice(i).match(tagRe);
+                    if (tag) {
+                        result += tag[0];
+                        i += tag[0].length;
+                    } else {
+                        if (visible >= max) break;
+                        result += line[i];
+                        visible++;
+                        i++;
+                    }
                 }
+                if (result !== line) changed = true;
+                updated.push(result);
             });
             if (changed) textarea.value = updated.join('\n');
         }
 
+        function toggleBlockPalette() {
+            const p = document.getElementById('block-palette');
+            const a = document.getElementById('block-palette-arrow');
+            const hidden = p.classList.toggle('hidden');
+            a.textContent = hidden ? '▾' : '▴';
+        }
+
+        function insertAtCursor(char) {
+            const ta = document.getElementById('edit-page-content');
+            const start = ta.selectionStart;
+            const end = ta.selectionEnd;
+            ta.value = ta.value.substring(0, start) + char + ta.value.substring(end);
+            ta.selectionStart = ta.selectionEnd = start + 1;
+            ta.focus();
+            validateRowLength(ta);
+            updateCharCounter();
+            scheduleAutoPreview();
+        }
+
+        let livePreviewTimer = null;
+
+        function scheduleAutoPreview() {
+            clearTimeout(livePreviewTimer);
+            livePreviewTimer = setTimeout(() => {
+                saveCurrentTextarea();
+                const pageNum = document.getElementById('edit-page-num').value;
+                ceefauxDatabase[pageNum] = {
+                    timer: Number(document.getElementById('edit-carousel-timer').value),
+                    subpages: activeEditorSubpages.filter(t => t.trim().length > 0)
+                };
+                renderPreview(pageNum, 0);
+            }, 600);
+        }
+
         function saveAndPreview() {
+            clearTimeout(livePreviewTimer);
             saveCurrentTextarea();
             const pageNum = document.getElementById('edit-page-num').value;
             ceefauxDatabase[pageNum] = {
@@ -502,14 +657,74 @@
             applyFastext();
             initEditorForm("100");
             renderPreview("100", 0);
+            document.getElementById('edit-page-content').addEventListener('scroll', function() {
+                document.getElementById('char-counter').scrollTop = this.scrollTop;
+            });
+            document.addEventListener('keydown', (e) => {
+                if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+                    e.preventDefault();
+                    saveAndPreview();
+                }
+            });
         };
 
         // --- GITHUB EXPORT ENGINE ---
         
+        function exportDatabase() {
+            applyFastext();
+            saveCurrentTextarea();
+            const pageNum = document.getElementById('edit-page-num').value;
+            ceefauxDatabase[pageNum] = {
+                timer: Number(document.getElementById('edit-carousel-timer').value),
+                subpages: activeEditorSubpages.filter(t => t.trim().length > 0)
+            };
+            const payload = JSON.stringify({ db: ceefauxDatabase, hotkeys }, null, 2);
+            const blob = new Blob([payload], { type: 'application/json' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'ceefaux-backup.json';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function handleImportFile(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                try {
+                    const data = JSON.parse(evt.target.result);
+                    if (data.db) ceefauxDatabase = data.db;
+                    if (data.hotkeys) {
+                        hotkeys = data.hotkeys;
+                        document.getElementById('ft-r-p').value = hotkeys.r.p;
+                        document.getElementById('ft-r-l').value = hotkeys.r.l;
+                        document.getElementById('ft-g-p').value = hotkeys.g.p;
+                        document.getElementById('ft-g-l').value = hotkeys.g.l;
+                        document.getElementById('ft-y-p').value = hotkeys.y.p;
+                        document.getElementById('ft-y-l').value = hotkeys.y.l;
+                        document.getElementById('ft-b-p').value = hotkeys.b.p;
+                        document.getElementById('ft-b-l').value = hotkeys.b.l;
+                        applyFastext();
+                    }
+                    const firstPage = Object.keys(ceefauxDatabase)[0] || "100";
+                    initEditorForm(firstPage);
+                    renderPreview(firstPage, 0);
+                    e.target.value = '';
+                } catch(err) {
+                    alert('Invalid backup file.');
+                }
+            };
+            reader.readAsText(file);
+        }
+
         function exportToGitHubPages() {
+            applyFastext();
             saveAndPreview(); // Ensure latest changes are committed to memory
             const dbPayload = JSON.stringify(ceefauxDatabase);
             const hkPayload = JSON.stringify(hotkeys);
+            const showRemote = document.getElementById('remote-default-on').checked;
 
             // We safely construct the viewer HTML template.
             // By using "\x3Cscript", we avoid the HTML parser breaking the JS literal.
@@ -551,6 +766,8 @@
         .noise-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 200%; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E"); opacity: 0.18; pointer-events: none; display: none; z-index: 11; animation: static-noise 0.2s steps(4) infinite; }
         @keyframes static-noise { 0% { transform: translateY(0); } 100% { transform: translateY(-50%); } }
         
+        .row { white-space: nowrap; overflow: hidden; }
+        .row-dh { font-size: 3.3rem; }
         .handheld-remote { background: linear-gradient(135deg, #2e2f33 0%, #1a1b1d 100%); border: 4px solid #43454a; box-shadow: 0 15px 35px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.1); }
         .remote-btn { box-shadow: 0 3px 0px #121315, inset 0 1px 1px rgba(255,255,255,0.2); transition: all 0.1s ease; }
         .remote-btn:active { transform: translateY(2px); box-shadow: 0 1px 0px #121315; }
@@ -568,7 +785,7 @@
                         <div><span class="color-w">P</span><span id="screen-page-num" class="color-w">100</span><span class="ml-4 color-y">CEEFAUX</span><span id="screen-subpage-num" class="color-c ml-4"></span></div>
                         <div id="screen-clock" class="color-y">00:00/00</div>
                     </div>
-                    <div id="screen-canvas" class="teletext-text grow flex flex-col justify-start gap-1 overflow-hidden tracking-wider"></div>
+                    <div id="screen-canvas" class="teletext-text grow flex flex-col justify-start gap-0 overflow-hidden tracking-wider"></div>
                     <div id="fastext-bar" class="teletext-text mt-2 pt-2 border-t border-dashed border-slate-800 flex justify-between text-center text-xs sm:text-sm">
                         <!-- Dynamic Hotkeys -->
                     </div>
@@ -678,8 +895,16 @@
             if(page.subpages.length > 1) document.getElementById('screen-subpage-num').innerText = \`\${subIdx+1}/\${page.subpages.length}\`;
             else document.getElementById('screen-subpage-num').innerText = "";
 
-            const lines = (page.subpages[subIdx]||"").split('\\n');
+            const allLines = (page.subpages[subIdx]||"").split('\\n');
+            let rowCount = 0, lines = [];
+            for (const line of allLines) {
+                if (rowCount >= 24) break;
+                lines.push(line);
+                rowCount += /\\[dh\\]/.test(line) ? 2 : 1;
+            }
             lines.forEach(l => {
+                const isDH = /\\[dh\\]/.test(l);
+                l = l.replace(/\\[dh\\]/g, '');
                 let fg="color-w", bg="bg-k", html="";
                 l.split(/(\\[[a-z0-9\\-]+\\])/g).forEach(p => {
                     if(p.startsWith('[') && p.endsWith(']')) {
@@ -699,7 +924,7 @@
                         html += \`<span class="\${fg} \${bg} font-mono tracking-wider">\${processed}</span>\`;
                     }
                 });
-                canvas.innerHTML += \`<div class="row flex min-h-[1.25em]">\${html||'<span class="color-w">&nbsp;</span>'}</div>\`;
+                canvas.innerHTML += \`<div class="row flex min-h-[1.25em]\${isDH?' row-dh':''}">\${html||'<span class="color-w">&nbsp;</span>'}</div>\`;
             });
 
             if(page.subpages.length > 1 && !isHeld) {
@@ -751,7 +976,7 @@
             if(e.key==='PageDown') { e.preventDefault(); offsetPage(1); }
         });
 
-        window.onload = () => { initFastext(); goPage("100"); };
+        window.onload = () => { initFastext(); goPage("100"); if(!${showRemote}) toggleRemote(); };
     \x3C/script>
 </body>
 </html>`;
