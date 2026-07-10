@@ -33,12 +33,7 @@
 
         @media (max-width: 640px) { .teletext-text { font-size: 1.1rem; } }
 
-        /* Teletext Colors */
-        .color-w { color: var(--tt-white); } .color-r { color: var(--tt-red); }
-        .color-g { color: var(--tt-green); } .color-y { color: var(--tt-yellow); }
-        .color-b { color: var(--tt-blue); } .color-m { color: var(--tt-magenta); }
-        .color-c { color: var(--tt-cyan); }
-        
+        /* Teletext Backgrounds defined first */
         .bg-w { background-color: var(--tt-white); color: var(--tt-black); }
         .bg-r { background-color: var(--tt-red); color: var(--tt-white); }
         .bg-g { background-color: var(--tt-green); color: var(--tt-black); }
@@ -48,6 +43,12 @@
         .bg-c { background-color: var(--tt-cyan); color: var(--tt-black); }
         .bg-k { background-color: var(--tt-black); color: var(--tt-white); }
 
+        /* Teletext Text Colors defined after backgrounds so they take priority */
+        .color-w { color: var(--tt-white); } .color-r { color: var(--tt-red); }
+        .color-g { color: var(--tt-green); } .color-y { color: var(--tt-yellow); }
+        .color-b { color: var(--tt-blue); } .color-m { color: var(--tt-magenta); }
+        .color-c { color: var(--tt-cyan); }
+        
         /* CRT Effects */
         .crt-frame {
             position: relative; background: #1e1e1c;
@@ -512,6 +513,7 @@
 
             // We safely construct the viewer HTML template.
             // By using "\x3Cscript", we avoid the HTML parser breaking the JS literal.
+            // The template has been updated to fix the CSS specificity and Remote width issues.
             const viewerHtml = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -530,13 +532,16 @@
         .teletext-text { font-family: 'VT323', monospace; font-size: 1.65rem; line-height: 1.15; letter-spacing: 0.5px; text-transform: uppercase; }
         @media (max-width: 640px) { .teletext-text { font-size: 1.1rem; } }
         
-        .color-w { color: var(--tt-white); } .color-r { color: var(--tt-red); } .color-g { color: var(--tt-green); }
-        .color-y { color: var(--tt-yellow); } .color-b { color: var(--tt-blue); } .color-m { color: var(--tt-magenta); } .color-c { color: var(--tt-cyan); }
+        /* Specificity Fix: Backgrounds first */
         .bg-w { background-color: var(--tt-white); color: var(--tt-black); } .bg-r { background-color: var(--tt-red); color: var(--tt-white); }
         .bg-g { background-color: var(--tt-green); color: var(--tt-black); } .bg-y { background-color: var(--tt-yellow); color: var(--tt-black); }
         .bg-b { background-color: var(--tt-blue); color: var(--tt-white); } .bg-m { background-color: var(--tt-magenta); color: var(--tt-white); }
         .bg-c { background-color: var(--tt-cyan); color: var(--tt-black); } .bg-k { background-color: var(--tt-black); color: var(--tt-white); }
 
+        /* Specificity Fix: Foregrounds second (overrides bg-inherited text colour) */
+        .color-w { color: var(--tt-white); } .color-r { color: var(--tt-red); } .color-g { color: var(--tt-green); }
+        .color-y { color: var(--tt-yellow); } .color-b { color: var(--tt-blue); } .color-m { color: var(--tt-magenta); } .color-c { color: var(--tt-cyan); }
+        
         .crt-frame { position: relative; background: #1e1e1c; border: 12px solid #2d2d2a; border-radius: 35px; box-shadow: inset 0 0 20px rgba(0,0,0,0.9), 0 10px 40px rgba(0,0,0,0.8), 0 0 0 4px #151514; overflow: hidden; }
         .crt-screen { position: relative; background-color: var(--tt-black); }
         .crt-screen::before { content: " "; display: block; position: absolute; top: 0; left: 0; bottom: 0; right: 0; background: radial-gradient(circle at center, transparent 60%, rgba(0, 0, 0, 0.4) 100%); pointer-events: none; z-index: 10; }
@@ -646,17 +651,15 @@
             document.getElementById('rem-btn-b').innerText = hotkeys.b.l;
         }
 
+        // Width logic fixed here: instead of shifting to col-span-12, we preserve 8 cols and center it
         function toggleRemote() {
             const rs = document.getElementById('remote-section');
             const crt = document.getElementById('crt-section');
-            const main = document.getElementById('viewer-main');
             rs.classList.toggle('hidden');
             if(rs.classList.contains('hidden')) {
-                crt.classList.replace('lg:col-span-8', 'lg:col-span-12');
-                main.classList.replace('max-w-6xl', 'max-w-4xl');
+                crt.classList.add('lg:col-start-3'); // Offset the 8 column monitor to perfectly center it in the 12 columns
             } else {
-                crt.classList.replace('lg:col-span-12', 'lg:col-span-8');
-                main.classList.replace('max-w-4xl', 'max-w-6xl');
+                crt.classList.remove('lg:col-start-3');
             }
         }
 
