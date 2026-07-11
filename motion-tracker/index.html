@@ -2,310 +2,426 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>M3 Motion Tracker</title>
-    <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.7.4.2.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>M41A Unified Motion Tracker</title>
+    <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.7.4.1.min.js"></script>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
         body {
-            background-color: #050b05;
-            color: #00ff33;
-            font-family: monospace;
-            overflow: hidden;
+            background-color: #030a05;
+            color: #00ff66;
+            font-family: 'Courier New', monospace;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            user-select: none;
         }
         #setup-screen {
             display: flex;
             flex-direction: column;
-            gap: 15px;
-            width: 80%;
-            max-width: 300px;
+            gap: 20px;
+            align-items: center;
             text-align: center;
+            padding: 20px;
         }
-        button {
-            background: #002200;
-            color: #00ff33;
-            border: 2px solid #00ff33;
-            padding: 15px;
-            font-size: 16px;
-            font-family: monospace;
+        #game-screen {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+        canvas {
+            border: 2px solid #004411;
+            border-radius: 50%;
+            background-color: #010502;
+            box-shadow: 0 0 30px rgba(0, 255, 102, 0.15);
+        }
+        .btn {
+            background-color: #00ff66;
+            color: #020704;
+            border: none;
+            padding: 15px 40px;
+            font-size: 18px;
+            font-weight: bold;
             cursor: pointer;
             text-transform: uppercase;
+            box-shadow: 0 0 10px rgba(0,255,102,0.4);
         }
-        button:active { background: #00ff33; color: #002200; }
-        #game-screen { display: none; width: 100vw; height: 100vh; position: relative; }
-        canvas { display: block; width: 100%; height: 100%; }
-        #hud {
-            position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
+        .btn-alt {
+            background-color: #004411;
+            color: #00ff66;
+            border: 1px solid #00ff66;
+        }
+        #telemetry {
+            margin-top: 15px;
+            font-size: 14px;
             text-align: center;
-            font-size: 18px;
-            width: 100%;
-            pointer-events: none;
-            text-shadow: 0 0 5px #00ff33;
+            height: 40px;
         }
     </style>
 </head>
 <body>
 
+    <!-- SETUP & PERMISSIONS SCREEN -->
     <div id="setup-screen">
-        <h2>M3 MOTION TRACKER</h2>
-        <p>Select your operational role:</p>
-        <button onclick="startGame('marine')">Execute Marine Protocol</button>
-        <button onclick="startGame('alien')">Execute Xenomorph Protocol</button>
+        <h2>M41A TELEMETRY LINK</h2>
+        <p>Select your operational role for this round:</p>
+        <button class="btn" onclick="initTracking('marine')">Deploy Marine</button>
+        <button class="btn btn-alt" onclick="initTracking('alien')">Deploy Alien</button>
+        <p style="font-size: 11px; color: #00aa44; max-width: 300px;">
+            Note: Requires Camera/Mic (for ultrasound processing), Location (GPS), and Motion Sensors (Compass).
+        </p>
     </div>
 
+    <!-- ACTIVE RADAR SCREEN -->
     <div id="game-screen">
-        <canvas id="radarCanvas"></canvas>
-        <div id="hud">RANGE: -- M<br><span id="role-display"></span></div>
+        <canvas id="radarCanvas" width="360" height="360"></canvas>
+        <div id="telemetry">INITIALIZING SCANNER...</div>
     </div>
 
-    <script>
-        // CONFIGURATION
-        const PUBNUB_PUB_KEY = 'pub-c-d0d3df8c-4589-4f34-a4f9-f8e19afe8a33'; 
-        const PUBNUB_SUB_KEY = 'sub-c-577de050-aa10-49d2-911f-b246fb6a450f';
-        const CHANNEL_NAME = 'aliens-motion-tracker-game';
-        const MAX_TRACKING_RANGE_METERS = 50; // Radar edge radius
+<script>
+// --- CORE CONFIGURATION ---
+const PUBNUB_PUB_KEY = 'pub-c-d0d3df8c-4589-4f34-a4f9-f8e19afe8a33'; 
+const PUBNUB_SUB_KEY = 'sub-c-577de050-aa10-49d2-911f-b246fb6a450f';
+const GAME_CHANNEL = 'aliens-sensor-fusion';
+const TARGET_FREQ = 19000; 
 
-        let pubnub;
-        let myId = 'ply_' + Math.random().toString(36).substr(2, 9);
-        let myRole = '';
-        let myCoords = null;
-        let players = {};
-        let audioCtx = null;
-        let nextPingTime = 0;
-        let closestDistance = Infinity;
+// --- APPLICATION STATE ---
+let role = ''; 
+let pubnub;
+let myId = 'p_' + Math.floor(Math.random() * 10000);
+let myCoords = null;
+let compassHeading = 0; 
+let globalPlayers = {};
 
-        const canvas = document.getElementById('radarCanvas');
-        const ctx = canvas.getContext('2d');
+// Audio variables
+let audioCtx = null;
+let micStream = null;
+let fftAnalyser = null;
+let ultrasonicOscillator = null;
 
-        function resizeCanvas() {
-            canvas.width = window.innerWidth * window.devicePixelRatio;
-            canvas.height = window.innerHeight * window.devicePixelRatio;
-            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-        }
-        window.addEventListener('resize', resizeCanvas);
+// Audio Asset Storage Buffers
+let soundBlipBuffer = null; // Idle scan (nothing found)
+let soundHitBuffer = null;  // Target scan hit
 
-        async function startGame(role) {
-            myRole = role;
-            document.getElementById('setup-screen').style.display = 'none';
-            document.getElementById('game-screen').style.display = 'block';
-            document.getElementById('role-display').innerText = `ROLE: UNKNOWN UTILITY`; // Kept ambiguous as requested
-            
-            resizeCanvas();
-            initAudio();
-            await initWakeLock();
-            initPubNub();
-            initGPS();
-            
-            requestAnimationFrame(gameLoop);
-        }
+// UI/Canvas Contexts
+let canvas, ctx;
+let sweepAngle = 0;
 
-        // 1. HARDWARE WAKE LOCK
-        async function initWakeLock() {
-            if ('wakeLock' in navigator) {
-                try { await navigator.wakeLock.request('screen'); } 
-                catch (err) { console.warn("Wake Lock request failed:", err); }
+// --- STEP 1: INITIALIZE HARDWARE & PERMISSIONS ---
+async function initTracking(selectedRole) {
+    role = selectedRole;
+    document.getElementById('setup-screen').style.display = 'none';
+    document.getElementById('game-screen').style.display = 'flex';
+    
+    canvas = document.getElementById('radarCanvas');
+    ctx = canvas.getContext('2d');
+
+    // Initialize Web Audio Context
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    // Force Screen Wake Lock
+    if ('wakeLock' in navigator) {
+        try { await navigator.wakeLock.request('screen'); } catch(e) {}
+    }
+
+    // Load Audio Files into Memory Buffers
+    if (role === 'marine') {
+        await loadAudioAssets();
+    }
+
+    // Initialize Audio Channels based on Role
+    if (role === 'alien') {
+        startUltrasoundEmission();
+    } else {
+        await startUltrasoundReception();
+    }
+
+    // Request Compass Access (Handles iOS permission prompts)
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        try {
+            const permission = await DeviceOrientationEvent.requestPermission();
+            if (permission === 'granted') {
+                window.addEventListener('deviceorientation', handleCompass, true);
+            }
+        } catch (err) { console.error("Compass permission denied", err); }
+    } else {
+        window.addEventListener('deviceorientationabsolute', handleCompass, true);
+        window.addEventListener('deviceorientation', handleCompass, true);
+    }
+
+    // Initialize PubNub Connection
+    pubnub = new PubNub({ publishKey: PUBNUB_PUB_KEY, subscribeKey: PUBNUB_SUB_KEY, userId: myId });
+    pubnub.addListener({
+        message: function(event) {
+            if (event.publisher !== myId) {
+                globalPlayers[event.publisher] = {
+                    coords: event.message.coords,
+                    role: event.message.role,
+                    lastSeen: Date.now()
+                };
             }
         }
+    });
+    pubnub.subscribe({ channels: [GAME_CHANNEL] });
 
-        // 2. REAL-TIME PUBLIC SIGNALLING (PUBNUB)
-        function initPubNub() {
-            pubnub = new PubNub({
-                publishKey: PUBNUB_PUB_KEY,
-                subscribeKey: PUBNUB_SUB_KEY,
-                userId: myId
+    // Start Geolocation Loop
+    startGPSHardware();
+
+    // Start Loops
+    requestAnimationFrame(renderRadarLoop);
+    if (role === 'marine') {
+        playAudibleAudioLoop();
+    }
+}
+
+// --- STEP 2: AUDIO ASSET STORAGE SYSTEM ---
+async function loadAudioAssets() {
+    try {
+        // Load the background empty scan click (1-second loop asset)
+        const blipResponse = await fetch('assets/audio/scan-blip.ogg');
+        const blipArrayBuffer = await blipResponse.arrayBuffer();
+        soundBlipBuffer = await audioCtx.decodeAudioData(blipArrayBuffer);
+
+        // Load the contact scan hit asset
+        const hitResponse = await fetch('assets/audio/scan-hit.ogg');
+        const hitArrayBuffer = await hitResponse.arrayBuffer();
+        soundHitBuffer = await audioCtx.decodeAudioData(hitArrayBuffer);
+
+        console.log("All track assets successfully loaded into buffers.");
+    } catch (err) {
+        console.error("Critical error downloading audio tracks:", err);
+    }
+}
+
+// --- STEP 3: ACOUSTIC ULTRASOUND SYSTEMS ---
+function startUltrasoundEmission() {
+    ultrasonicOscillator = audioCtx.createOscillator();
+    let gainNode = audioCtx.createGain();
+    
+    ultrasonicOscillator.type = 'sine';
+    ultrasonicOscillator.frequency.value = TARGET_FREQ;
+    
+    gainNode.gain.value = 1.0; 
+    ultrasonicOscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    ultrasonicOscillator.start();
+}
+
+async function startUltrasoundReception() {
+    try {
+        micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false } });
+        let source = audioCtx.createMediaStreamSource(micStream);
+        fftAnalyser = audioCtx.createAnalyser();
+        fftAnalyser.fftSize = 1024; 
+        source.connect(fftAnalyser);
+    } catch(err) {
+        console.error("Microphone access failed", err);
+    }
+}
+
+function getUltrasoundVolume() {
+    if (!fftAnalyser) return 0;
+    let bufferLength = fftAnalyser.frequencyBinCount;
+    let dataArray = new Uint8Array(bufferLength);
+    fftAnalyser.getByteFrequencyData(dataArray);
+
+    let binIndex = Math.round(TARGET_FREQ * fftAnalyser.fftSize / audioCtx.sampleRate);
+    let amplitude = (dataArray[binIndex-1] + dataArray[binIndex] + dataArray[binIndex+1]) / 3;
+    return amplitude / 255; 
+}
+
+// --- STEP 4: SENSOR ORIENTATION & COMPASS ---
+function handleCompass(event) {
+    if (event.webkitCompassHeading) {
+        compassHeading = event.webkitCompassHeading;
+    } else if (event.absolute && event.alpha !== null) {
+        compassHeading = 360 - event.alpha;
+    }
+}
+
+function startGPSHardware() {
+    navigator.geolocation.watchPosition(
+        (position) => {
+            myCoords = { lat: position.coords.latitude, lon: position.coords.longitude };
+            pubnub.publish({
+                channel: GAME_CHANNEL,
+                message: { coords: myCoords, role: role }
             });
+        },
+        (err) => console.error(err),
+        { enableHighAccuracy: true, maximumAge: 0 }
+    );
+}
 
-            pubnub.addListener({
-                message: (event) => {
-                    if (event.message.id !== myId) {
-                        players[event.message.id] = {
-                            lat: event.message.lat,
-                            lon: event.message.lon,
-                            timestamp: Date.now()
-                        };
-                    }
-                }
-            });
+// --- STEP 5: MATHEMATICAL COORDINATE COUPLING ---
+function calculateBearing(lat1, lon1, lat2, lon2) {
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const lat1Rad = lat1 * Math.PI / 180;
+    const lat2Rad = lat2 * Math.PI / 180;
 
-            pubnub.subscribe({ channels: [CHANNEL_NAME] });
+    const y = Math.sin(dLon) * Math.cos(lat2Rad);
+    const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) - Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLon);
+    
+    return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360; 
+}
+
+function calculateGpsDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371000; 
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+    return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+}
+
+// --- STEP 6: GRAPHIC ENGINE LOOP ---
+function renderRadarLoop() {
+    ctx.fillStyle = "rgba(1, 5, 2, 0.15)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    const radius = cx - 10;
+
+    ctx.strokeStyle = "#003311";
+    ctx.lineWidth = 1;
+    for (let r = radius / 3; r <= radius; r += radius / 3) {
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.stroke();
+    }
+
+    let nearestTrackingDistance = Infinity;
+    let usVolume = (role === 'marine') ? getUltrasoundVolume() : 0;
+    const now = Date.now();
+
+    for (let id in globalPlayers) {
+        if (now - globalPlayers[id].lastSeen > 12000) {
+            delete globalPlayers[id];
+            continue;
         }
 
-        // 3. HIGH ACCURACY GPS HARDWARE LINK
-        function initGPS() {
-            if (!navigator.geolocation) return alert("GPS engine missing on this unit.");
+        const target = globalPlayers[id];
+        if (!myCoords || !target.coords) continue;
 
-            navigator.geolocation.watchPosition(
-                (pos) => {
-                    myCoords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
-                    // Broadcast immediately to network
-                    if (pubnub) {
-                        pubnub.publish({
-                            channel: CHANNEL_NAME,
-                            message: { id: myId, lat: myCoords.lat, lon: myCoords.lon }
-                        });
-                    }
-                },
-                (err) => console.error("GPS Error:", err),
-                { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
-            );
+        let rawGpsDistance = calculateGpsDistance(myCoords.lat, myCoords.lon, target.coords.lat, target.coords.lon);
+        let finalDisplayDistance = rawGpsDistance;
+
+        const US_THRESHOLD = 0.04;
+        if (role === 'marine' && usVolume > US_THRESHOLD) {
+            finalDisplayDistance = 15 - (usVolume * 13.5);
         }
 
-        // 4. HAVERSINE MATHEMATICAL CONVERSIONS
-        function getDistanceAndBearing(lat1, lon1, lat2, lon2) {
-            const R = 6371000; // Earth radius meters
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLon = (lon2 - lon1) * Math.PI / 180;
-            const rLat1 = lat1 * Math.PI / 180;
-            const rLat2 = lat2 * Math.PI / 180;
-
-            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                      Math.sin(dLon/2) * Math.sin(dLon/2) * Math.cos(rLat1) * Math.cos(rLat2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-            const distance = R * c;
-
-            const y = Math.sin(dLon) * Math.cos(rLat2);
-            const x = Math.cos(rLat1) * Math.sin(rLat2) - Math.sin(rLat1) * Math.cos(rLat2) * Math.cos(dLon);
-            const bearing = Math.atan2(y, x);
-
-            return { distance, bearing };
+        if (finalDisplayDistance < nearestTrackingDistance) {
+            nearestTrackingDistance = finalDisplayDistance;
         }
 
-        // 5. SYNTHETIC AUDIO SIGNALS (AUTHENTIC PING ENGINE)
-        function initAudio() {
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            nextPingTime = audioCtx.currentTime;
-        }
+        let targetBearing = calculateBearing(myCoords.lat, myCoords.lon, target.coords.lat, target.coords.lon);
+        let relativeAngleDeg = targetBearing - compassHeading;
+        let relativeAngleRad = (relativeAngleDeg - 90) * Math.PI / 180; 
 
-        function triggerAudioPing(distance) {
-            if (!audioCtx) return;
-            
-            // Map proximity to parameters
-            const clampDist = Math.max(2, Math.min(MAX_TRACKING_RANGE_METERS, distance));
-            const pct = 1 - ((clampDist - 2) / (MAX_TRACKING_RANGE_METERS - 2)); // 1.0 close, 0.0 far
+        let displayMaxRange = 30; 
+        let currentScaleRadius = (Math.min(finalDisplayDistance, displayMaxRange) / displayMaxRange) * radius;
 
-            // Calculate pitch shift and ping repetition frequency
-            const pitch = 500 + (pct * 700); // 500Hz to 1200Hz
-            const interval = 2.0 - (pct * 1.85); // 2.0s interval scaling down to 0.15s
+        let blipX = cx + currentScaleRadius * Math.cos(relativeAngleRad);
+        let blipY = cy + currentScaleRadius * Math.sin(relativeAngleRad);
 
-            if (audioCtx.currentTime >= nextPingTime) {
-                const osc = audioCtx.createOscillator();
-                const gainNode = audioCtx.createGain();
-                
-                // Authentic click/chirp envelope shape
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(pitch, audioCtx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(pitch * 0.4, audioCtx.currentTime + 0.08);
-
-                gainNode.gain.setValueAtTime(0.4, audioCtx.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.12);
-
-                osc.connect(gainNode);
-                gainNode.connect(audioCtx.destination);
-                
-                osc.start();
-                osc.stop(audioCtx.currentTime + 0.13);
-
-                nextPingTime = audioCtx.currentTime + interval;
-            }
-        }
-
-        // 6. VISUAL RENDERING PIPELINE (2D CRT EFFECT)
-        let sweepAngle = 0;
-        function gameLoop() {
-            const w = canvas.width / window.devicePixelRatio;
-            const h = canvas.height / window.devicePixelRatio;
-            const cx = w / 2;
-            const cy = h * 0.6;
-            const radarRadius = Math.min(w * 0.45, h * 0.5);
-
-            // CRT Glow effect screen wipes
-            ctx.fillStyle = 'rgba(5, 11, 5, 0.15)';
-            ctx.fillRect(0, 0, w, h);
-
-            // Draw Vector Grids
-            ctx.strokeStyle = 'rgba(0, 255, 51, 0.2)';
-            ctx.lineWidth = 1;
-            
-            // Concentric range rings
-            for(let r = 0.33; r <= 1; r += 0.33) {
-                ctx.beginPath();
-                ctx.arc(cx, cy, radarRadius * r, Math.PI, 2 * Math.PI);
-                ctx.stroke();
-            }
-
-            // Radar fan lines
+        let normalizedSweepAngle = (sweepAngle * 180 / Math.PI + 360) % 360;
+        let normalizedBlipAngle = (relativeAngleRad * 180 / Math.PI + 360) % 360;
+        
+        if (Math.abs(normalizedSweepAngle - normalizedBlipAngle) < 15 || Math.abs(normalizedSweepAngle - normalizedBlipAngle) > 345) {
+            ctx.fillStyle = "rgba(0, 255, 102, 0.9)";
             ctx.beginPath();
-            ctx.moveTo(cx - radarRadius, cy);
-            ctx.lineTo(cx + radarRadius, cy);
-            ctx.moveTo(cx, cy);
-            ctx.lineTo(cx, cy - radarRadius);
-            ctx.stroke();
-
-            closestDistance = Infinity;
-
-            if (myCoords) {
-                const now = Date.now();
-                Object.keys(players).forEach(id => {
-                    const p = players[id];
-                    if (now - p.timestamp > 15000) return; // Drop stale clients (15s timeout)
-
-                    const locData = getDistanceAndBearing(myCoords.lat, myCoords.lon, p.lat, p.lon);
-                    
-                    if (locData.distance < closestDistance) {
-                        closestDistance = locData.distance;
-                    }
-
-                    // Calculate drawing vectors assuming screen top is true North
-                    if (locData.distance <= MAX_TRACKING_RANGE_METERS) {
-                        const distPx = (locData.distance / MAX_TRACKING_RANGE_METERS) * radarRadius;
-                        const bx = cx + distPx * Math.sin(locData.bearing);
-                        const by = cy - distPx * Math.cos(locData.bearing);
-
-                        // Render unidentified signal blips
-                        ctx.fillStyle = 'rgba(0, 255, 51, 0.8)';
-                        ctx.beginPath();
-                        ctx.arc(bx, by, 8, 0, 2 * Math.PI);
-                        ctx.fill();
-                        
-                        // Signal trailing artifact
-                        ctx.fillStyle = 'rgba(0, 255, 51, 0.2)';
-                        ctx.beginPath();
-                        ctx.arc(bx, by, 16, 0, 2 * Math.PI);
-                        ctx.fill();
-                    }
-                });
-            }
-
-            // Manage continuous audio frequency sweeps
-            if (closestDistance !== Infinity && closestDistance <= MAX_TRACKING_RANGE_METERS) {
-                triggerAudioPing(closestDistance);
-                document.getElementById('hud').innerHTML = `RANGE: ${Math.round(closestDistance)} M<br><span id="role-display">MONITOR ACTIVE</span>`;
-            } else {
-                document.getElementById('hud').innerHTML = `RANGE: -- M<br><span id="role-display">MONITOR ACTIVE</span>`;
-            }
-
-            // Authentic CRT sweeping line overlay
-            sweepAngle += 0.02;
-            let sweepX = cx + radarRadius * Math.cos(Math.PI + Math.abs(Math.sin(sweepAngle)) * Math.PI);
-            let sweepY = cy + radarRadius * Math.sin(Math.PI + Math.abs(Math.sin(sweepAngle)) * Math.PI);
-            
-            ctx.strokeStyle = 'rgba(0, 255, 51, 0.1)';
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.moveTo(cx, cy);
-            ctx.lineTo(sweepX, sweepY);
-            ctx.stroke();
-
-            requestAnimationFrame(gameLoop);
+            ctx.arc(blipX, blipY, 7, 0, Math.PI * 2);
+            ctx.fill();
         }
-    </script>
+    }
+
+    const telemetry = document.getElementById('telemetry');
+    if (role === 'alien') {
+        telemetry.innerHTML = `TRANSMITTING ACOUSTIC ULTRASOUND FREQ...<br>ROLE: XENOMORPH RESIDENT`;
+    } else {
+        if (nearestTrackingDistance === Infinity) {
+            telemetry.innerHTML = `SEARCHING TELEMETRY SECTORS...<br>NO TARGETS DETECTED`;
+        } else {
+            telemetry.innerHTML = `RANGE: ${nearestTrackingDistance.toFixed(1)}M<br>US-AMP LOCK: ${usVolume.toFixed(3)}`;
+        }
+    }
+
+    sweepAngle += 0.04; 
+    if (sweepAngle > Math.PI * 2) sweepAngle = 0;
+
+    ctx.strokeStyle = "rgba(0, 255, 102, 0.4)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + radius * Math.cos(sweepAngle), cy + radius * Math.sin(sweepAngle));
+    ctx.stroke();
+
+    requestAnimationFrame(renderRadarLoop);
+}
+
+// --- STEP 7: DUAL AUDIO FILE INTEGRATION ENGINE ---
+function playAudibleAudioLoop() {
+    if (role !== 'marine' || !soundBlipBuffer || !soundHitBuffer) return;
+
+    let lowestDistance = Infinity;
+    let usVolume = getUltrasoundVolume();
+
+    // Determine target proximity across active connections
+    for (let id in globalPlayers) {
+        if (!myCoords || !globalPlayers[id].coords) continue;
+        let d = calculateGpsDistance(myCoords.lat, myCoords.lon, globalPlayers[id].coords.lat, globalPlayers[id].coords.lon);
+        
+        if (usVolume > 0.04) {
+            d = 15 - (usVolume * 13.5);
+        }
+        if (d < lowestDistance) lowestDistance = d;
+    }
+
+    let nextTimingInterval = 1000; // Default 1 second idle tempo
+
+    // CASE 1: No targets within range -> Play standard scan loop click once per second
+    if (lowestDistance === Infinity) {
+        let blipSource = audioCtx.createBufferSource();
+        let blipGain = audioCtx.createGain();
+
+        blipSource.buffer = soundBlipBuffer;
+        blipGain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+
+        blipSource.connect(blipGain);
+        blipGain.connect(audioCtx.destination);
+        blipSource.start(0);
+
+        nextTimingInterval = 1000; // Force exact 1 second interval
+    } 
+    // CASE 2: Alien Detected -> Suppress idle click, scale up target hit audio instead
+    else {
+        let boundedDistance = Math.min(lowestDistance, 30);
+        let ratio = boundedDistance / 30;
+
+        // Closer means faster tempo and higher playback rate/pitch alteration
+        let targetPlaybackRate = 2.0 - ratio;            // 1.0 (normal) up to 2.0 (fast/high pitched)
+        nextTimingInterval = 120 + (ratio * 880);         // 120ms (touching) up to 1000ms (outer boundary)
+
+        let hitSource = audioCtx.createBufferSource();
+        let hitGain = audioCtx.createGain();
+
+        hitSource.buffer = soundHitBuffer;
+        hitSource.playbackRate.setValueAtTime(targetPlaybackRate, audioCtx.currentTime);
+        hitGain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+
+        hitSource.connect(hitGain);
+        hitGain.connect(audioCtx.destination);
+        hitSource.start(0);
+    }
+
+    // Schedule next sound playback frame dynamically
+    setTimeout(playAudibleAudioLoop, nextTimingInterval);
+}
+</script>
 </body>
 </html>
