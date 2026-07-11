@@ -42,7 +42,135 @@
             left: 0;
             width: 100%;
             height: 100%;
+            z-index: 1;
         }
+        
+        /* --- CSS RADAR PULSE WAVES --- */
+        .radar-pulse-container {
+            position: absolute;
+            left: 50%;
+            top: 76%; /* Anchored exactly at the tracking hub center */
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 2;
+        }
+        .pulse-wave {
+            position: absolute;
+            border-radius: 50%;
+            /* Emulates the soft, thick white/blue gradient wavefront from the screen */
+            border: 24px solid rgba(230, 245, 255, 0.08);
+            box-shadow: inset 0 0 20px rgba(255, 255, 255, 0.05);
+            transform: translate(-50%, -50%);
+            width: 0px;
+            height: 0px;
+            opacity: 0;
+            animation: radar-sweep-out 3s linear infinite;
+        }
+        .pulse-wave:nth-child(2) { animation-delay: 1s; }
+        .pulse-wave:nth-child(3) { animation-delay: 2s; }
+
+        @keyframes radar-sweep-out {
+            0% {
+                width: 0px;
+                height: 0px;
+                opacity: 0.0;
+            }
+            5% {
+                opacity: 0.8;
+            }
+            100% {
+                width: 180vmax;
+                height: 180vmax;
+                opacity: 0;
+            }
+        }
+
+        /* --- PURE CSS HUD DISPLAY MASK --- */
+        #hud-mask {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 24vh;
+            background-color: #0088ff;
+            z-index: 10;
+            pointer-events: none;
+            /* Creates the precise tactical display notch cutout using mathematical coordinate geometry */
+            clip-path: polygon(
+                0% 0%, 
+                calc(50% - 75px) 0%, 
+                calc(50% - 60px) 45%, 
+                calc(50% + 60px) 45%, 
+                calc(50% + 75px) 0%, 
+                100% 0%, 
+                100% 100%, 
+                0% 100%
+            );
+        }
+        
+        /* Dark interface window context directly behind the cutout hole */
+        #hud-well-bg {
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 150px;
+            height: 24vh;
+            background-color: #010804;
+            z-index: 5;
+            pointer-events: none;
+        }
+
+        /* HUD Readout Typography Containers */
+        #hud-text-layer {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 24vh;
+            z-index: 15;
+            pointer-events: none;
+            box-sizing: border-box;
+            padding: 20px;
+            color: #ffffff;
+            font-family: Arial, sans-serif;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        .meta-left {
+            position: absolute;
+            left: 20px;
+            top: 32px;
+        }
+        .meta-right {
+            position: absolute;
+            right: 140px; /* Leave space clear for calibration gear button */
+            top: 32px;
+        }
+        .range-display-container {
+            position: absolute;
+            left: 50%;
+            top: 8px;
+            transform: translateX(-50%);
+            width: 120px;
+            text-align: center;
+            font-family: 'Courier New', monospace;
+            color: #ff0000;
+        }
+        .range-main {
+            font-size: 38px;
+            font-weight: bold;
+            letter-spacing: -2px;
+        }
+        .range-sub {
+            position: absolute;
+            font-size: 13px;
+            top: 2px;
+            left: 82px;
+            text-align: left;
+            line-height: 14px;
+        }
+
         .btn {
             background-color: #00ff66;
             color: #000000;
@@ -67,7 +195,7 @@
             height: 100%;
             background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
             background-size: 100% 4px;
-            z-index: 5;
+            z-index: 20;
             pointer-events: none;
             display: none;
         }
@@ -78,13 +206,13 @@
             position: absolute;
             top: 15px;
             left: 15px;
-            z-index: 10;
+            z-index: 25;
         }
         #config-trigger {
             position: absolute;
             bottom: 15px;
             right: 15px;
-            z-index: 20;
+            z-index: 30;
             background: rgba(0, 0, 0, 0.6);
             border: 1px solid #00ff66;
             color: #00ff66;
@@ -93,7 +221,6 @@
             cursor: pointer;
             font-weight: bold;
         }
-        /* Calibration Menu Overlay */
         #config-menu {
             display: none;
             position: absolute;
@@ -105,7 +232,7 @@
             background: rgba(1, 8, 4, 0.95);
             border: 2px solid #00ff66;
             padding: 20px;
-            z-index: 30;
+            z-index: 40;
             box-shadow: 0 0 20px rgba(0, 255, 102, 0.5);
         }
         .config-group {
@@ -158,7 +285,30 @@
         </div>
         
         <div id="scanline-layer" class="scanlines"></div>
+        
+        <!-- Hardware Animated CSS Waves Layers -->
+        <div class="radar-pulse-container">
+            <div class="pulse-wave"></div>
+            <div class="pulse-wave"></div>
+            <div class="pulse-wave"></div>
+        </div>
+
         <canvas id="radarCanvas"></canvas>
+
+        <!-- Pure CSS HUD Panels Layout -->
+        <div id="hud-well-bg"></div>
+        <div id="hud-mask"></div>
+        
+        <!-- Crisp HTML/CSS HUD Labels Layer Overlap -->
+        <div id="hud-text-layer">
+            <div class="meta-left">F.E.M.S. 5.547.60</div>
+            <div class="meta-right">CX. 54/38.04</div>
+            <div class="range-display-container" id="range-readout-box">
+                <!-- Injected dynamically via script functions -->
+                <span class="range-main">00</span>
+                <span class="range-sub">00<br>m</span>
+            </div>
+        </div>
 
         <button id="config-trigger" onclick="toggleConfigMenu()">⚙ CALIBRATE</button>
 
@@ -166,7 +316,6 @@
         <div id="config-menu">
             <h3 style="margin-top: 0; text-align: center; font-size: 14px; border-bottom: 1px solid #00ff66; padding-bottom: 8px;">SYSTEM CALIBRATION</h3>
             
-            <!-- Compass Offset Block -->
             <div class="config-group">
                 <label>Compass Rotation Correction</label>
                 <div class="config-row">
@@ -176,11 +325,9 @@
                 </div>
             </div>
 
-            <!-- Indoor Distance Multiplier Block -->
             <div class="config-group">
                 <label>Indoor Range Scaling: <span id="multiplier-val">1.0</span>x</label>
                 <input type="range" class="config-slider" min="0.1" max="3.0" step="0.1" value="1.0" id="dist-slider" oninput="updateDistanceMultiplier(this.value)">
-                <span style="font-size: 9px; color: #888; display: block; margin-top: 4px;">Reduces scale factor to compensate for confined indoor GPS updates.</span>
             </div>
 
             <button class="btn btn-alt" style="width: 100%; padding: 8px; font-size: 12px;" onclick="toggleConfigMenu()">Apply & Close</button>
@@ -212,10 +359,8 @@ let ultrasonicOscillator = null;
 let soundBlipBuffer = null; 
 let soundHitBuffer = null;  
 
-// UI Textures
+// UI Texture
 let imgMotion = new Image();
-let imgEdgeLeft = new Image();
-let imgEdgeRight = new Image();
 
 // Display Management
 let canvas, ctx;
@@ -223,10 +368,7 @@ let sweepAngle = 0;
 let nearestTrackingDistance = Infinity;
 let currentUsVolume = 0;
 
-// Pre-load visual graphics from your assets folders
 imgMotion.src = 'assets/gfx/motion.png';
-imgEdgeLeft.src = 'assets/gfx/edge.png';
-imgEdgeRight.src = 'assets/gfx/edge_right.png';
 
 // --- INITIALIZATION ---
 async function initTracking(selectedRole) {
@@ -239,7 +381,7 @@ async function initTracking(selectedRole) {
     
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
-    setCompassOffset(0); // Set initial button state
+    setCompassOffset(0);
 
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
@@ -289,7 +431,6 @@ async function initTracking(selectedRole) {
 }
 
 function resizeCanvas() {
-    // Keep internal canvas pixel resolutions direct 1:1 with real client dimensions to stop aspect skewing
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 }
@@ -403,7 +544,7 @@ function calculateGpsDistance(lat1, lon1, lat2, lon2) {
     return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
 }
 
-// --- ADVANCED GRAPHICS LOOP ---
+// --- GRAPHICS LOOP ---
 function renderRadarLoop() {
     const w = canvas.width;
     const h = canvas.height;
@@ -413,28 +554,24 @@ function renderRadarLoop() {
 
     const cx = w / 2;
     const cy = h * 0.76; 
-
-    // Dynamic scale limit preventing elements from stretching out of bounds in landscape or portrait
     let maxRadarRadius = Math.min(cx, cy) * 0.95; 
 
     currentUsVolume = (role === 'marine') ? getUltrasoundVolume() : 0;
     nearestTrackingDistance = Infinity;
     const now = Date.now();
 
-    // 1. DRAW ROTATING GRAPHICS ELEMENT WITH COMPASS CALIBRATION SHIFT
+    // 1. DRAW ROTATING RADAR IMAGE HUB BOUNDS
     ctx.save();
     ctx.translate(cx, cy);
-    // Factor in the custom calibration offset angle toggled by user
     let modifiedHeading = compassHeading + compassOffset;
     ctx.rotate(-modifiedHeading * Math.PI / 180);
     
     if (imgMotion.complete) {
-        // Uniform square mapping bounds guarantee a clean circle shape without stretching
         ctx.drawImage(imgMotion, -maxRadarRadius, -maxRadarRadius, maxRadarRadius * 2, maxRadarRadius * 2);
     }
     ctx.restore();
 
-    // 2. PARSE AND CALCULATE MULTIPLAYER POSITIONS
+    // 2. PARSE MULTIPLAYER GPS TARGET POSITIONS
     let targetsToRender = [];
     for (let id in globalPlayers) {
         if (now - globalPlayers[id].lastSeen > 12000) {
@@ -445,7 +582,6 @@ function renderRadarLoop() {
         const target = globalPlayers[id];
         if (!myCoords || !target.coords) continue;
 
-        // Apply distance scaling parameter configuration
         let distance = calculateGpsDistance(myCoords.lat, myCoords.lon, target.coords.lat, target.coords.lon) * distanceMultiplier;
         
         if (role === 'marine' && currentUsVolume > 0.04) {
@@ -469,7 +605,7 @@ function renderRadarLoop() {
         });
     }
 
-    // 3. DRAW RADAR SWEEP LINE & RENDER BLIPS
+    // 3. DRAW RADAR SWEEP LINE & BLIPS
     sweepAngle += 0.035;
     if (sweepAngle > Math.PI * 2) sweepAngle = 0;
     let normalizedSweepAngle = (sweepAngle * 180 / Math.PI + 360) % 360;
@@ -493,58 +629,18 @@ function renderRadarLoop() {
     ctx.lineTo(cx + maxRadarRadius * Math.cos(sweepAngle), cy + maxRadarRadius * Math.sin(sweepAngle));
     ctx.stroke();
 
-    // 4. DRAW HUD PANEL MASK MAPPED RELATIVE TO THE NEW SCREEN SAFE RADIUS BOUNDS
-    const hudHeight = h * 0.24; 
-    const hudTop = h - hudHeight;
-    const cutoutWidth = 120; 
-    const imgWidth = 40;     
-
-    ctx.fillStyle = "#0088ff";
-    ctx.fillRect(0, hudTop, cx - (cutoutWidth / 2) - imgWidth, hudHeight);
-    ctx.fillRect(cx + (cutoutWidth / 2) + imgWidth, hudTop, w, hudHeight);
-
-    if (imgEdgeLeft.complete) {
-        ctx.drawImage(imgEdgeLeft, cx - (cutoutWidth / 2) - imgWidth, hudTop, imgWidth, hudHeight);
-    }
-    if (imgEdgeRight.complete) {
-        ctx.drawImage(imgEdgeRight, cx + (cutoutWidth / 2), hudTop, imgWidth, hudHeight);
-    }
-
-    ctx.fillStyle = "#010804";
-    ctx.fillRect(cx - (cutoutWidth / 2), hudTop, cutoutWidth, hudHeight);
-
-    // 5. DRAW DIGITAL RANGE CODES INFRASTRUCTURE
+    // 4. UPDATE INTERACTIVE HUD TEXT METRICS LAYER VIA DOM
+    const readoutBox = document.getElementById('range-readout-box');
     if (role === 'marine') {
-        ctx.fillStyle = "#ff0000";
-        ctx.font = "bold 38px 'Courier New', monospace";
-        ctx.textAlign = "center";
-
         if (nearestTrackingDistance === Infinity) {
-            ctx.fillText("00", cx - 10, hudTop + 45);
-            ctx.font = "14px 'Courier New', monospace";
-            ctx.fillText("00", cx + 25, hudTop + 30);
-            ctx.fillText("m", cx + 25, hudTop + 45);
+            readoutBox.innerHTML = `<span class="range-main">00</span><span class="range-sub">00<br>m</span>`;
         } else {
             let integerPart = Math.floor(nearestTrackingDistance).toString().padStart(2, '0');
             let decimalPart = Math.floor((nearestTrackingDistance % 1) * 100).toString().padStart(2, '0');
-
-            ctx.fillText(integerPart, cx - 10, hudTop + 45);
-            ctx.font = "14px 'Courier New', monospace";
-            ctx.fillText(decimalPart, cx + 25, hudTop + 30);
-            ctx.fillText("m", cx + 25, hudTop + 45);
+            readoutBox.innerHTML = `<span class="range-main">${integerPart}</span><span class="range-sub">${decimalPart}<br>m</span>`;
         }
-
-        ctx.fillStyle = "#ffffff";
-        ctx.font = "bold 14px Arial, sans-serif";
-        ctx.textAlign = "left";
-        ctx.fillText("F.E.M.S. 3.643.44", 20, hudTop + 35);
-        ctx.textAlign = "right";
-        ctx.fillText("C.X. 63/67.21", w - 140, hudTop + 35); // Shifted left slightly to make room for config gear button
     } else {
-        ctx.fillStyle = "#00ff66";
-        ctx.font = "14px 'Courier New', monospace";
-        ctx.textAlign = "center";
-        ctx.fillText("NODE ACTIVE", cx, hudTop + 35);
+        readoutBox.innerHTML = `<span class="range-main" style="font-size:16px; color:#00ff66; line-height:45px;">ACTIVE</span>`;
     }
 
     requestAnimationFrame(renderRadarLoop);
@@ -570,8 +666,6 @@ function playAudibleAudioLoop() {
         let boundedDistance = Math.min(nearestTrackingDistance, 30);
         let ratio = boundedDistance / 30;
 
-        // Strict limit implementation: scaling scales up from 1000ms minimum to 3000ms maximum interval. 
-        // This ensures sound never plays faster than once a second.
         nextTimingInterval = 1000 + (ratio * 2000);         
 
         let targetPlaybackRate = 2.0 - ratio;            
