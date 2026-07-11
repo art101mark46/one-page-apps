@@ -20,14 +20,23 @@
             user-select: none;
             -webkit-user-select: none;
         }
+        /* Absolute fullscreen coverage ensures zero rendering overlap on mobile devices */
         #setup-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: #000000;
             display: flex;
             flex-direction: column;
             gap: 20px;
             align-items: center;
+            justify-content: center;
             text-align: center;
             padding: 20px;
-            z-index: 10;
+            z-index: 9999;
+            box-sizing: border-box;
         }
         #game-container {
             display: none;
@@ -56,7 +65,7 @@
             background-size: 100% 4px;
             z-index: 20;
             pointer-events: none;
-            display: none; /* Toggled via JS */
+            display: none; /* Toggled via calibration panel */
         }
         .scanlines.active {
             display: block;
@@ -72,6 +81,7 @@
             cursor: pointer;
             text-transform: uppercase;
             box-shadow: 0 0 10px rgba(0,255,102,0.4);
+            border-radius: 4px;
         }
         .btn-alt {
             background-color: #002208;
@@ -83,7 +93,7 @@
             position: absolute;
             bottom: 10px;
             right: 10px;
-            z-index: 1000; /* Extremely high to prevent HUD overlap */
+            z-index: 1000; /* Super high index prevents any tactical mask overlap */
             background: rgba(0, 30, 10, 0.9);
             border: 1px solid #00ff66;
             color: #00ff66;
@@ -155,11 +165,10 @@
     <div id="setup-screen">
         <h2>M41A SENSOR LINKUP</h2>
         <button class="btn" onclick="initTracking('marine')">Deploy Marine</button>
-        <button class="btn btn-alt" onclick="initTracking('alien')">Deploy Alien</button>
+        <button class="btn btn-alt" style="margin-top: 10px;" onclick="initTracking('alien')">Deploy Alien</button>
     </div>
 
     <div id="game-container">
-        
         <!-- Optional Scanlines Layer -->
         <div id="scanline-layer" class="scanlines"></div>
         
@@ -232,7 +241,11 @@ let currentUsVolume = 0;
 
 async function initTracking(selectedRole) {
     role = selectedRole;
-    document.getElementById('setup-screen').style.display = 'none';
+    
+    // Destroy setup screen entirely to avoid layout duplication errors on mobile
+    const setupNode = document.getElementById('setup-screen');
+    if (setupNode) setupNode.remove();
+    
     document.getElementById('game-container').style.display = 'block';
     
     canvas = document.getElementById('radarCanvas');
@@ -255,7 +268,7 @@ async function initTracking(selectedRole) {
         startUltrasoundEmission();
     }
 
-    // Compass
+    // Compass Setup
     if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
         try {
             const permission = await DeviceOrientationEvent.requestPermission();
@@ -403,6 +416,14 @@ function calculateGpsDistance(lat1, lon1, lat2, lon2) {
     return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
 }
 
+// Map a bearing degree orientation back into a highly readable cardinal string
+function getCardinalHeading(deg) {
+    const bearing = (deg + 360) % 360;
+    const directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+    const idx = Math.round(bearing / 22.5) % 16;
+    return `${Math.round(bearing).toString().padStart(3, '0')}° ${directions[idx]}`;
+}
+
 function renderRadarLoop() {
     const w = canvas.width;
     const h = canvas.height;
@@ -412,11 +433,11 @@ function renderRadarLoop() {
     ctx.fillRect(0, 0, w, h);
 
     // Layout configuration
-    const hudHeight = Math.max(h * 0.22, 160); // Ensure HUD isn't too small on short screens
+    const hudHeight = Math.max(h * 0.24, 180); // Deepen HUD slightly to accommodate coordinate metrics
     const hudTop = h - hudHeight;
     const cx = w / 2;
-    const cutoutDepth = 40;
-    const cy = hudTop + cutoutDepth; // Anchor the sweep point cleanly inside the notch
+    const cutoutDepth = 70; // Deeper cutout matching request
+    const cy = hudTop + cutoutDepth; // Anchor the sweep point inside the notch
     let maxRadarRadius = Math.max(w, h); 
 
     currentUsVolume = (role === 'marine') ? getUltrasoundVolume() : 0;
@@ -425,23 +446,18 @@ function renderRadarLoop() {
 
     // 1. DRAW EXPANDING RADAR PULSE RINGS
     const pulseCount = 3;
-    const pulseCycleDuration = 3000; // 3 seconds per wave
+    const pulseCycleDuration = 3000; 
     ctx.lineCap = 'round';
     
     for (let i = 0; i < pulseCount; i++) {
-        // Calculate dynamic offset from 0.0 to 1.0 for each wave
         let t = ((now + i * (pulseCycleDuration / pulseCount)) % pulseCycleDuration) / pulseCycleDuration;
-        
-        // Easing curve so it grows nicely
         let currentRadius = (t * t) * maxRadarRadius * 1.5;
-        
-        // Opacity fades out as it gets larger
         let alpha = (1.0 - t) * 0.25; 
         
         ctx.beginPath();
         ctx.arc(cx, cy, currentRadius, 0, Math.PI * 2);
         ctx.strokeStyle = `rgba(200, 240, 255, ${alpha})`;
-        ctx.lineWidth = 30; // Thick fuzzy look
+        ctx.lineWidth = 30; 
         ctx.stroke();
     }
 
@@ -451,7 +467,6 @@ function renderRadarLoop() {
     let modifiedHeading = compassHeading + compassOffset;
     ctx.rotate(-modifiedHeading * Math.PI / 180);
     
-    // Scale motion.png relative to screen
     let imageRadius = Math.min(cx, cy - 20) * 0.95;
     
     if (imgMotion.complete) {
@@ -493,7 +508,7 @@ function renderRadarLoop() {
         });
     }
 
-    // 4. DRAW RADAR SWEEP LINE & BLIPS
+    // 4. DRAW RADAR SWEEP CYCLE & BLIPS (No sweep line itself drawn)
     sweepAngle += 0.035;
     if (sweepAngle > Math.PI * 2) sweepAngle = 0;
     let normalizedSweepAngle = (sweepAngle * 180 / Math.PI + 360) % 360;
@@ -510,26 +525,18 @@ function renderRadarLoop() {
         }
     });
 
-    ctx.strokeStyle = "rgba(0, 255, 102, 0.25)";
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.lineTo(cx + maxRadarRadius * Math.cos(sweepAngle), cy + maxRadarRadius * Math.sin(sweepAngle));
-    ctx.stroke();
-
     // 5. DRAW BLUE TACTICAL HUD POLYGON DIRECTLY ON CANVAS
-    // Math logic for the precise chamfered notch cutout
     const halfNotch = 60; // 120px wide notch total
     const chamfer = 25;   // Width of the angled slope part
     
     ctx.fillStyle = "#0088ff";
     ctx.beginPath();
     ctx.moveTo(0, hudTop);
-    ctx.lineTo(cx - halfNotch - chamfer, hudTop); // Top left edge
-    ctx.lineTo(cx - halfNotch, hudTop + cutoutDepth); // Slope down
-    ctx.lineTo(cx + halfNotch, hudTop + cutoutDepth); // Bottom flat of notch
-    ctx.lineTo(cx + halfNotch + chamfer, hudTop); // Slope up
-    ctx.lineTo(w, hudTop); // Top right edge
+    ctx.lineTo(cx - halfNotch - chamfer, hudTop); 
+    ctx.lineTo(cx - halfNotch, hudTop + cutoutDepth); // slope down to deep bottom notch
+    ctx.lineTo(cx + halfNotch, hudTop + cutoutDepth); 
+    ctx.lineTo(cx + halfNotch + chamfer, hudTop); 
+    ctx.lineTo(w, hudTop); 
     ctx.lineTo(w, h);
     ctx.lineTo(0, h);
     ctx.closePath();
@@ -549,15 +556,22 @@ function renderRadarLoop() {
             decimalPart = Math.floor((nearestTrackingDistance % 1) * 100).toString().padStart(2, '0');
         }
 
-        // Draw Big Integer
+        // Draw Big Integer slightly higher inside deeper cutout
         ctx.font = "bold 44px 'Courier New', monospace";
-        ctx.fillText(integerPart, cx - 15, hudTop + cutoutDepth - 3);
+        ctx.fillText(integerPart, cx - 15, hudTop + 35);
         
         // Draw Small Decimals
         ctx.font = "bold 16px 'Courier New', monospace";
         ctx.textAlign = "left";
         ctx.fillText(decimalPart, cx + 22, hudTop + 14);
         ctx.fillText("m", cx + 22, hudTop + 32);
+
+        // Draw Cardinal Compass Reading inside the deep notch well beneath distance
+        ctx.fillStyle = "#00ff66";
+        ctx.font = "bold 15px 'Courier New', monospace";
+        ctx.textAlign = "center";
+        const compassText = getCardinalHeading(modifiedHeading);
+        ctx.fillText(compassText, cx, hudTop + 62);
 
         // White Interface Context Text
         ctx.fillStyle = "#ffffff";
@@ -566,705 +580,23 @@ function renderRadarLoop() {
         ctx.fillText("F.E.M.S. 5.547.60", 15, hudTop + 40);
         
         ctx.textAlign = "right";
-        // Leaving room for the calibration button on the right
         ctx.fillText("CX. 54/38.04", w - 15, hudTop + 40);
     } else {
         ctx.fillStyle = "#00ff66";
         ctx.font = "bold 16px 'Courier New', monospace";
         ctx.textAlign = "center";
-        ctx.fillText("NODE ACTIVE", cx, hudTop + cutoutDepth - 10);
+        ctx.fillText("NODE ACTIVE", cx, hudTop + 30);
+        
+        // Draw alien cardinal alignment
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 15px 'Courier New', monospace";
+        const compassText = getCardinalHeading(modifiedHeading);
+        ctx.fillText(compassText, cx, hudTop + 55);
     }
 
     requestAnimationFrame(renderRadarLoop);
 }
 
-function playAudibleAudioLoop() {
-    if (role !== 'marine' || !soundBlipBuffer || !soundHitBuffer) return;
-
-    let nextTimingInterval = 1000; 
-
-    if (nearestTrackingDistance === Infinity) {
-        let blipSource = audioCtx.createBufferSource();
-        let blipGain = audioCtx.createGain();
-        blipSource.buffer = soundBlipBuffer;
-        blipGain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-        blipSource.connect(blipGain);
-        blipGain.connect(audioCtx.destination);
-        blipSource.start(0);
-        nextTimingInterval = 1000; 
-    } 
-    else {
-        let boundedDistance = Math.min(nearestTrackingDistance, 30);
-        let ratio = boundedDistance / 30;
-
-        nextTimingInterval = 1000 + (ratio * 2000);         
-
-        let targetPlaybackRate = 2.0 - ratio;            
-        let hitSource = audioCtx.createBufferSource();
-        let hitGain = audioCtx.createGain();
-
-        hitSource.buffer = soundHitBuffer;
-        hitSource.playbackRate.setValueAtTime(targetPlaybackRate, audioCtx.currentTime);
-        hitGain.gain.setValueAtTime(0.5, audioCtx.currentTime);
-
-        hitSource.connect(hitGain);
-        hitGain.connect(audioCtx.destination);
-        hitSource.start(0);
-    }
-
-    setTimeout(playAudibleAudioLoop, nextTimingInterval);
-}
-</script>
-</body>
-</html><!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>M41A Tactical Motion Tracker</title>
-    <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.7.4.1.min.js"></script>
-    <style>
-        body {
-            background-color: #000000;
-            color: #00ff66;
-            font-family: 'Courier New', monospace;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            margin: 0;
-            overflow: hidden;
-            user-select: none;
-        }
-        #setup-screen {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-            align-items: center;
-            text-align: center;
-            padding: 20px;
-            z-index: 10;
-        }
-        #game-container {
-            display: none;
-            position: relative;
-            width: 100vw;
-            height: 100vh;
-            background-color: #000000;
-            overflow: hidden;
-        }
-        #radarCanvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 1;
-        }
-        
-        /* --- CSS RADAR PULSE WAVES --- */
-        .radar-pulse-container {
-            position: absolute;
-            left: 50%;
-            top: 76%; /* Anchored exactly at the tracking hub center */
-            transform: translate(-50%, -50%);
-            pointer-events: none;
-            z-index: 2;
-        }
-        .pulse-wave {
-            position: absolute;
-            border-radius: 50%;
-            /* Emulates the soft, thick white/blue gradient wavefront from the screen */
-            border: 24px solid rgba(230, 245, 255, 0.08);
-            box-shadow: inset 0 0 20px rgba(255, 255, 255, 0.05);
-            transform: translate(-50%, -50%);
-            width: 0px;
-            height: 0px;
-            opacity: 0;
-            animation: radar-sweep-out 3s linear infinite;
-        }
-        .pulse-wave:nth-child(2) { animation-delay: 1s; }
-        .pulse-wave:nth-child(3) { animation-delay: 2s; }
-
-        @keyframes radar-sweep-out {
-            0% {
-                width: 0px;
-                height: 0px;
-                opacity: 0.0;
-            }
-            5% {
-                opacity: 0.8;
-            }
-            100% {
-                width: 180vmax;
-                height: 180vmax;
-                opacity: 0;
-            }
-        }
-
-        /* --- PURE CSS HUD DISPLAY MASK --- */
-        #hud-mask {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            height: 24vh;
-            background-color: #0088ff;
-            z-index: 10;
-            pointer-events: none;
-            /* Creates the precise tactical display notch cutout using mathematical coordinate geometry */
-            clip-path: polygon(
-                0% 0%, 
-                calc(50% - 75px) 0%, 
-                calc(50% - 60px) 45%, 
-                calc(50% + 60px) 45%, 
-                calc(50% + 75px) 0%, 
-                100% 0%, 
-                100% 100%, 
-                0% 100%
-            );
-        }
-        
-        /* Dark interface window context directly behind the cutout hole */
-        #hud-well-bg {
-            position: absolute;
-            bottom: 0;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 150px;
-            height: 24vh;
-            background-color: #010804;
-            z-index: 5;
-            pointer-events: none;
-        }
-
-        /* HUD Readout Typography Containers */
-        #hud-text-layer {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            height: 24vh;
-            z-index: 15;
-            pointer-events: none;
-            box-sizing: border-box;
-            padding: 20px;
-            color: #ffffff;
-            font-family: Arial, sans-serif;
-            font-weight: bold;
-            font-size: 14px;
-        }
-        .meta-left {
-            position: absolute;
-            left: 20px;
-            top: 32px;
-        }
-        .meta-right {
-            position: absolute;
-            right: 140px; /* Leave space clear for calibration gear button */
-            top: 32px;
-        }
-        .range-display-container {
-            position: absolute;
-            left: 50%;
-            top: 8px;
-            transform: translateX(-50%);
-            width: 120px;
-            text-align: center;
-            font-family: 'Courier New', monospace;
-            color: #ff0000;
-        }
-        .range-main {
-            font-size: 38px;
-            font-weight: bold;
-            letter-spacing: -2px;
-        }
-        .range-sub {
-            position: absolute;
-            font-size: 13px;
-            top: 2px;
-            left: 82px;
-            text-align: left;
-            line-height: 14px;
-        }
-
-        .btn {
-            background-color: #00ff66;
-            color: #000000;
-            border: none;
-            padding: 15px 40px;
-            font-size: 18px;
-            font-weight: bold;
-            cursor: pointer;
-            text-transform: uppercase;
-            box-shadow: 0 0 10px rgba(0,255,102,0.4);
-        }
-        .btn-alt {
-            background-color: #002208;
-            color: #00ff66;
-            border: 1px solid #00ff66;
-        }
-        .scanlines {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
-            background-size: 100% 4px;
-            z-index: 20;
-            pointer-events: none;
-            display: none;
-        }
-        .scanlines.active {
-            display: block;
-        }
-        #top-controls {
-            position: absolute;
-            top: 15px;
-            left: 15px;
-            z-index: 25;
-        }
-        #config-trigger {
-            position: absolute;
-            bottom: 15px;
-            right: 15px;
-            z-index: 30;
-            background: rgba(0, 0, 0, 0.6);
-            border: 1px solid #00ff66;
-            color: #00ff66;
-            padding: 8px 12px;
-            font-size: 12px;
-            cursor: pointer;
-            font-weight: bold;
-        }
-        #config-menu {
-            display: none;
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 85%;
-            max-width: 320px;
-            background: rgba(1, 8, 4, 0.95);
-            border: 2px solid #00ff66;
-            padding: 20px;
-            z-index: 40;
-            box-shadow: 0 0 20px rgba(0, 255, 102, 0.5);
-        }
-        .config-group {
-            margin-bottom: 20px;
-        }
-        .config-group label {
-            display: block;
-            font-size: 12px;
-            margin-bottom: 8px;
-            text-transform: uppercase;
-            color: #ffffff;
-        }
-        .config-row {
-            display: flex;
-            gap: 10px;
-        }
-        .config-btn {
-            flex: 1;
-            background: #002208;
-            border: 1px solid #00ff66;
-            color: #00ff66;
-            padding: 6px;
-            font-size: 12px;
-            cursor: pointer;
-        }
-        .config-btn.active {
-            background: #00ff66;
-            color: #000000;
-            font-weight: bold;
-        }
-        .config-slider {
-            width: 100%;
-            accent-color: #00ff66;
-        }
-    </style>
-</head>
-<body>
-
-    <!-- SETUP SCREEN -->
-    <div id="setup-screen">
-        <h2>M41A SENSOR LINKUP</h2>
-        <button class="btn" onclick="initTracking('marine')">Deploy Marine</button>
-        <button class="btn btn-alt" onclick="initTracking('alien')">Deploy Alien</button>
-    </div>
-
-    <!-- MAIN INTERFACE CONTAINER -->
-    <div id="game-container">
-        <div id="top-controls">
-            <button class="btn btn-alt" style="padding: 8px 15px; font-size: 12px;" onclick="toggleScanlines()">Toggle Scanlines</button>
-        </div>
-        
-        <div id="scanline-layer" class="scanlines"></div>
-        
-        <!-- Hardware Animated CSS Waves Layers -->
-        <div class="radar-pulse-container">
-            <div class="pulse-wave"></div>
-            <div class="pulse-wave"></div>
-            <div class="pulse-wave"></div>
-        </div>
-
-        <canvas id="radarCanvas"></canvas>
-
-        <!-- Pure CSS HUD Panels Layout -->
-        <div id="hud-well-bg"></div>
-        <div id="hud-mask"></div>
-        
-        <!-- Crisp HTML/CSS HUD Labels Layer Overlap -->
-        <div id="hud-text-layer">
-            <div class="meta-left">F.E.M.S. 5.547.60</div>
-            <div class="meta-right">CX. 54/38.04</div>
-            <div class="range-display-container" id="range-readout-box">
-                <!-- Injected dynamically via script functions -->
-                <span class="range-main">00</span>
-                <span class="range-sub">00<br>m</span>
-            </div>
-        </div>
-
-        <button id="config-trigger" onclick="toggleConfigMenu()">⚙ CALIBRATE</button>
-
-        <!-- CONFIGURATION MODAL -->
-        <div id="config-menu">
-            <h3 style="margin-top: 0; text-align: center; font-size: 14px; border-bottom: 1px solid #00ff66; padding-bottom: 8px;">SYSTEM CALIBRATION</h3>
-            
-            <div class="config-group">
-                <label>Compass Rotation Correction</label>
-                <div class="config-row">
-                    <button class="config-btn" id="deg-0" onclick="setCompassOffset(0)">0°</button>
-                    <button class="config-btn" id="deg-90" onclick="setCompassOffset(90)">+90°</button>
-                    <button class="config-btn" id="deg-270" onclick="setCompassOffset(-90)">-90°</button>
-                </div>
-            </div>
-
-            <div class="config-group">
-                <label>Indoor Range Scaling: <span id="multiplier-val">1.0</span>x</label>
-                <input type="range" class="config-slider" min="0.1" max="3.0" step="0.1" value="1.0" id="dist-slider" oninput="updateDistanceMultiplier(this.value)">
-            </div>
-
-            <button class="btn btn-alt" style="width: 100%; padding: 8px; font-size: 12px;" onclick="toggleConfigMenu()">Apply & Close</button>
-        </div>
-    </div>
-
-<script>
-// --- CONFIGURATION ---
-const PUBNUB_PUB_KEY = 'pub-c-d0d3df8c-4589-4f34-a4f9-f8e19afe8a33'; 
-const PUBNUB_SUB_KEY = 'sub-c-577de050-aa10-49d2-911f-b246fb6a450f';
-const GAME_CHANNEL = 'aliens-sensor-fusion';
-const TARGET_FREQ = 19000; 
-
-// --- GAME STATE ---
-let role = ''; 
-let pubnub;
-let myId = 'p_' + Math.floor(Math.random() * 10000);
-let myCoords = null;
-let compassHeading = 0; 
-let compassOffset = 0; 
-let distanceMultiplier = 1.0;
-let globalPlayers = {};
-
-// Audio Channels
-let audioCtx = null;
-let micStream = null;
-let fftAnalyser = null;
-let ultrasonicOscillator = null;
-let soundBlipBuffer = null; 
-let soundHitBuffer = null;  
-
-// UI Texture
-let imgMotion = new Image();
-
-// Display Management
-let canvas, ctx;
-let sweepAngle = 0;
-let nearestTrackingDistance = Infinity;
-let currentUsVolume = 0;
-
-imgMotion.src = 'assets/gfx/motion.png';
-
-// --- INITIALIZATION ---
-async function initTracking(selectedRole) {
-    role = selectedRole;
-    document.getElementById('setup-screen').style.display = 'none';
-    document.getElementById('game-container').style.display = 'block';
-    
-    canvas = document.getElementById('radarCanvas');
-    ctx = canvas.getContext('2d');
-    
-    resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
-    setCompassOffset(0);
-
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-
-    if ('wakeLock' in navigator) {
-        try { await navigator.wakeLock.request('screen'); } catch(e) {}
-    }
-
-    if (role === 'marine') {
-        await loadAudioAssets();
-        await startUltrasoundReception();
-    } else {
-        startUltrasoundEmission();
-    }
-
-    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-        try {
-            const permission = await DeviceOrientationEvent.requestPermission();
-            if (permission === 'granted') {
-                window.addEventListener('deviceorientation', handleCompass, true);
-            }
-        } catch (err) {}
-    } else {
-        window.addEventListener('deviceorientationabsolute', handleCompass, true);
-        window.addEventListener('deviceorientation', handleCompass, true);
-    }
-
-    pubnub = new PubNub({ publishKey: PUBNUB_PUB_KEY, subscribeKey: PUBNUB_SUB_KEY, userId: myId });
-    pubnub.addListener({
-        message: function(event) {
-            if (event.publisher !== myId) {
-                globalPlayers[event.publisher] = {
-                    coords: event.message.coords,
-                    role: event.message.role,
-                    lastSeen: Date.now()
-                };
-            }
-        }
-    });
-    pubnub.subscribe({ channels: [GAME_CHANNEL] });
-
-    startGPSHardware();
-
-    requestAnimationFrame(renderRadarLoop);
-    if (role === 'marine') {
-        playAudibleAudioLoop();
-    }
-}
-
-function resizeCanvas() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-}
-
-function toggleScanlines() {
-    document.getElementById('scanline-layer').classList.toggle('active');
-}
-
-function toggleConfigMenu() {
-    const menu = document.getElementById('config-menu');
-    menu.style.display = (menu.style.display === 'block') ? 'none' : 'block';
-}
-
-function setCompassOffset(degrees) {
-    compassOffset = degrees;
-    document.getElementById('deg-0').classList.remove('active');
-    document.getElementById('deg-90').classList.remove('active');
-    document.getElementById('deg-270').classList.remove('active');
-    
-    if (degrees === 0) document.getElementById('deg-0').classList.add('active');
-    if (degrees === 90) document.getElementById('deg-90').classList.add('active');
-    if (degrees === -90) document.getElementById('deg-270').classList.add('active');
-}
-
-function updateDistanceMultiplier(val) {
-    distanceMultiplier = parseFloat(val);
-    document.getElementById('multiplier-val').innerText = val;
-}
-
-// --- AUDIO HANDLING ---
-async function loadAudioAssets() {
-    try {
-        const blipResponse = await fetch('assets/audio/scan-blip.ogg');
-        const blipArrayBuffer = await blipResponse.arrayBuffer();
-        soundBlipBuffer = await audioCtx.decodeAudioData(blipArrayBuffer);
-
-        const hitResponse = await fetch('assets/audio/scan-hit.ogg');
-        const hitArrayBuffer = await hitResponse.arrayBuffer();
-        soundHitBuffer = await audioCtx.decodeAudioData(hitArrayBuffer);
-    } catch (err) {
-        console.error("Audio files missing:", err);
-    }
-}
-
-function startUltrasoundEmission() {
-    ultrasonicOscillator = audioCtx.createOscillator();
-    let gainNode = audioCtx.createGain();
-    ultrasonicOscillator.type = 'sine';
-    ultrasonicOscillator.frequency.value = TARGET_FREQ;
-    gainNode.gain.value = 1.0; 
-    ultrasonicOscillator.connect(gainNode);
-    gainNode.connect(audioCtx.destination);
-    ultrasonicOscillator.start();
-}
-
-async function startUltrasoundReception() {
-    try {
-        micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false } });
-        let source = audioCtx.createMediaStreamSource(micStream);
-        fftAnalyser = audioCtx.createAnalyser();
-        fftAnalyser.fftSize = 1024; 
-        source.connect(fftAnalyser);
-    } catch(err) {}
-}
-
-function getUltrasoundVolume() {
-    if (!fftAnalyser) return 0;
-    let dataArray = new Uint8Array(fftAnalyser.frequencyBinCount);
-    fftAnalyser.getByteFrequencyData(dataArray);
-    let binIndex = Math.round(TARGET_FREQ * fftAnalyser.fftSize / audioCtx.sampleRate);
-    return ((dataArray[binIndex-1] + dataArray[binIndex] + dataArray[binIndex+1]) / 3) / 255;
-}
-
-// --- TELEMETRY ---
-function handleCompass(event) {
-    if (event.webkitCompassHeading) {
-        compassHeading = event.webkitCompassHeading;
-    } else if (event.absolute && event.alpha !== null) {
-        compassHeading = 360 - event.alpha;
-    }
-}
-
-function startGPSHardware() {
-    navigator.geolocation.watchPosition(
-        (position) => {
-            myCoords = { lat: position.coords.latitude, lon: position.coords.longitude };
-            pubnub.publish({
-                channel: GAME_CHANNEL,
-                message: { coords: myCoords, role: role }
-            });
-        },
-        (err) => {},
-        { enableHighAccuracy: true, maximumAge: 0 }
-    );
-}
-
-function calculateBearing(lat1, lon1, lat2, lon2) {
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const lat1Rad = lat1 * Math.PI / 180;
-    const lat2Rad = lat2 * Math.PI / 180;
-    const y = Math.sin(dLon) * Math.cos(lat2Rad);
-    const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) - Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLon);
-    return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360; 
-}
-
-function calculateGpsDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371000; 
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
-    return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
-}
-
-// --- GRAPHICS LOOP ---
-function renderRadarLoop() {
-    const w = canvas.width;
-    const h = canvas.height;
-
-    ctx.fillStyle = "#000000";
-    ctx.fillRect(0, 0, w, h);
-
-    const cx = w / 2;
-    const cy = h * 0.76; 
-    let maxRadarRadius = Math.min(cx, cy) * 0.95; 
-
-    currentUsVolume = (role === 'marine') ? getUltrasoundVolume() : 0;
-    nearestTrackingDistance = Infinity;
-    const now = Date.now();
-
-    // 1. DRAW ROTATING RADAR IMAGE HUB BOUNDS
-    ctx.save();
-    ctx.translate(cx, cy);
-    let modifiedHeading = compassHeading + compassOffset;
-    ctx.rotate(-modifiedHeading * Math.PI / 180);
-    
-    if (imgMotion.complete) {
-        ctx.drawImage(imgMotion, -maxRadarRadius, -maxRadarRadius, maxRadarRadius * 2, maxRadarRadius * 2);
-    }
-    ctx.restore();
-
-    // 2. PARSE MULTIPLAYER GPS TARGET POSITIONS
-    let targetsToRender = [];
-    for (let id in globalPlayers) {
-        if (now - globalPlayers[id].lastSeen > 12000) {
-            delete globalPlayers[id];
-            continue;
-        }
-
-        const target = globalPlayers[id];
-        if (!myCoords || !target.coords) continue;
-
-        let distance = calculateGpsDistance(myCoords.lat, myCoords.lon, target.coords.lat, target.coords.lon) * distanceMultiplier;
-        
-        if (role === 'marine' && currentUsVolume > 0.04) {
-            distance = 15 - (currentUsVolume * 13.5);
-        }
-
-        if (distance < nearestTrackingDistance) {
-            nearestTrackingDistance = distance;
-        }
-
-        let targetBearing = calculateBearing(myCoords.lat, myCoords.lon, target.coords.lat, target.coords.lon);
-        let relativeAngleRad = (targetBearing - modifiedHeading - 90) * Math.PI / 180; 
-
-        let displayScaleRange = 30; 
-        let currentScaleRadius = (Math.min(distance, displayScaleRange) / displayScaleRange) * maxRadarRadius;
-
-        targetsToRender.push({
-            x: cx + currentScaleRadius * Math.cos(relativeAngleRad),
-            y: cy + currentScaleRadius * Math.sin(relativeAngleRad),
-            angle: (relativeAngleRad * 180 / Math.PI + 360) % 360
-        });
-    }
-
-    // 3. DRAW RADAR SWEEP LINE & BLIPS
-    sweepAngle += 0.035;
-    if (sweepAngle > Math.PI * 2) sweepAngle = 0;
-    let normalizedSweepAngle = (sweepAngle * 180 / Math.PI + 360) % 360;
-
-    targetsToRender.forEach(blip => {
-        if (Math.abs(normalizedSweepAngle - blip.angle) < 20 || Math.abs(normalizedSweepAngle - blip.angle) > 340) {
-            ctx.fillStyle = "rgba(0, 255, 102, 0.95)";
-            ctx.shadowBlur = 15;
-            ctx.shadowColor = "#00ff66";
-            ctx.beginPath();
-            ctx.arc(blip.x, blip.y, 8, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.shadowBlur = 0;
-        }
-    });
-
-    ctx.strokeStyle = "rgba(0, 255, 102, 0.25)";
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.lineTo(cx + maxRadarRadius * Math.cos(sweepAngle), cy + maxRadarRadius * Math.sin(sweepAngle));
-    ctx.stroke();
-
-    // 4. UPDATE INTERACTIVE HUD TEXT METRICS LAYER VIA DOM
-    const readoutBox = document.getElementById('range-readout-box');
-    if (role === 'marine') {
-        if (nearestTrackingDistance === Infinity) {
-            readoutBox.innerHTML = `<span class="range-main">00</span><span class="range-sub">00<br>m</span>`;
-        } else {
-            let integerPart = Math.floor(nearestTrackingDistance).toString().padStart(2, '0');
-            let decimalPart = Math.floor((nearestTrackingDistance % 1) * 100).toString().padStart(2, '0');
-            readoutBox.innerHTML = `<span class="range-main">${integerPart}</span><span class="range-sub">${decimalPart}<br>m</span>`;
-        }
-    } else {
-        readoutBox.innerHTML = `<span class="range-main" style="font-size:16px; color:#00ff66; line-height:45px;">ACTIVE</span>`;
-    }
-
-    requestAnimationFrame(renderRadarLoop);
-}
-
-// --- AUDIO HANDLING PROCESSED LOOP ---
 function playAudibleAudioLoop() {
     if (role !== 'marine' || !soundBlipBuffer || !soundHitBuffer) return;
 
