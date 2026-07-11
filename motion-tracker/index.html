@@ -435,9 +435,8 @@ function renderRadarLoop() {
     // Layout configuration
     const hudHeight = Math.max(h * 0.24, 180); // Deepen HUD slightly to accommodate coordinate metrics
     const hudTop = h - hudHeight;
-    const cx = w / 2;
     const cutoutDepth = 70; // Deeper cutout matching request
-    const cy = hudTop + cutoutDepth; // Anchor the sweep point inside the notch
+    const cy = hudTop; // Center of radar sweep level with the top of the blue section
     let maxRadarRadius = Math.max(w, h); 
 
     currentUsVolume = (role === 'marine') ? getUltrasoundVolume() : 0;
