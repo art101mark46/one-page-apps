@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>M3 Motion Tracker</title>
+    <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.7.4.2.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+        body {
+            background-color: #050b05;
+            color: #00ff33;
+            font-family: monospace;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+        #setup-screen {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: 80%;
+            max-width: 300px;
+            text-align: center;
+        }
+        button {
+            background: #002200;
+            color: #00ff33;
+            border: 2px solid #00ff33;
+            padding: 15px;
+            font-size: 16px;
+            font-family: monospace;
+            cursor: pointer;
+            text-transform: uppercase;
+        }
+        button:active { background: #00ff33; color: #002200; }
+        #game-screen { display: none; width: 100vw; height: 100vh; position: relative; }
+        canvas { display: block; width: 100%; height: 100%; }
+        #hud {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            font-size: 18px;
+            width: 100%;
+            pointer-events: none;
+            text-shadow: 0 0 5px #00ff33;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="setup-screen">
+        <h2>M3 MOTION TRACKER</h2>
+        <p>Select your operational role:</p>
+        <button onclick="startGame('marine')">Execute Marine Protocol</button>
+        <button onclick="startGame('alien')">Execute Xenomorph Protocol</button>
+    </div>
+
+    <div id="game-screen">
+        <canvas id="radarCanvas"></canvas>
+        <div id="hud">RANGE: -- M<br><span id="role-display"></span></div>
+    </div>
+
+    <script>
+        // CONFIGURATION
+        const PUBNUB_PUB_KEY = 'pub-c-d0d3df8c-4589-4f34-a4f9-f8e19afe8a33'; 
+        const PUBNUB_SUB_KEY = 'sub-c-577de050-aa10-49d2-911f-b246fb6a450f';
+        const CHANNEL_NAME = 'aliens-motion-tracker-game';
+        const MAX_TRACKING_RANGE_METERS = 50; // Radar edge radius
+
+        let pubnub;
+        let myId = 'ply_' + Math.random().toString(36).substr(2, 9);
+        let myRole = '';
+        let myCoords = null;
+        let players = {};
+        let audioCtx = null;
+        let nextPingTime = 0;
+        let closestDistance = Infinity;
+
+        const canvas = document.getElementById('radarCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth * window.devicePixelRatio;
+            canvas.height = window.innerHeight * window.devicePixelRatio;
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        async function startGame(role) {
+            myRole = role;
+            document.getElementById('setup-screen').style.display = 'none';
+            document.getElementById('game-screen').style.display = 'block';
+            document.getElementById('role-display').innerText = `ROLE: UNKNOWN UTILITY`; // Kept ambiguous as requested
+            
+            resizeCanvas();
+            initAudio();
+            await initWakeLock();
+            initPubNub();
+            initGPS();
+            
+            requestAnimationFrame(gameLoop);
+        }
+
+        // 1. HARDWARE WAKE LOCK
+        async function initWakeLock() {
+            if ('wakeLock' in navigator) {
+                try { await navigator.wakeLock.request('screen'); } 
+                catch (err) { console.warn("Wake Lock request failed:", err); }
+            }
+        }
+
+        // 2. REAL-TIME PUBLIC SIGNALLING (PUBNUB)
+        function initPubNub() {
+            pubnub = new PubNub({
+                publishKey: PUBNUB_PUB_KEY,
+                subscribeKey: PUBNUB_SUB_KEY,
+                userId: myId
+            });
+
+            pubnub.addListener({
+                message: (event) => {
+                    if (event.message.id !== myId) {
+                        players[event.message.id] = {
+                            lat: event.message.lat,
+                            lon: event.message.lon,
+                            timestamp: Date.now()
+                        };
+                    }
+                }
+            });
+
+            pubnub.subscribe({ channels: [CHANNEL_NAME] });
+        }
+
+        // 3. HIGH ACCURACY GPS HARDWARE LINK
+        function initGPS() {
+            if (!navigator.geolocation) return alert("GPS engine missing on this unit.");
+
+            navigator.geolocation.watchPosition(
+                (pos) => {
+                    myCoords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+                    // Broadcast immediately to network
+                    if (pubnub) {
+                        pubnub.publish({
+                            channel: CHANNEL_NAME,
+                            message: { id: myId, lat: myCoords.lat, lon: myCoords.lon }
+                        });
+                    }
+                },
+                (err) => console.error("GPS Error:", err),
+                { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
+            );
+        }
+
+        // 4. HAVERSINE MATHEMATICAL CONVERSIONS
+        function getDistanceAndBearing(lat1, lon1, lat2, lon2) {
+            const R = 6371000; // Earth radius meters
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const rLat1 = lat1 * Math.PI / 180;
+            const rLat2 = lat2 * Math.PI / 180;
+
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.sin(dLon/2) * Math.sin(dLon/2) * Math.cos(rLat1) * Math.cos(rLat2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            const distance = R * c;
+
+            const y = Math.sin(dLon) * Math.cos(rLat2);
+            const x = Math.cos(rLat1) * Math.sin(rLat2) - Math.sin(rLat1) * Math.cos(rLat2) * Math.cos(dLon);
+            const bearing = Math.atan2(y, x);
+
+            return { distance, bearing };
+        }
+
+        // 5. SYNTHETIC AUDIO SIGNALS (AUTHENTIC PING ENGINE)
+        function initAudio() {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            nextPingTime = audioCtx.currentTime;
+        }
+
+        function triggerAudioPing(distance) {
+            if (!audioCtx) return;
+            
+            // Map proximity to parameters
+            const clampDist = Math.max(2, Math.min(MAX_TRACKING_RANGE_METERS, distance));
+            const pct = 1 - ((clampDist - 2) / (MAX_TRACKING_RANGE_METERS - 2)); // 1.0 close, 0.0 far
+
+            // Calculate pitch shift and ping repetition frequency
+            const pitch = 500 + (pct * 700); // 500Hz to 1200Hz
+            const interval = 2.0 - (pct * 1.85); // 2.0s interval scaling down to 0.15s
+
+            if (audioCtx.currentTime >= nextPingTime) {
+                const osc = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                
+                // Authentic click/chirp envelope shape
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(pitch, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(pitch * 0.4, audioCtx.currentTime + 0.08);
+
+                gainNode.gain.setValueAtTime(0.4, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.12);
+
+                osc.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.13);
+
+                nextPingTime = audioCtx.currentTime + interval;
+            }
+        }
+
+        // 6. VISUAL RENDERING PIPELINE (2D CRT EFFECT)
+        let sweepAngle = 0;
+        function gameLoop() {
+            const w = canvas.width / window.devicePixelRatio;
+            const h = canvas.height / window.devicePixelRatio;
+            const cx = w / 2;
+            const cy = h * 0.6;
+            const radarRadius = Math.min(w * 0.45, h * 0.5);
+
+            // CRT Glow effect screen wipes
+            ctx.fillStyle = 'rgba(5, 11, 5, 0.15)';
+            ctx.fillRect(0, 0, w, h);
+
+            // Draw Vector Grids
+            ctx.strokeStyle = 'rgba(0, 255, 51, 0.2)';
+            ctx.lineWidth = 1;
+            
+            // Concentric range rings
+            for(let r = 0.33; r <= 1; r += 0.33) {
+                ctx.beginPath();
+                ctx.arc(cx, cy, radarRadius * r, Math.PI, 2 * Math.PI);
+                ctx.stroke();
+            }
+
+            // Radar fan lines
+            ctx.beginPath();
+            ctx.moveTo(cx - radarRadius, cy);
+            ctx.lineTo(cx + radarRadius, cy);
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(cx, cy - radarRadius);
+            ctx.stroke();
+
+            closestDistance = Infinity;
+
+            if (myCoords) {
+                const now = Date.now();
+                Object.keys(players).forEach(id => {
+                    const p = players[id];
+                    if (now - p.timestamp > 15000) return; // Drop stale clients (15s timeout)
+
+                    const locData = getDistanceAndBearing(myCoords.lat, myCoords.lon, p.lat, p.lon);
+                    
+                    if (locData.distance < closestDistance) {
+                        closestDistance = locData.distance;
+                    }
+
+                    // Calculate drawing vectors assuming screen top is true North
+                    if (locData.distance <= MAX_TRACKING_RANGE_METERS) {
+                        const distPx = (locData.distance / MAX_TRACKING_RANGE_METERS) * radarRadius;
+                        const bx = cx + distPx * Math.sin(locData.bearing);
+                        const by = cy - distPx * Math.cos(locData.bearing);
+
+                        // Render unidentified signal blips
+                        ctx.fillStyle = 'rgba(0, 255, 51, 0.8)';
+                        ctx.beginPath();
+                        ctx.arc(bx, by, 8, 0, 2 * Math.PI);
+                        ctx.fill();
+                        
+                        // Signal trailing artifact
+                        ctx.fillStyle = 'rgba(0, 255, 51, 0.2)';
+                        ctx.beginPath();
+                        ctx.arc(bx, by, 16, 0, 2 * Math.PI);
+                        ctx.fill();
+                    }
+                });
+            }
+
+            // Manage continuous audio frequency sweeps
+            if (closestDistance !== Infinity && closestDistance <= MAX_TRACKING_RANGE_METERS) {
+                triggerAudioPing(closestDistance);
+                document.getElementById('hud').innerHTML = `RANGE: ${Math.round(closestDistance)} M<br><span id="role-display">MONITOR ACTIVE</span>`;
+            } else {
+                document.getElementById('hud').innerHTML = `RANGE: -- M<br><span id="role-display">MONITOR ACTIVE</span>`;
+            }
+
+            // Authentic CRT sweeping line overlay
+            sweepAngle += 0.02;
+            let sweepX = cx + radarRadius * Math.cos(Math.PI + Math.abs(Math.sin(sweepAngle)) * Math.PI);
+            let sweepY = cy + radarRadius * Math.sin(Math.PI + Math.abs(Math.sin(sweepAngle)) * Math.PI);
+            
+            ctx.strokeStyle = 'rgba(0, 255, 51, 0.1)';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(sweepX, sweepY);
+            ctx.stroke();
+
+            requestAnimationFrame(gameLoop);
+        }
+    </script>
+</body>
+</html>
