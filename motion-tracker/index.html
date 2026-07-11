@@ -59,15 +59,14 @@
             color: #00ff66;
             border: 1px solid #00ff66;
         }
-        /* Optional CRT Scanlines Layer */
         .scanlines {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
-            background-size: 100% 4px, 6px 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+            background-size: 100% 4px;
             z-index: 5;
             pointer-events: none;
             display: none;
@@ -75,11 +74,71 @@
         .scanlines.active {
             display: block;
         }
-        #controls-overlay {
+        #top-controls {
             position: absolute;
             top: 15px;
-            right: 15px;
+            left: 15px;
             z-index: 10;
+        }
+        #config-trigger {
+            position: absolute;
+            bottom: 15px;
+            right: 15px;
+            z-index: 20;
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid #00ff66;
+            color: #00ff66;
+            padding: 8px 12px;
+            font-size: 12px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        /* Calibration Menu Overlay */
+        #config-menu {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 85%;
+            max-width: 320px;
+            background: rgba(1, 8, 4, 0.95);
+            border: 2px solid #00ff66;
+            padding: 20px;
+            z-index: 30;
+            box-shadow: 0 0 20px rgba(0, 255, 102, 0.5);
+        }
+        .config-group {
+            margin-bottom: 20px;
+        }
+        .config-group label {
+            display: block;
+            font-size: 12px;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            color: #ffffff;
+        }
+        .config-row {
+            display: flex;
+            gap: 10px;
+        }
+        .config-btn {
+            flex: 1;
+            background: #002208;
+            border: 1px solid #00ff66;
+            color: #00ff66;
+            padding: 6px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .config-btn.active {
+            background: #00ff66;
+            color: #000000;
+            font-weight: bold;
+        }
+        .config-slider {
+            width: 100%;
+            accent-color: #00ff66;
         }
     </style>
 </head>
@@ -94,11 +153,38 @@
 
     <!-- MAIN INTERFACE CONTAINER -->
     <div id="game-container">
-        <div id="controls-overlay">
+        <div id="top-controls">
             <button class="btn btn-alt" style="padding: 8px 15px; font-size: 12px;" onclick="toggleScanlines()">Toggle Scanlines</button>
         </div>
+        
         <div id="scanline-layer" class="scanlines"></div>
         <canvas id="radarCanvas"></canvas>
+
+        <button id="config-trigger" onclick="toggleConfigMenu()">⚙ CALIBRATE</button>
+
+        <!-- CONFIGURATION MODAL -->
+        <div id="config-menu">
+            <h3 style="margin-top: 0; text-align: center; font-size: 14px; border-bottom: 1px solid #00ff66; padding-bottom: 8px;">SYSTEM CALIBRATION</h3>
+            
+            <!-- Compass Offset Block -->
+            <div class="config-group">
+                <label>Compass Rotation Correction</label>
+                <div class="config-row">
+                    <button class="config-btn" id="deg-0" onclick="setCompassOffset(0)">0°</button>
+                    <button class="config-btn" id="deg-90" onclick="setCompassOffset(90)">+90°</button>
+                    <button class="config-btn" id="deg-270" onclick="setCompassOffset(-90)">-90°</button>
+                </div>
+            </div>
+
+            <!-- Indoor Distance Multiplier Block -->
+            <div class="config-group">
+                <label>Indoor Range Scaling: <span id="multiplier-val">1.0</span>x</label>
+                <input type="range" class="config-slider" min="0.1" max="3.0" step="0.1" value="1.0" id="dist-slider" oninput="updateDistanceMultiplier(this.value)">
+                <span style="font-size: 9px; color: #888; display: block; margin-top: 4px;">Reduces scale factor to compensate for confined indoor GPS updates.</span>
+            </div>
+
+            <button class="btn btn-alt" style="width: 100%; padding: 8px; font-size: 12px;" onclick="toggleConfigMenu()">Apply & Close</button>
+        </div>
     </div>
 
 <script>
@@ -114,6 +200,8 @@ let pubnub;
 let myId = 'p_' + Math.floor(Math.random() * 10000);
 let myCoords = null;
 let compassHeading = 0; 
+let compassOffset = 0; 
+let distanceMultiplier = 1.0;
 let globalPlayers = {};
 
 // Audio Channels
@@ -128,8 +216,6 @@ let soundHitBuffer = null;
 let imgMotion = new Image();
 let imgEdgeLeft = new Image();
 let imgEdgeRight = new Image();
-let assetsLoadedCount = 0;
-const TOTAL_ASSETS = 3;
 
 // Display Management
 let canvas, ctx;
@@ -142,7 +228,7 @@ imgMotion.src = 'assets/gfx/motion.png';
 imgEdgeLeft.src = 'assets/gfx/edge.png';
 imgEdgeRight.src = 'assets/gfx/edge_right.png';
 
-// --- STEP 1: INITIALIZATION ---
+// --- INITIALIZATION ---
 async function initTracking(selectedRole) {
     role = selectedRole;
     document.getElementById('setup-screen').style.display = 'none';
@@ -151,9 +237,9 @@ async function initTracking(selectedRole) {
     canvas = document.getElementById('radarCanvas');
     ctx = canvas.getContext('2d');
     
-    // Automatically scale canvas context sizes to device resolution
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
+    setCompassOffset(0); // Set initial button state
 
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
@@ -168,7 +254,6 @@ async function initTracking(selectedRole) {
         startUltrasoundEmission();
     }
 
-    // Capture Orientation (Compass Heading)
     if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
         try {
             const permission = await DeviceOrientationEvent.requestPermission();
@@ -181,7 +266,6 @@ async function initTracking(selectedRole) {
         window.addEventListener('deviceorientation', handleCompass, true);
     }
 
-    // PubNub Signaling
     pubnub = new PubNub({ publishKey: PUBNUB_PUB_KEY, subscribeKey: PUBNUB_SUB_KEY, userId: myId });
     pubnub.addListener({
         message: function(event) {
@@ -198,7 +282,6 @@ async function initTracking(selectedRole) {
 
     startGPSHardware();
 
-    // Fire engines
     requestAnimationFrame(renderRadarLoop);
     if (role === 'marine') {
         playAudibleAudioLoop();
@@ -206,16 +289,37 @@ async function initTracking(selectedRole) {
 }
 
 function resizeCanvas() {
-    canvas.width = window.innerWidth * window.devicePixelRatio;
-    canvas.height = window.innerHeight * window.devicePixelRatio;
-    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    // Keep internal canvas pixel resolutions direct 1:1 with real client dimensions to stop aspect skewing
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
 }
 
 function toggleScanlines() {
     document.getElementById('scanline-layer').classList.toggle('active');
 }
 
-// --- STEP 2: AUDIO NETWORKING ---
+function toggleConfigMenu() {
+    const menu = document.getElementById('config-menu');
+    menu.style.display = (menu.style.display === 'block') ? 'none' : 'block';
+}
+
+function setCompassOffset(degrees) {
+    compassOffset = degrees;
+    document.getElementById('deg-0').classList.remove('active');
+    document.getElementById('deg-90').classList.remove('active');
+    document.getElementById('deg-270').classList.remove('active');
+    
+    if (degrees === 0) document.getElementById('deg-0').classList.add('active');
+    if (degrees === 90) document.getElementById('deg-90').classList.add('active');
+    if (degrees === -90) document.getElementById('deg-270').classList.add('active');
+}
+
+function updateDistanceMultiplier(val) {
+    distanceMultiplier = parseFloat(val);
+    document.getElementById('multiplier-val').innerText = val;
+}
+
+// --- AUDIO HANDLING ---
 async function loadAudioAssets() {
     try {
         const blipResponse = await fetch('assets/audio/scan-blip.ogg');
@@ -226,7 +330,7 @@ async function loadAudioAssets() {
         const hitArrayBuffer = await hitResponse.arrayBuffer();
         soundHitBuffer = await audioCtx.decodeAudioData(hitArrayBuffer);
     } catch (err) {
-        console.error("Audio files missing or blocked by browser:", err);
+        console.error("Audio files missing:", err);
     }
 }
 
@@ -259,7 +363,7 @@ function getUltrasoundVolume() {
     return ((dataArray[binIndex-1] + dataArray[binIndex] + dataArray[binIndex+1]) / 3) / 255;
 }
 
-// --- STEP 3: LOGICAL TELEMETRY ---
+// --- TELEMETRY ---
 function handleCompass(event) {
     if (event.webkitCompassHeading) {
         compassHeading = event.webkitCompassHeading;
@@ -299,32 +403,33 @@ function calculateGpsDistance(lat1, lon1, lat2, lon2) {
     return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
 }
 
-// --- STEP 4: DISPLAY ADVANCED GRAPHICS ---
+// --- ADVANCED GRAPHICS LOOP ---
 function renderRadarLoop() {
-    const w = canvas.width / window.devicePixelRatio;
-    const h = canvas.height / window.devicePixelRatio;
+    const w = canvas.width;
+    const h = canvas.height;
 
-    // Clear background
     ctx.fillStyle = "#000000";
     ctx.fillRect(0, 0, w, h);
 
-    // Setup coordinates: the center of the tracking grid matches the digital display hub window
     const cx = w / 2;
     const cy = h * 0.76; 
-    const maxRadarRadius = w * 0.85; 
+
+    // Dynamic scale limit preventing elements from stretching out of bounds in landscape or portrait
+    let maxRadarRadius = Math.min(cx, cy) * 0.95; 
 
     currentUsVolume = (role === 'marine') ? getUltrasoundVolume() : 0;
     nearestTrackingDistance = Infinity;
     const now = Date.now();
 
-    // 1. DRAW ROTATING GRAPHICS ELEMENT (motion.png)
+    // 1. DRAW ROTATING GRAPHICS ELEMENT WITH COMPASS CALIBRATION SHIFT
     ctx.save();
     ctx.translate(cx, cy);
-    // Rotate canvas coordinate space inversely based on compass orientation
-    ctx.rotate(-compassHeading * Math.PI / 180);
+    // Factor in the custom calibration offset angle toggled by user
+    let modifiedHeading = compassHeading + compassOffset;
+    ctx.rotate(-modifiedHeading * Math.PI / 180);
     
-    // Draw the asset image center-aligned
     if (imgMotion.complete) {
+        // Uniform square mapping bounds guarantee a clean circle shape without stretching
         ctx.drawImage(imgMotion, -maxRadarRadius, -maxRadarRadius, maxRadarRadius * 2, maxRadarRadius * 2);
     }
     ctx.restore();
@@ -340,7 +445,9 @@ function renderRadarLoop() {
         const target = globalPlayers[id];
         if (!myCoords || !target.coords) continue;
 
-        let distance = calculateGpsDistance(myCoords.lat, myCoords.lon, target.coords.lat, target.coords.lon);
+        // Apply distance scaling parameter configuration
+        let distance = calculateGpsDistance(myCoords.lat, myCoords.lon, target.coords.lat, target.coords.lon) * distanceMultiplier;
+        
         if (role === 'marine' && currentUsVolume > 0.04) {
             distance = 15 - (currentUsVolume * 13.5);
         }
@@ -350,7 +457,7 @@ function renderRadarLoop() {
         }
 
         let targetBearing = calculateBearing(myCoords.lat, myCoords.lon, target.coords.lat, target.coords.lon);
-        let relativeAngleRad = (targetBearing - compassHeading - 90) * Math.PI / 180; 
+        let relativeAngleRad = (targetBearing - modifiedHeading - 90) * Math.PI / 180; 
 
         let displayScaleRange = 30; 
         let currentScaleRadius = (Math.min(distance, displayScaleRange) / displayScaleRange) * maxRadarRadius;
@@ -365,10 +472,8 @@ function renderRadarLoop() {
     // 3. DRAW RADAR SWEEP LINE & RENDER BLIPS
     sweepAngle += 0.035;
     if (sweepAngle > Math.PI * 2) sweepAngle = 0;
-
     let normalizedSweepAngle = (sweepAngle * 180 / Math.PI + 360) % 360;
 
-    // Render blips when sweep line intersects them
     targetsToRender.forEach(blip => {
         if (Math.abs(normalizedSweepAngle - blip.angle) < 20 || Math.abs(normalizedSweepAngle - blip.angle) > 340) {
             ctx.fillStyle = "rgba(0, 255, 102, 0.95)";
@@ -377,11 +482,10 @@ function renderRadarLoop() {
             ctx.beginPath();
             ctx.arc(blip.x, blip.y, 8, 0, Math.PI * 2);
             ctx.fill();
-            ctx.shadowBlur = 0; // Reset shadow
+            ctx.shadowBlur = 0;
         }
     });
 
-    // Draw scanning sweep beam line
     ctx.strokeStyle = "rgba(0, 255, 102, 0.25)";
     ctx.lineWidth = 3;
     ctx.beginPath();
@@ -389,27 +493,23 @@ function renderRadarLoop() {
     ctx.lineTo(cx + maxRadarRadius * Math.cos(sweepAngle), cy + maxRadarRadius * Math.sin(sweepAngle));
     ctx.stroke();
 
-    // 4. DRAW AUTHENTIC BOTTOM HUD MASK (edge.png & edge_right.png)
+    // 4. DRAW HUD PANEL MASK MAPPED RELATIVE TO THE NEW SCREEN SAFE RADIUS BOUNDS
     const hudHeight = h * 0.24; 
     const hudTop = h - hudHeight;
-    const cutoutWidth = 120; // Width of center dark window
-    const imgWidth = 40;     // Diagonal asset image width dimensions
+    const cutoutWidth = 120; 
+    const imgWidth = 40;     
 
-    // Solid blue panel fields fill out to screen boundaries
     ctx.fillStyle = "#0088ff";
     ctx.fillRect(0, hudTop, cx - (cutoutWidth / 2) - imgWidth, hudHeight);
     ctx.fillRect(cx + (cutoutWidth / 2) + imgWidth, hudTop, w, hudHeight);
 
-    // Left Cutout Slope
     if (imgEdgeLeft.complete) {
         ctx.drawImage(imgEdgeLeft, cx - (cutoutWidth / 2) - imgWidth, hudTop, imgWidth, hudHeight);
     }
-    // Right Cutout Slope
     if (imgEdgeRight.complete) {
         ctx.drawImage(imgEdgeRight, cx + (cutoutWidth / 2), hudTop, imgWidth, hudHeight);
     }
 
-    // Dark background box inside center display track window
     ctx.fillStyle = "#010804";
     ctx.fillRect(cx - (cutoutWidth / 2), hudTop, cutoutWidth, hudHeight);
 
@@ -425,7 +525,6 @@ function renderRadarLoop() {
             ctx.fillText("00", cx + 25, hudTop + 30);
             ctx.fillText("m", cx + 25, hudTop + 45);
         } else {
-            // Split display values for movie accuracy formatting
             let integerPart = Math.floor(nearestTrackingDistance).toString().padStart(2, '0');
             let decimalPart = Math.floor((nearestTrackingDistance % 1) * 100).toString().padStart(2, '0');
 
@@ -435,13 +534,12 @@ function renderRadarLoop() {
             ctx.fillText("m", cx + 25, hudTop + 45);
         }
 
-        // Context structural metadata readout borders
         ctx.fillStyle = "#ffffff";
         ctx.font = "bold 14px Arial, sans-serif";
         ctx.textAlign = "left";
         ctx.fillText("F.E.M.S. 3.643.44", 20, hudTop + 35);
         ctx.textAlign = "right";
-        ctx.fillText("C.X. 63/67.21", w - 20, hudTop + 35);
+        ctx.fillText("C.X. 63/67.21", w - 140, hudTop + 35); // Shifted left slightly to make room for config gear button
     } else {
         ctx.fillStyle = "#00ff66";
         ctx.font = "14px 'Courier New', monospace";
@@ -452,7 +550,7 @@ function renderRadarLoop() {
     requestAnimationFrame(renderRadarLoop);
 }
 
-// --- STEP 5: INTEGRATED AUDIO PROCESSING LOOP ---
+// --- AUDIO HANDLING PROCESSED LOOP ---
 function playAudibleAudioLoop() {
     if (role !== 'marine' || !soundBlipBuffer || !soundHitBuffer) return;
 
@@ -472,9 +570,11 @@ function playAudibleAudioLoop() {
         let boundedDistance = Math.min(nearestTrackingDistance, 30);
         let ratio = boundedDistance / 30;
 
-        let targetPlaybackRate = 2.0 - ratio;            
-        nextTimingInterval = 120 + (ratio * 880);         
+        // Strict limit implementation: scaling scales up from 1000ms minimum to 3000ms maximum interval. 
+        // This ensures sound never plays faster than once a second.
+        nextTimingInterval = 1000 + (ratio * 2000);         
 
+        let targetPlaybackRate = 2.0 - ratio;            
         let hitSource = audioCtx.createBufferSource();
         let hitGain = audioCtx.createGain();
 
