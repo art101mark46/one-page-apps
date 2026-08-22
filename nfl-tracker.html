@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NFL Schedule Explorer</title>
+    <!-- Flatpickr CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <style>
+        :root {
+            --primary: #013369; 
+            --secondary: #D50A0A; 
+            --bg: #f4f4f9;
+            --card-bg: #ffffff;
+            --text: #333333;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            transition: background-color 0.5s ease; 
+        }
+        .container {
+            max-width: 1050px;
+            margin: 0 auto;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            text-shadow: 0px 2px 10px rgba(255,255,255,0.8); 
+        }
+        .controls {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 30px;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        input[type="text"], select {
+            padding: 10px 14px;
+            font-size: 15px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            width: 190px;
+            outline: none;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            background-color: #ffffff;
+        }
+        input[type="text"]:focus, select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 5px rgba(1, 51, 105, 0.5);
+        }
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #ffffff;
+            padding: 9px 14px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            user-select: none;
+        }
+        .toggle-container input {
+            cursor: pointer;
+            width: 18px;
+            height: 18px;
+            accent-color: var(--primary);
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 20px;
+        }
+        .card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: transform 0.2s, opacity 0.3s;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 15px rgba(0,0,0,0.25);
+        }
+        .card.past-game {
+            background: #ededef;
+            opacity: 0.55;
+            filter: grayscale(40%);
+            border: 1px dashed #bbb;
+        }
+        .card.past-game:hover {
+            opacity: 0.95;
+            filter: grayscale(0%);
+        }
+        .matchup {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            margin-bottom: 15px;
+        }
+        .team {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex: 1;
+            text-align: center;
+        }
+        .team img {
+            width: 70px;
+            height: 70px;
+            object-fit: contain;
+            margin-bottom: 10px;
+        }
+        .team-name {
+            font-weight: bold;
+            font-size: 14px;
+        }
+        .vs {
+            font-weight: 900;
+            color: #ccc;
+            font-size: 16px;
+            padding: 0 10px;
+        }
+        .game-info {
+            text-align: center;
+            font-size: 14px;
+            color: #444;
+            border-top: 1px solid #eee;
+            padding-top: 15px;
+            width: 100%;
+        }
+        .no-results {
+            text-align: center;
+            grid-column: 1 / -1;
+            font-size: 18px;
+            color: #333;
+            background: rgba(255,255,255,0.9);
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 18px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            font-size: 14px;
+        }
+        button:hover {
+            background: var(--secondary);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>NFL Schedule Explorer</h1>
+    </header>
+
+    <div class="controls">
+        <input type="text" id="search-input" placeholder="Search team (e.g. Chiefs)">
+        <input type="text" id="date-input" placeholder="Select a date...">
+        
+        <select id="time-select">
+            <option value="">All UK Times</option>
+        </select>
+
+        <label class="toggle-container">
+            <input type="checkbox" id="hide-past-toggle">
+            Hide past
+        </label>
+
+        <button id="clear-filters">Reset</button>
+    </div>
+
+    <div id="games-grid" class="grid">
+        <div class="no-results">Loading games...</div>
+    </div>
+</div>
+
+<!-- Flatpickr JS Library -->
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
+<script>
+    let allGames = [];
+    let validDates = new Set();
+    let fpInstance = null;
+
+    const grid = document.getElementById('games-grid');
+    const searchInput = document.getElementById('search-input');
+    const dateInput = document.getElementById('date-input');
+    const timeSelect = document.getElementById('time-select');
+    const hidePastToggle = document.getElementById('hide-past-toggle');
+    const clearFiltersBtn = document.getElementById('clear-filters');
+
+    async function init() {
+        try {
+            const response = await fetch('https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?limit=1000&dates=2026');
+            const data = await response.json();
+            
+            const rawGames = data.events.map(event => {
+                const homeTeam = event.competitions[0].competitors.find(c => c.homeAway === 'home').team;
+                const awayTeam = event.competitions[0].competitors.find(c => c.homeAway === 'away').team;
+                
+                const gameDateObj = new Date(event.date);
+                const localDateStr = gameDateObj.getFullYear() + "-" + 
+                                     String(gameDateObj.getMonth() + 1).padStart(2, '0') + "-" + 
+                                     String(gameDateObj.getDate()).padStart(2, '0');
+                
+                validDates.add(localDateStr);
+
+                const ukTimeStr = gameDateObj.toLocaleString('en-GB', { 
+                    weekday: 'short', 
+                    month: 'short', 
+                    day: 'numeric', 
+                    hour: '2-digit', 
+                    minute: '2-digit',
+                    timeZone: 'Europe/London',
+                    timeZoneName: 'short'
+                });
+
+                // Extract exact UK time (e.g., "18:00", "21:25")
+                const ukTimeOnly = gameDateObj.toLocaleTimeString('en-GB', { 
+                    hour: '2-digit', 
+                    minute: '2-digit', 
+                    timeZone: 'Europe/London' 
+                });
+
+                return {
+                    timestamp: gameDateObj.getTime(), 
+                    dateStr: localDateStr,
+                    dateTime: ukTimeStr,
+                    timeOnly: ukTimeOnly,
+                    homeName: homeTeam.displayName,
+                    homeLogo: homeTeam.logo || 'https://a.espncdn.com/i/teamlogos/nfl/500/default.png',
+                    homeColor: homeTeam.color ? '#' + homeTeam.color : null,
+                    awayName: awayTeam.displayName,
+                    awayLogo: awayTeam.logo || 'https://a.espncdn.com/i/teamlogos/nfl/500/default.png',
+                    awayColor: awayTeam.color ? '#' + awayTeam.color : null,
+                    status: event.status.type.detail
+                };
+            });
+
+            const threshold = Date.now() - (24 * 60 * 60 * 1000);
+
+            // 1. Upcoming games chronologically
+            const upcomingGames = rawGames
+                .filter(g => g.timestamp >= threshold)
+                .sort((a, b) => a.timestamp - b.timestamp);
+
+            // 2. Past games reverse-chronologically
+            const pastGames = rawGames
+                .filter(g => g.timestamp < threshold)
+                .sort((a, b) => b.timestamp - a.timestamp);
+
+            allGames = [...upcomingGames, ...pastGames];
+
+            // Dynamically populate time dropdown with available kickoff times
+            const timeSet = new Set(allGames.map(g => g.timeOnly));
+            const sortedTimes = Array.from(timeSet).sort();
+
+            timeSelect.innerHTML = '<option value="">All UK Times</option>';
+            sortedTimes.forEach(time => {
+                const opt = document.createElement('option');
+                opt.value = time;
+                opt.textContent = `${time} UK`;
+                timeSelect.appendChild(opt);
+            });
+
+            fpInstance = flatpickr(dateInput, {
+                dateFormat: "Y-m-d",
+                enable: Array.from(validDates).sort(), 
+                onChange: filterGames
+            });
+
+            renderGames(allGames);
+
+        } catch (error) {
+            console.error("Error fetching NFL data:", error);
+            grid.innerHTML = '<div class="no-results">Failed to load schedule data. Please check your network.</div>';
+        }
+    }
+
+    function renderGames(games) {
+        grid.innerHTML = '';
+        if (games.length === 0) {
+            grid.innerHTML = '<div class="no-results">No games found for this search/filter combination.</div>';
+            return;
+        }
+
+        const threshold = Date.now() - (24 * 60 * 60 * 1000);
+
+        games.forEach(game => {
+            const isPast = game.timestamp < threshold;
+            const card = document.createElement('div');
+            card.className = isPast ? 'card past-game' : 'card';
+            card.innerHTML = `
+                <div class="matchup">
+                    <div class="team">
+                        <img src="${game.awayLogo}" alt="${game.awayName} logo">
+                        <div class="team-name">${game.awayName}</div>
+                    </div>
+                    <div class="vs">@</div>
+                    <div class="team">
+                        <img src="${game.homeLogo}" alt="${game.homeName} logo">
+                        <div class="team-name">${game.homeName}</div>
+                    </div>
+                </div>
+                <div class="game-info">
+                    <strong>${game.dateTime}</strong><br>
+                    ${game.status}
+                </div>
+            `;
+            grid.appendChild(card);
+        });
+    }
+
+    function filterGames() {
+        const searchTerm = searchInput.value.toLowerCase().trim();
+        const selectedDate = dateInput.value; 
+        const selectedTime = timeSelect.value;
+        const hidePast = hidePastToggle.checked;
+        const threshold = Date.now() - (24 * 60 * 60 * 1000);
+
+        const filtered = allGames.filter(game => {
+            const isPast = game.timestamp < threshold;
+            if (hidePast && isPast) return false;
+
+            const matchesSearch = game.homeName.toLowerCase().includes(searchTerm) || 
+                                  game.awayName.toLowerCase().includes(searchTerm);
+            const matchesDate = selectedDate ? game.dateStr === selectedDate : true;
+            const matchesTime = selectedTime ? game.timeOnly === selectedTime : true;
+
+            return matchesSearch && matchesDate && matchesTime;
+        });
+
+        let bgColor = '#f4f4f9';
+        if (searchTerm.length > 2 && filtered.length > 0) {
+            for (const game of filtered) {
+                if (game.homeName.toLowerCase().includes(searchTerm) && game.homeColor) {
+                    bgColor = game.homeColor;
+                    break;
+                }
+                if (game.awayName.toLowerCase().includes(searchTerm) && game.awayColor) {
+                    bgColor = game.awayColor;
+                    break;
+                }
+            }
+        }
+        
+        document.body.style.backgroundColor = bgColor;
+        renderGames(filtered);
+    }
+
+    // Event Listeners
+    searchInput.addEventListener('input', filterGames);
+    timeSelect.addEventListener('change', filterGames);
+    hidePastToggle.addEventListener('change', filterGames);
+    
+    clearFiltersBtn.addEventListener('click', () => {
+        searchInput.value = '';
+        timeSelect.value = '';
+        hidePastToggle.checked = false;
+        if (fpInstance) {
+            fpInstance.clear();
+        }
+        filterGames();
+    });
+
+    init();
+</script>
+
+</body>
+</html>
